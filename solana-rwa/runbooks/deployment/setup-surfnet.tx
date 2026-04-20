@@ -1,0 +1,87 @@
+################################################################
+# Solana RWA - Setup Surfnet Runbook
+# Configures the local Surfnet environment for testing
+# Sets up accounts, token accounts, and program authorities
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+# =============================================================================
+# Setup Payer Account Balance
+# =============================================================================
+
+action "setup_payer_balance" "svm::setup_surfnet" {
+    description = "Set up payer account with sufficient balance"
+    set_account {
+        public_key = signer.payer.public_key
+        lamports = svm::sol_to_lamports(100)
+    }
+}
+
+# =============================================================================
+# Setup Test Token Accounts
+# =============================================================================
+
+action "setup_usdc_token_account" "svm::setup_surfnet" {
+    description = "Set up USDC token account for testing"
+    set_token_account {
+        public_key = signer.payer.public_key
+        token = "usdc"
+        amount = 1000000000
+        state = "initialized"
+    }
+}
+
+# =============================================================================
+# Setup Program Authority (for localnet testing)
+# =============================================================================
+
+action "set_program_authorities" "svm::setup_surfnet" {
+    description = "Set program upgrade authorities for localnet"
+    set_program_authority {
+        program_id = input.solana_rwa_program_id
+        authority = signer.authority.public_key
+    }
+    
+    set_program_authority {
+        program_id = input.identity_registry_program_id
+        authority = signer.authority.public_key
+    }
+    
+    set_program_authority {
+        program_id = input.compliance_aggregator_program_id
+        authority = signer.authority.public_key
+    }
+}
+
+# =============================================================================
+# Clone Mainnet Programs (for mainnet fork testing)
+# =============================================================================
+
+action "clone_token_program" "svm::setup_surfnet" {
+    description = "Clone SPL Token program from mainnet for local testing"
+    clone_program_account {
+        source_program_id = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        destination_program_id = input.token_program_id
+    }
+}
+
+action "clone_usdc_mint" "svm::setup_surfnet" {
+    description = "Clone USDC mint from mainnet for local testing"
+    set_account {
+        public_key = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        // This will be streamed from mainnet when using mainnet fork
+    }
+}
+
+# =============================================================================
+# Outputs
+# =============================================================================
+
+output "setup_complete" {
+    description = "Confirmation that surfnet setup is complete"
+    value = "Surfnet configured with:\n- Payer balance: 100 SOL\n- USDC token account: 1000 USDC\n- Program authorities set"
+}

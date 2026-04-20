@@ -1,0 +1,66 @@
+################################################################
+# Solana RWA - Upgrade Programs Runbook
+# Upgrades deployed programs to new versions
+# IMPORTANT: Programs must be deployed with upgrade authority set
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+# =============================================================================
+# Upgrade Compliance Aggregator
+# =============================================================================
+
+action "upgrade_compliance_aggregator" "svm::deploy_program" {
+    description = "Upgrade compliance_aggregator program to new version"
+    program = svm::get_program_from_anchor_project("compliance_aggregator")
+    authority = signer.authority
+    payer = signer.payer
+    // For upgrades, we don't use instant_surfnet_deployment
+    // instant_surfnet_deployment = false
+}
+
+# =============================================================================
+# Upgrade Identity Registry
+# =============================================================================
+
+action "upgrade_identity_registry" "svm::deploy_program" {
+    description = "Upgrade identity_registry program to new version"
+    program = svm::get_program_from_anchor_project("identity_registry")
+    authority = signer.authority
+    payer = signer.payer
+    // instant_surfnet_deployment = false
+}
+
+# =============================================================================
+# Upgrade Solana RWA Token
+# =============================================================================
+
+action "upgrade_solana_rwa" "svm::deploy_program" {
+    description = "Upgrade solana_rwa (token) program to new version"
+    program = svm::get_program_from_anchor_project("solana_rwa")
+    authority = signer.authority
+    payer = signer.payer
+    // instant_surfnet_deployment = false
+}
+
+# =============================================================================
+# Outputs
+# =============================================================================
+
+output "upgrade_compliance_aggregator_signature" {
+    description = "Transaction signature of compliance_aggregator upgrade"
+    value = action.upgrade_compliance_aggregator.signatures
+}
+
+output "upgrade_identity_registry_signature" {
+    description = "Transaction signature of identity_registry upgrade"
+    value = action.upgrade_identity_registry.signatures
+}
+
+output "upgrade_solana_rwa_signature" {
+    description = "Transaction signature of solana_rwa upgrade"
+    value = action.upgrade_solana_rwa.signatures
+}
