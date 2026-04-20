@@ -86,18 +86,23 @@ export default function ManagePage() {
 
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center p-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+      <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="orb absolute -top-1/4 -left-1/4 w-96 h-96 bg-primary rounded-full blur-3xl" />
+          <div className="orb absolute top-1/3 -right-1/4 w-80 h-80 bg-secondary rounded-full blur-3xl" />
+        </div>
+        <div className="noise-overlay fixed inset-0 pointer-events-none" />
+        <div className="text-center p-8 relative z-10 animate-fadeIn">
+          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-glow">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Wallet Required</h2>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+          <h2 className="text-3xl font-bold text-foreground mb-3">Wallet Required</h2>
+          <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
             Please connect your Solana wallet to manage tokens and execute transactions.
           </p>
-          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all">
+          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all shadow-glow hover:shadow-glow-secondary">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
@@ -109,20 +114,28 @@ export default function ManagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Animated background orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="orb absolute -top-1/4 -left-1/4 w-96 h-96 bg-primary rounded-full blur-3xl" />
+        <div className="orb absolute top-1/3 -right-1/4 w-80 h-80 bg-secondary rounded-full blur-3xl" />
+      </div>
+      <div className="fixed inset-0 grid-pattern pointer-events-none opacity-50" />
+      <div className="noise-overlay fixed inset-0 pointer-events-none" />
+
       {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
+      <nav className="bg-surface/80 backdrop-blur-xl border-b border-surface-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <Link href="/" className="flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Back
               </Link>
-              <span className="text-gray-300">|</span>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <span className="text-foreground-muted">|</span>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 Token Management
               </h1>
             </div>
@@ -132,17 +145,17 @@ export default function ManagePage() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Wallet Info */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+        <div className="glass-card p-6 mb-8 animate-fadeInUp">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500 mb-1">Connected Wallet</p>
-              <p className="font-mono text-gray-900">{shortAddress}</p>
+              <p className="text-sm text-foreground-tertiary mb-1">Connected Wallet</p>
+              <p className="font-mono text-foreground">{shortAddress}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-500 mb-1">SOL Balance</p>
-              <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <p className="text-sm text-foreground-tertiary mb-1">SOL Balance</p>
+              <p className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 {isLoading ? '...' : solBalance.toFixed(4)} SOL
               </p>
             </div>
@@ -150,8 +163,8 @@ export default function ManagePage() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="border-b border-gray-200">
+        <div className="glass-card overflow-hidden animate-fadeInUp">
+          <div className="border-b border-surface-border">
             <nav className="flex overflow-x-auto">
               {tabs.map((tab) => (
                 <button
@@ -159,8 +172,8 @@ export default function ManagePage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-purple-500 text-purple-600 bg-purple-50/50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary-light bg-primary/5'
+                      : 'border-transparent text-foreground-tertiary hover:text-foreground-secondary hover:border-primary/50'
                   }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,35 +188,35 @@ export default function ManagePage() {
           {/* Transfer Tab */}
           {activeTab === 'transfer' && (
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Transfer Tokens</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Transfer Tokens</h3>
               <form onSubmit={handleTransfer} className="max-w-lg space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipient Address</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Recipient Address</label>
                   <input
                     type="text"
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Amount</label>
                   <input
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow hover:shadow-glow-secondary"
                 >
                   {isLoading ? 'Processing...' : 'Transfer Tokens'}
                 </button>
@@ -214,35 +227,35 @@ export default function ManagePage() {
           {/* Mint Tab */}
           {activeTab === 'mint' && (
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Mint New Tokens</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Mint New Tokens</h3>
               <form onSubmit={handleMint} className="max-w-lg space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipient Address</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Recipient Address</label>
                   <input
                     type="text"
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount to Mint</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Amount to Mint</label>
                   <input
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow hover:shadow-glow-secondary"
                 >
                   {isLoading ? 'Processing...' : 'Mint Tokens'}
                 </button>
@@ -253,35 +266,35 @@ export default function ManagePage() {
           {/* Burn Tab */}
           {activeTab === 'burn' && (
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Burn Tokens</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Burn Tokens</h3>
               <form onSubmit={handleBurn} className="max-w-lg space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">From Address</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">From Address</label>
                   <input
                     type="text"
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount to Burn</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Amount to Burn</label>
                   <input
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg font-medium hover:from-red-700 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-error to-warning text-white rounded-lg font-medium hover:from-error-light hover:to-warning-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Processing...' : 'Burn Tokens'}
                 </button>
@@ -292,23 +305,23 @@ export default function ManagePage() {
           {/* Freeze Tab */}
           {activeTab === 'freeze' && (
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Freeze/Unfreeze Account</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Freeze/Unfreeze Account</h3>
               <form onSubmit={handleFreeze} className="max-w-lg space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Account Address</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Account Address</label>
                   <input
                     type="text"
                     value={accountToFreeze}
                     onChange={(e) => setAccountToFreeze(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-warning focus:border-transparent transition-all hover:border-warning/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg font-medium hover:from-yellow-700 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-warning to-error text-white rounded-lg font-medium hover:from-warning-light hover:to-error-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Processing...' : 'Toggle Freeze Status'}
                 </button>
@@ -319,26 +332,26 @@ export default function ManagePage() {
           {/* Agents Tab */}
           {activeTab === 'agents' && (
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Manage Agents</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-xl font-bold text-foreground mb-4">Manage Agents</h3>
+              <p className="text-foreground-secondary mb-6">
                 Agents are authorized addresses that can perform token operations on your behalf.
               </p>
               <form onSubmit={handleAddAgent} className="max-w-lg space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Agent Address</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Agent Address</label>
                   <input
                     type="text"
                     value={agentAddress}
                     onChange={(e) => setAgentAddress(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-success focus:border-transparent transition-all hover:border-success/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-success to-secondary text-white rounded-lg font-medium hover:from-success-light hover:to-secondary-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Processing...' : 'Add Agent'}
                 </button>
@@ -349,14 +362,14 @@ export default function ManagePage() {
 
         {/* Transaction Status */}
         {transactionHash && (
-          <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="mt-6 bg-success/10 border border-success/20 rounded-xl p-4 animate-fadeInUp">
             <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <div>
-                <p className="font-medium text-green-800">Transaction Submitted!</p>
-                <p className="text-sm text-green-600 font-mono">{transactionHash}</p>
+                <p className="font-medium text-success-light">Transaction Submitted!</p>
+                <p className="text-sm text-success-light/80 font-mono">{transactionHash}</p>
               </div>
             </div>
           </div>

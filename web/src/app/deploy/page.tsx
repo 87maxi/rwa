@@ -42,18 +42,25 @@ export default function DeployPage() {
 
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center p-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+      <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+        {/* Animated background orbs */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="orb absolute -top-1/4 -left-1/4 w-96 h-96 bg-primary rounded-full blur-3xl" />
+          <div className="orb absolute top-1/3 -right-1/4 w-80 h-80 bg-secondary rounded-full blur-3xl" />
+        </div>
+        <div className="noise-overlay fixed inset-0 pointer-events-none" />
+        
+        <div className="text-center p-8 relative z-10 animate-fadeIn">
+          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-glow">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Wallet Required</h2>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+          <h2 className="text-3xl font-bold text-foreground mb-3">Wallet Required</h2>
+          <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
             Please connect your Solana wallet to deploy a new token.
           </p>
-          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all">
+          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all shadow-glow hover:shadow-glow-secondary">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
@@ -65,20 +72,28 @@ export default function DeployPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Animated background orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="orb absolute -top-1/4 -left-1/4 w-96 h-96 bg-primary rounded-full blur-3xl" />
+        <div className="orb absolute top-1/3 -right-1/4 w-80 h-80 bg-secondary rounded-full blur-3xl" />
+      </div>
+      <div className="fixed inset-0 grid-pattern pointer-events-none opacity-50" />
+      <div className="noise-overlay fixed inset-0 pointer-events-none" />
+
       {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
+      <nav className="bg-surface/80 backdrop-blur-xl border-b border-surface-border sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <Link href="/" className="flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Back
               </Link>
-              <span className="text-gray-300">|</span>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <span className="text-foreground-muted">|</span>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 Deploy New Token
               </h1>
             </div>
@@ -90,14 +105,14 @@ export default function DeployPage() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8">
+        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-8">
           <div className="flex gap-3">
-            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
             <div>
-              <p className="text-sm font-medium text-blue-900">About Token Deployment</p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="text-sm font-medium text-primary-light">About Token Deployment</p>
+              <p className="text-sm text-primary-light/80 mt-1">
                 Deploying a new compliant security token on Solana. The token will be registered on-chain with your wallet as the owner.
               </p>
             </div>
@@ -105,17 +120,17 @@ export default function DeployPage() {
         </div>
 
         {/* Deployment Form */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Token Configuration</h2>
-            <p className="text-sm text-gray-500 mt-1">Configure your new security token parameters</p>
+        <div className="glass-card rounded-2xl overflow-hidden animate-fadeInUp">
+          <div className="p-6 border-b border-surface-border">
+            <h2 className="text-xl font-bold text-foreground">Token Configuration</h2>
+            <p className="text-sm text-foreground-tertiary mt-1">Configure your new security token parameters</p>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Token Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Token Name <span className="text-red-500">*</span>
+              <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Token Name <span className="text-error">*</span>
               </label>
               <input
                 id="name"
@@ -123,15 +138,15 @@ export default function DeployPage() {
                 value={tokenConfig.name}
                 onChange={(e) => setTokenConfig({ ...tokenConfig, name: e.target.value })}
                 placeholder="My Security Token"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 required
               />
             </div>
 
             {/* Token Symbol */}
             <div>
-              <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 mb-2">
-                Symbol <span className="text-red-500">*</span>
+              <label htmlFor="symbol" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Symbol <span className="text-error">*</span>
               </label>
               <input
                 id="symbol"
@@ -140,7 +155,7 @@ export default function DeployPage() {
                 onChange={(e) => setTokenConfig({ ...tokenConfig, symbol: e.target.value.toUpperCase() })}
                 placeholder="MST"
                 maxLength={10}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 required
               />
             </div>
@@ -148,7 +163,7 @@ export default function DeployPage() {
             {/* Decimals and Initial Supply */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="decimals" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="decimals" className="block text-sm font-medium text-foreground-secondary mb-2">
                   Decimals
                 </label>
                 <input
@@ -158,12 +173,12 @@ export default function DeployPage() {
                   onChange={(e) => setTokenConfig({ ...tokenConfig, decimals: Number(e.target.value) })}
                   min="0"
                   max="18"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 />
               </div>
 
               <div>
-                <label htmlFor="initialSupply" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="initialSupply" className="block text-sm font-medium text-foreground-secondary mb-2">
                   Initial Supply (Post-Deployment)
                 </label>
                 <input
@@ -174,20 +189,20 @@ export default function DeployPage() {
                   placeholder="0"
                   step="0.000000001"
                   min="0"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 />
               </div>
             </div>
 
             {/* Authority Configuration */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-              <h3 className="font-medium text-gray-900">Authority Configuration</h3>
-              <p className="text-sm text-gray-600">
+            <div className="bg-background-secondary rounded-xl p-4 space-y-4 border border-surface-border">
+              <h3 className="font-medium text-foreground">Authority Configuration</h3>
+              <p className="text-sm text-foreground-tertiary">
                 Leave blank to use your connected wallet as the authority.
               </p>
 
               <div>
-                <label htmlFor="mintAuthority" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="mintAuthority" className="block text-sm font-medium text-foreground-secondary mb-2">
                   Mint Authority
                 </label>
                 <input
@@ -196,12 +211,12 @@ export default function DeployPage() {
                   value={tokenConfig.mintAuthority}
                   onChange={(e) => setTokenConfig({ ...tokenConfig, mintAuthority: e.target.value })}
                   placeholder="Leave blank for current wallet"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg bg-background border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 />
               </div>
 
               <div>
-                <label htmlFor="freezeAuthority" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="freezeAuthority" className="block text-sm font-medium text-foreground-secondary mb-2">
                   Freeze Authority
                 </label>
                 <input
@@ -210,30 +225,30 @@ export default function DeployPage() {
                   value={tokenConfig.freezeAuthority}
                   onChange={(e) => setTokenConfig({ ...tokenConfig, freezeAuthority: e.target.value })}
                   placeholder="Leave blank for current wallet"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg bg-background border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 />
               </div>
             </div>
 
             {/* Deployment Summary */}
-            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-              <h3 className="font-medium text-purple-900 mb-2">Deployment Summary</h3>
+            <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+              <h3 className="font-medium text-primary-light mb-2">Deployment Summary</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-purple-600">Token:</span>
-                  <span className="ml-2 text-purple-900 font-medium">{tokenConfig.name}</span>
+                  <span className="text-primary-light">Token:</span>
+                  <span className="ml-2 text-foreground font-medium">{tokenConfig.name}</span>
                 </div>
                 <div>
-                  <span className="text-purple-600">Symbol:</span>
-                  <span className="ml-2 text-purple-900 font-medium">{tokenConfig.symbol}</span>
+                  <span className="text-primary-light">Symbol:</span>
+                  <span className="ml-2 text-foreground font-medium">{tokenConfig.symbol}</span>
                 </div>
                 <div>
-                  <span className="text-purple-600">Decimals:</span>
-                  <span className="ml-2 text-purple-900 font-medium">{tokenConfig.decimals}</span>
+                  <span className="text-primary-light">Decimals:</span>
+                  <span className="ml-2 text-foreground font-medium">{tokenConfig.decimals}</span>
                 </div>
                 <div>
-                  <span className="text-purple-600">Network:</span>
-                  <span className="ml-2 text-purple-900 font-medium">Solana Localnet</span>
+                  <span className="text-primary-light">Network:</span>
+                  <span className="ml-2 text-foreground font-medium">Solana Localnet</span>
                 </div>
               </div>
             </div>
@@ -242,7 +257,7 @@ export default function DeployPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium text-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              className="w-full px-6 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium text-lg hover:from-primary-dark hover:to-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow hover:shadow-glow-secondary"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -261,22 +276,22 @@ export default function DeployPage() {
 
         {/* Transaction Status */}
         {transactionHash && (
-          <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-6">
+          <div className="mt-6 bg-success/10 border border-success/20 rounded-xl p-6 animate-fadeInUp">
             <div className="flex items-start gap-3">
-              <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6 text-success flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <h3 className="font-medium text-green-900 text-lg">Token Deployed Successfully!</h3>
-                <p className="text-sm text-green-700 mt-1">Your token has been registered on the Solana blockchain.</p>
-                <div className="mt-3 bg-white rounded-lg p-3 border border-green-200">
-                  <p className="text-xs text-green-600 mb-1">Transaction Hash</p>
-                  <p className="text-sm font-mono text-green-800 break-all">{transactionHash}</p>
+                <h3 className="font-medium text-success-light text-lg">Token Deployed Successfully!</h3>
+                <p className="text-sm text-success-light/80 mt-1">Your token has been registered on the Solana blockchain.</p>
+                <div className="mt-3 bg-background rounded-lg p-3 border border-success/20">
+                  <p className="text-xs text-success-light/80 mb-1">Transaction Hash</p>
+                  <p className="text-sm font-mono text-success-light break-all">{transactionHash}</p>
                 </div>
                 <div className="mt-4 flex gap-3">
                   <Link
                     href="/manage"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-success text-white rounded-lg text-sm font-medium hover:bg-success-light transition-all"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -286,7 +301,7 @@ export default function DeployPage() {
                   </Link>
                   <Link
                     href="/"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-white text-green-700 border border-green-300 rounded-lg text-sm font-medium hover:bg-green-50 transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-background-secondary text-success border border-success/30 rounded-lg text-sm font-medium hover:bg-success/10 transition-all"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
