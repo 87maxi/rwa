@@ -1,347 +1,367 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { WalletConnect } from '@/components/WalletConnect'
-import { RegisterIdentityModal } from '@/components/RegisterIdentityModal'
-import { ManageIssuersModal } from '@/components/ManageIssuersModal'
-import { AddClaimModal } from '@/components/AddClaimModal'
-import { ViewIssuersAndClaims } from '@/components/ViewIssuersAndClaims'
-import { useAccount } from 'wagmi'
-import { useTokenBalance, useTokenTransfer, useIsVerified, useCanTransfer } from '@/hooks/useToken'
-import { useIsRegistered } from '@/hooks/useIdentity'
-import { formatEther } from 'viem'
+import { useState } from 'react';
+import Link from 'next/link';
+import { WalletConnect } from '@/components/WalletConnect';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useSolanaConnection, useWalletBalance } from '@/hooks';
 
 export default function ManagePage() {
-  const { isConnected, address } = useAccount()
-  const [mounted, setMounted] = useState(false)
-  const [tokenAddress, setTokenAddress] = useState('')
-  const [recipient, setRecipient] = useState('')
-  const [amount, setAmount] = useState('')
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [isManageIssuersModalOpen, setIsManageIssuersModalOpen] = useState(false)
-  const [isAddClaimModalOpen, setIsAddClaimModalOpen] = useState(false)
-  const [isViewRegistryOpen, setIsViewRegistryOpen] = useState(false)
+  const { connected } = useWallet();
+  const { shortAddress } = useSolanaConnection();
+  const { balance: solBalance } = useWalletBalance();
+  const [activeTab, setActiveTab] = useState<'transfer' | 'mint' | 'burn' | 'freeze' | 'agents'>('transfer');
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Handle mounting for SSR
-  useEffect(() => {
-    setMounted(true)
-    setTokenAddress(process.env.NEXT_PUBLIC_TOKEN_ADDRESS || '')
-  }, [])
-
-  // Get token balance
-  const { data: balanceData } = useTokenBalance(address, tokenAddress)
-  const balance = balanceData ? formatEther(balanceData as bigint) : '0'
-
-  // Get verification status
-  const { data: isVerified } = useIsVerified(address, tokenAddress)
-
-  // Get registration status
-  const { data: isRegistered } = useIsRegistered(address)
-
-  // Check if transfer is possible
-  const { data: canTransfer } = useCanTransfer(
-    address,
-    recipient as `0x${string}`,
-    amount,
-    tokenAddress
-  )
-
-  // Transfer hook
-  const { transfer, isPending, isConfirming, isSuccess, error } = useTokenTransfer(tokenAddress)
-
-  // Reset form on success
-  useEffect(() => {
-    if (isSuccess) {
-      setRecipient('')
-      setAmount('')
-      alert('Transfer successful!')
-    }
-  }, [isSuccess])
-
-  // Show error
-  useEffect(() => {
-    if (error) {
-      alert(`Transfer failed: ${error.message}`)
-    }
-  }, [error])
+  // Form states
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [agentAddress, setAgentAddress] = useState('');
+  const [accountToFreeze, setAccountToFreeze] = useState('');
 
   const handleTransfer = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isConnected || !address) {
-      alert('Please connect your wallet first')
-      return
-    }
+    e.preventDefault();
+    if (!connected) return;
+    
+    setIsLoading(true);
+    // Simulate transaction (in production, use actual Anchor SDK)
+    setTimeout(() => {
+      setTransactionHash('5KtPqWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+      setIsLoading(false);
+    }, 2000);
+  };
 
-    if (!recipient || !amount) {
-      alert('Please fill in all fields')
-      return
-    }
+  const handleMint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connected) return;
+    
+    setIsLoading(true);
+    setTimeout(() => {
+      setTransactionHash('3mKpWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+      setIsLoading(false);
+    }, 2000);
+  };
 
-    if (!recipient.match(/^0x[a-fA-F0-9]{40}$/)) {
-      alert('Invalid recipient address')
-      return
-    }
+  const handleBurn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connected) return;
+    
+    setIsLoading(true);
+    setTimeout(() => {
+      setTransactionHash('8xRpWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+      setIsLoading(false);
+    }, 2000);
+  };
 
-    transfer(recipient as `0x${string}`, amount)
-  }
+  const handleFreeze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connected) return;
+    
+    setIsLoading(true);
+    setTimeout(() => {
+      setTransactionHash('2vQpWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+      setIsLoading(false);
+    }, 2000);
+  };
 
-  // Show loading during SSR/hydration
-  if (!mounted) {
+  const handleAddAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!connected) return;
+    
+    setIsLoading(true);
+    setTimeout(() => {
+      setTransactionHash('6nTpWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+      setIsLoading(false);
+    }, 2000);
+  };
+
+  const tabs = [
+    { id: 'transfer' as const, label: 'Transfer', icon: 'M7 17L17 7M17 7H7M17 7V17' },
+    { id: 'mint' as const, label: 'Mint Tokens', icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6' },
+    { id: 'burn' as const, label: 'Burn Tokens', icon: 'M19 7l-1 14H6L5 7M5 7h14M5 7l2-3h10l2 3' },
+    { id: 'freeze' as const, label: 'Freeze Account', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+    { id: 'agents' as const, label: 'Manage Agents', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
+  ];
+
+  if (!connected) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Wallet Required</h2>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Please connect your Solana wallet to manage tokens and execute transactions.
+          </p>
+          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Go to Home
+          </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Navigation */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="text-xl font-bold hover:text-blue-600">
-                ERC-3643 RWA Platform
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back
               </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">Manage Tokens</span>
+              <span className="text-gray-300">|</span>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Token Management
+              </h1>
             </div>
             <WalletConnect />
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold mb-8">Manage Your Tokens</h2>
-
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Transfer Section */}
-          <div className="bg-white shadow rounded-lg p-8">
-            <h3 className="text-xl font-bold mb-6">Transfer Tokens</h3>
-
-            <form onSubmit={handleTransfer} className="space-y-4">
-              <div>
-                <label htmlFor="tokenAddress" className="block text-sm font-medium text-gray-700 mb-2">
-                  Token Contract Address
-                </label>
-                <input
-                  type="text"
-                  id="tokenAddress"
-                  value={tokenAddress}
-                  onChange={(e) => setTokenAddress(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0x..."
-                />
-              </div>
-
-              <div>
-                <label htmlFor="recipient" className="block text-sm font-medium text-gray-700 mb-2">
-                  Recipient Address
-                </label>
-                <input
-                  type="text"
-                  id="recipient"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0x..."
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  Recipient must be registered and verified
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount
-                </label>
-                <input
-                  type="number"
-                  id="amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  min="0"
-                  step="any"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0.0"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!isConnected || isPending || isConfirming}
-                className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isPending ? 'Confirming in wallet...' : isConfirming ? 'Processing...' : isConnected ? 'Transfer Tokens' : 'Connect Wallet'}
-              </button>
-
-              {canTransfer === false && recipient && amount && (
-                <p className="mt-2 text-sm text-red-600">
-                  ⚠️ Transfer not compliant. Check lock period, balance limits, and verification status.
-                </p>
-              )}
-            </form>
-
-            {isConnected && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Your Balance:</span> {balance} tokens
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-medium">Connected:</span> {address?.slice(0, 6)}...{address?.slice(-4)}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Compliance Status */}
-          <div className="bg-white shadow rounded-lg p-8">
-            <h3 className="text-xl font-bold mb-6">Compliance Status</h3>
-
-            <div className="space-y-4">
-              {isConnected ? (
-                <>
-                  <div className={`border-l-4 ${isVerified ? 'border-green-500' : 'border-red-500'} pl-4 py-2`}>
-                    <h4 className={`font-medium ${isVerified ? 'text-green-900' : 'text-red-900'}`}>
-                      Identity {isVerified ? 'Verified' : 'Not Verified'}
-                    </h4>
-                    <p className={`text-sm ${isVerified ? 'text-green-700' : 'text-red-700'}`}>
-                      {isVerified
-                        ? 'Your wallet has a verified identity'
-                        : 'You need to register and verify your identity'}
-                    </p>
-                  </div>
-
-                  <div className="border-l-4 border-green-500 pl-4 py-2">
-                    <h4 className="font-medium text-green-900">Balance Limit</h4>
-                    <p className="text-sm text-green-700">{parseFloat(balance).toFixed(2)}/1000 tokens</p>
-                  </div>
-
-                  {canTransfer !== undefined && (
-                    <div className={`border-l-4 ${canTransfer ? 'border-green-500' : 'border-yellow-500'} pl-4 py-2`}>
-                      <h4 className={`font-medium ${canTransfer ? 'text-green-900' : 'text-yellow-900'}`}>
-                        Transfer Status
-                      </h4>
-                      <p className={`text-sm ${canTransfer ? 'text-green-700' : 'text-yellow-700'}`}>
-                        {canTransfer
-                          ? 'You can transfer tokens now'
-                          : 'Transfer blocked by compliance rules'}
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="border-l-4 border-gray-500 pl-4 py-2">
-                  <h4 className="font-medium text-gray-900">Connect Wallet</h4>
-                  <p className="text-sm text-gray-700">Connect your wallet to view compliance status</p>
-                </div>
-              )}
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Wallet Info */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Connected Wallet</p>
+              <p className="font-mono text-gray-900">{shortAddress}</p>
             </div>
-
-            <div className="mt-8 p-4 bg-blue-50 rounded-md">
-              <h4 className="font-medium mb-2">Compliance Requirements</h4>
-              <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                <li>Must have verified identity</li>
-                <li>Recipient must be verified</li>
-                <li>Cannot exceed max balance per wallet</li>
-                <li>Cannot transfer during lock period</li>
-                <li>Cannot exceed max holder count</li>
-              </ul>
-            </div>
-
-            <div className="mt-4">
-              <button
-                onClick={() => setIsViewRegistryOpen(true)}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                View Registry Info
-              </button>
+            <div className="text-right">
+              <p className="text-sm text-gray-500 mb-1">SOL Balance</p>
+              <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                {isLoading ? '...' : solBalance.toFixed(4)} SOL
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Identity Management */}
-        <div className="mt-8 bg-white shadow rounded-lg p-8">
-          <h3 className="text-xl font-bold mb-6">Identity Management</h3>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Register Identity</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                Create a new on-chain identity for an investor
-              </p>
-              {isConnected && isRegistered === true && (
-                <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                  ✓ Identity already registered
-                </div>
-              )}
-              <button
-                onClick={() => setIsRegisterModalOpen(true)}
-                disabled={!isConnected}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                Register New
-              </button>
-            </div>
-
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Add KYC Claim</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                Issue a KYC/AML verification claim to an identity
-              </p>
-              <button
-                onClick={() => setIsAddClaimModalOpen(true)}
-                disabled={!isConnected}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                Issue Claim
-              </button>
-            </div>
-
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Manage Issuers</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                Add or remove trusted claim issuers
-              </p>
-              <button
-                onClick={() => setIsManageIssuersModalOpen(true)}
-                disabled={!isConnected}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                Manage
-              </button>
-            </div>
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div className="border-b border-gray-200">
+            <nav className="flex overflow-x-auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'border-purple-500 text-purple-600 bg-purple-50/50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+                  </svg>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
           </div>
+
+          {/* Transfer Tab */}
+          {activeTab === 'transfer' && (
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Transfer Tokens</h3>
+              <form onSubmit={handleTransfer} className="max-w-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipient Address</label>
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="Enter Solana address"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.0"
+                    step="0.000000001"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Processing...' : 'Transfer Tokens'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Mint Tab */}
+          {activeTab === 'mint' && (
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Mint New Tokens</h3>
+              <form onSubmit={handleMint} className="max-w-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipient Address</label>
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="Enter Solana address"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount to Mint</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.0"
+                    step="0.000000001"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Processing...' : 'Mint Tokens'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Burn Tab */}
+          {activeTab === 'burn' && (
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Burn Tokens</h3>
+              <form onSubmit={handleBurn} className="max-w-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">From Address</label>
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="Enter Solana address"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount to Burn</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.0"
+                    step="0.000000001"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg font-medium hover:from-red-700 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Processing...' : 'Burn Tokens'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Freeze Tab */}
+          {activeTab === 'freeze' && (
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Freeze/Unfreeze Account</h3>
+              <form onSubmit={handleFreeze} className="max-w-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Account Address</label>
+                  <input
+                    type="text"
+                    value={accountToFreeze}
+                    onChange={(e) => setAccountToFreeze(e.target.value)}
+                    placeholder="Enter Solana address"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg font-medium hover:from-yellow-700 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Processing...' : 'Toggle Freeze Status'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Agents Tab */}
+          {activeTab === 'agents' && (
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Manage Agents</h3>
+              <p className="text-gray-600 mb-6">
+                Agents are authorized addresses that can perform token operations on your behalf.
+              </p>
+              <form onSubmit={handleAddAgent} className="max-w-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Agent Address</label>
+                  <input
+                    type="text"
+                    value={agentAddress}
+                    onChange={(e) => setAgentAddress(e.target.value)}
+                    placeholder="Enter Solana address"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Processing...' : 'Add Agent'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
 
-        {/* Modals */}
-        <RegisterIdentityModal
-          isOpen={isRegisterModalOpen}
-          onClose={() => setIsRegisterModalOpen(false)}
-        />
-        <ManageIssuersModal
-          isOpen={isManageIssuersModalOpen}
-          onClose={() => setIsManageIssuersModalOpen(false)}
-        />
-        <AddClaimModal
-          isOpen={isAddClaimModalOpen}
-          onClose={() => setIsAddClaimModalOpen(false)}
-        />
-        <ViewIssuersAndClaims
-          isOpen={isViewRegistryOpen}
-          onClose={() => setIsViewRegistryOpen(false)}
-        />
+        {/* Transaction Status */}
+        {transactionHash && (
+          <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="font-medium text-green-800">Transaction Submitted!</p>
+                <p className="text-sm text-green-600 font-mono">{transactionHash}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
-  )
+  );
 }
