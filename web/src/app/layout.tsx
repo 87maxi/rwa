@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Web3Provider } from "@/providers/Web3Provider";
+import { SolanaProvider } from "@/providers/SolanaProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ERC-3643 RWA Token Platform",
-  description: "Create and manage compliant security tokens on-chain",
+  title: "Solana RWA Token Platform",
+  description: "Create and manage compliant security tokens on Solana blockchain with built-in KYC/AML compliance, transfer restrictions, and regulatory controls.",
+  keywords: ["solana", "rwa", "tokenization", "security-tokens", "compliance", "kyc", "aml"],
 };
 
 export default function RootLayout({
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Web3Provider>{children}</Web3Provider>
+        <SolanaProvider network="localnet">
+          {children}
+        </SolanaProvider>
       </body>
     </html>
   );
