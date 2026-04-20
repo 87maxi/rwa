@@ -60,49 +60,73 @@ export function NetworkStatus() {
 
   return (
     <div className="fixed bottom-4 left-4 z-40">
-      <div 
+      <div
         className={`
-          backdrop-blur-md border-l-4 rounded-lg shadow-xl
-          px-4 py-3 min-w-64
+          relative backdrop-blur-xl rounded-xl shadow-2xl
+          px-4 py-2.5 min-w-72 overflow-hidden
           animate-[fadeInUp_0.3s_ease-out]
-          ${networkColor}
+          border
         `}
+        style={{
+          background: `linear-gradient(135deg, ${networkColor}10 0%, ${networkColor}05 100%)`,
+          borderColor: `${networkColor}30`
+        }}
       >
-        <div className="flex items-center gap-3">
+        {/* Animated border glow */}
+        <div className="absolute inset-0 rounded-xl" style={{ boxShadow: `inset 0 0 20px ${networkColor}10` }} />
+        
+        {/* Scanning line animation */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r-transparent via-primary to-transparent opacity-50"
+             style={{
+               background: `linear-gradient(90deg, transparent, ${networkColor}, transparent)`,
+               animation: 'shimmer 3s ease-in-out infinite'
+             }}
+        />
+        
+        <div className="relative flex items-center gap-3">
           {/* Status indicator */}
-          <div className="relative">
-            <div 
+          <div className="relative flex-shrink-0">
+            <div
               className={`
-                w-3 h-3 rounded-full
-                ${connected ? 'bg-emerald-400' : 'bg-red-400'}
+                w-2.5 h-2.5 rounded-full
+                ${connected ? 'bg-success' : 'bg-error'}
                 ${connected ? 'animate-pulse' : ''}
               `}
             />
             {connected && (
-              <div 
+              <div
                 className={`
                   absolute inset-0 rounded-full
-                  bg-emerald-400 animate-ping
-                  opacity-75
+                  bg-success animate-ping
+                  opacity-50
                 `}
               />
             )}
           </div>
           
           {/* Network info */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">{networkLabel}</span>
-              <span className="text-xs text-white/70">
-                Slot: {slot.toLocaleString()}
+              <span className="text-xs font-bold text-foreground truncate">{networkLabel}</span>
+              <span className="text-[10px] text-foreground-muted font-mono">
+                #{slot.toLocaleString()}
               </span>
             </div>
-            <div className="text-xs text-white/60">
-              {connected ? 'Connected' : 'Disconnected'}
-              <span className="ml-2">
-                Last update: {lastUpdate.toLocaleTimeString()}
+            <div className="flex items-center gap-2 text-[10px] text-foreground-muted">
+              <span className={connected ? 'text-success' : 'text-error'}>
+                {connected ? '● Connected' : '○ Disconnected'}
+              </span>
+              <span className="hidden sm:inline opacity-50">
+                {lastUpdate.toLocaleTimeString()}
               </span>
             </div>
+          </div>
+
+          {/* Network icon */}
+          <div className="flex-shrink-0">
+            <svg className="w-4 h-4 text-foreground-muted" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
           </div>
         </div>
       </div>
@@ -121,9 +145,9 @@ function getNetworkLabel(network: 'localnet' | 'devnet' | 'mainnet'): string {
 
 function getNetworkColor(network: 'localnet' | 'devnet' | 'mainnet'): string {
   const colors: Record<string, string> = {
-    localnet: 'bg-blue-500/90 border-blue-400 text-white',
-    devnet: 'bg-amber-500/90 border-amber-400 text-white',
-    mainnet: 'bg-emerald-500/90 border-emerald-400 text-white',
+    localnet: '#8b5cf6',
+    devnet: '#f59e0b',
+    mainnet: '#10b981',
   };
   return colors[network] || colors.localnet;
 }
@@ -134,16 +158,24 @@ function getNetworkColor(network: 'localnet' | 'devnet' | 'mainnet'): string {
 export function NetworkBadge({ network }: { network?: 'localnet' | 'devnet' | 'mainnet' }) {
   const net = network || 'localnet';
   const label = getNetworkLabel(net);
+  const color = getNetworkColor(net);
 
   return (
-    <span 
+    <span
       className={`
-        inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-        backdrop-blur-md border
-        ${getNetworkColor(net)}
+        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
+        border backdrop-blur-sm
       `}
+      style={{
+        background: `${color}10`,
+        borderColor: `${color}30`,
+        color: color
+      }}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${net === 'localnet' ? 'bg-blue-400' : net === 'devnet' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+      <span
+        className="w-1.5 h-1.5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
       {label}
     </span>
   );
