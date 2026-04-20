@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 /**
  * Anchor SDK Client for Solana RWA Program
  *
@@ -70,7 +72,6 @@ export function getProgramId(
 /**
  * Build initialize instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildInitializeInstruction(
   tokenState: PublicKey,
   owner: PublicKey,
@@ -79,6 +80,7 @@ export function buildInitializeInstruction(
   decimals: number,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const nameBuffer = Buffer.from(name, 'utf-8');
   const symbolBuffer = Buffer.from(symbol, 'utf-8');
 
@@ -120,7 +122,6 @@ export function buildInitializeInstruction(
 /**
  * Build mint instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildMintInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
@@ -128,6 +129,7 @@ export function buildMintInstruction(
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(16);
   let offset = 0;
 
@@ -151,7 +153,6 @@ export function buildMintInstruction(
 /**
  * Build burn instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildBurnInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
@@ -159,6 +160,7 @@ export function buildBurnInstruction(
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(16);
   let offset = 0;
 
@@ -182,7 +184,6 @@ export function buildBurnInstruction(
 /**
  * Build transfer instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildTransferInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
@@ -191,6 +192,7 @@ export function buildTransferInstruction(
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   // Anchor layout: discriminator + amount (from/to are in accounts)
   const data = Buffer.alloc(16);
   let offset = 0;
@@ -216,13 +218,13 @@ export function buildTransferInstruction(
 /**
  * Build freeze account instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildFreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(8);
   const offset = 0;
 
@@ -243,13 +245,13 @@ export function buildFreezeInstruction(
 /**
  * Build unfreeze account instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildUnfreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(8);
   const offset = 0;
 
@@ -270,13 +272,13 @@ export function buildUnfreezeInstruction(
 /**
  * Build add agent instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildAddAgentInstruction(
   tokenState: PublicKey,
   payer: PublicKey,
   agent: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(40);
   const offset = 0;
 
@@ -299,13 +301,13 @@ export function buildAddAgentInstruction(
 /**
  * Build remove agent instruction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function buildRemoveAgentInstruction(
   tokenState: PublicKey,
   payer: PublicKey,
   agent: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // programId parameter reserved for future use
   const data = Buffer.alloc(40);
   const offset = 0;
 
