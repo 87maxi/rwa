@@ -73,8 +73,7 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
       return endpoint;
     }
     // urls is defined for potential future use
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _urls: Record<NetworkType, string> = {
+    const urls: Record<NetworkType, string> = {
       localnet: 'http://localhost:8899',
       devnet: 'https://api.devnet.solana.com',
       mainnet: 'https://api.mainnet-beta.solana.com',
@@ -110,13 +109,7 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
   );
 }
 
-// Network selector hook
-export function useNetworkSelector(initialNetwork: NetworkType = 'localnet') {
-  const [selectedNetwork, setSelectedNetwork] = React.useState<NetworkType>(initialNetwork);
-
-  const switchNetwork = (network: NetworkType) => {
-    setSelectedNetwork(network);
-  };
-
-  return { selectedNetwork, switchNetwork };
-}
+// Network selector hook - use useSolanaConnection() for network state instead
+// This hook was removed as it managed local state that never synced with the provider.
+// Network detection is now centralized in useSolanaConnection() which derives network
+// from the connection.rpcEndpoint URL, ensuring a single source of truth.

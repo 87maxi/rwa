@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 // Token State interface matching Anchor IDL
@@ -42,16 +42,16 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
   const [state, setState] = useState<TokenState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
-  // Set mounted state on client side only to prevent hydration mismatch
+  const connectionRef = useRef(connection);
+
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    connectionRef.current = connection;
+  }, [connection]);
 
   const fetchTokenState = useCallback(async () => {
-    if (!mounted) return; // Skip if not mounted yet
-    if (!tokenAccountPubkey || !connection) {
+    const currentConnection = connectionRef.current;
+    if (!tokenAccountPubkey || !currentConnection) {
       setState(null);
       return;
     }
@@ -61,7 +61,7 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
 
     try {
       const publicKey = new PublicKey(tokenAccountPubkey);
-      const accountInfo = await connection.getAccountInfo(publicKey, 'confirmed');
+      const accountInfo = await currentConnection.getAccountInfo(publicKey, 'confirmed');
 
       if (!accountInfo) {
         setState(null);
@@ -78,16 +78,17 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, connection, mounted]);
+  }, [tokenAccountPubkey]);
 
   useEffect(() => {
-    if (!mounted) return; // Skip if not mounted yet
-    fetchTokenState();
-  }, [fetchTokenState, mounted]);
+    // Async IIFE to fetch initial state
+    (async () => {
+      await fetchTokenState();
+    })();
+  }, [fetchTokenState]);
 
   // Subscribe to account changes
   useEffect(() => {
-    if (!mounted) return; // Skip if not mounted yet
     if (!tokenAccountPubkey || !connection) return;
 
     try {
@@ -111,7 +112,7 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
     } catch (err) {
       console.error('Error setting up account subscription:', err);
     }
-  }, [tokenAccountPubkey, connection, mounted]);
+  }, [tokenAccountPubkey, connection]);
 
   return { state, loading, error };
 }
@@ -278,8 +279,7 @@ function deserializeTokenState(data: Buffer, discriminatorSize: number = 8): Tok
  * Simplified implementation - uses public key bytes directly
  */
 // hexToBase58 is available for future use when base58 encoding is needed
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _hexToBase58(hex: string): string {
+function hexToBase58(hex: string): string {
   // For display purposes, we return the hex representation
   // In production, use a proper base58 library like @solana/web3.js
   const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SolanaProvider } from "@/providers/SolanaProvider";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { NetworkStatus } from "@/components/NetworkStatus";
+import { ClientOnly } from "@/components/ClientOnly";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,9 +33,15 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SolanaProvider network="localnet">
-          {children}
-          <NotificationContainer />
-          <NetworkStatus />
+          <ClientOnly fallback={children}>
+            {children}
+          </ClientOnly>
+          <ClientOnly fallback={<div className="fixed top-4 right-4 z-50" />}>
+            <NotificationContainer />
+          </ClientOnly>
+          <ClientOnly fallback={<div className="fixed top-4 right-20 z-50 w-48 h-10" />}>
+            <NetworkStatus />
+          </ClientOnly>
         </SolanaProvider>
       </body>
     </html>

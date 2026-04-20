@@ -7,20 +7,13 @@ import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 /**
  * Hook para obtener información del estado de conexión Solana
- * Usa patrón mounted para prevenir hydration mismatch
  */
 export function useSolanaConnection() {
   const { connection } = useConnection();
-  const { publicKey, connected, connecting } = useWallet();
-  const [mounted, setMounted] = useState(false);
-
-  // Set mounted state on client side only
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const { publicKey, connected, connecting, disconnect } = useWallet();
 
   const getNetworkType = (): NetworkType => {
-    if (!connection || !mounted) return 'localnet';
+    if (!connection) return 'localnet';
     
     const url = connection.rpcEndpoint;
     if (url.includes('localhost') || url.includes('127.0.0.1')) {
@@ -45,8 +38,8 @@ export function useSolanaConnection() {
   const getNetworkColor = (): string => {
     const network = getNetworkType();
     const colors: Record<NetworkType, string> = {
-      localnet: '#f59e0b',
-      devnet: '#8b5cf6',
+      localnet: '#8b5cf6',
+      devnet: '#f59e0b',
       mainnet: '#10b981',
     };
     return colors[network];
@@ -57,6 +50,7 @@ export function useSolanaConnection() {
     publicKey,
     connected,
     connecting,
+    disconnect,
     networkType: getNetworkType(),
     networkLabel: getNetworkLabel(),
     networkColor: getNetworkColor(),

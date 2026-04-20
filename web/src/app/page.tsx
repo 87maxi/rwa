@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { NetworkStatus } from '@/components/NetworkStatus';
+import { ClientOnly } from '@/components/ClientOnly';
 
 export default function Home() {
   const { connected } = useWallet();
@@ -75,9 +76,13 @@ export default function Home() {
 
             {/* Right side - Network + Wallet */}
             <div className="navbar-actions flex items-center gap-3">
-              <NetworkStatus />
+              <ClientOnly fallback={<div className="w-24 h-10" />}>
+                <NetworkStatus />
+              </ClientOnly>
               <div className="navbar-divider" />
-              <WalletConnect />
+              <ClientOnly fallback={<div className="w-32 h-12" />}>
+                <WalletConnect />
+              </ClientOnly>
             </div>
           </div>
         </div>

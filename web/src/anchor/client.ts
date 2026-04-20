@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 /**
  * Anchor SDK Client for Solana RWA Program
  *

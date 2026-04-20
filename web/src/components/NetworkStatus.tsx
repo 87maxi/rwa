@@ -1,24 +1,33 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 
 export function NetworkStatus() {
   const { connection } = useConnection();
-  const [slot, setSlot] = useState<number>(0);
-  const [latency, setLatency] = useState<number>(0);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
+  const [slot, setSlot] = useState<number>();
+  const [latency, setLatency] = useState<number>();
+  const [isConnected, setIsConnected] = useState<boolean>();
 
-  // Set mounted state on client side only to prevent hydration mismatch
+  const connectionRef = useRef(connection);
+
+  // Hydration-safe mounted detection - start with false on both server and client
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    connectionRef.current = connection;
+  }, [connection]);
+
   const fetchSlot = useCallback(async () => {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection) return;
+    
     const startTime = Date.now();
     try {
-      const slotNumber = await connection.getSlot();
+      const slotNumber = await currentConnection.getSlot();
       const end_time = Date.now();
       setSlot(slotNumber);
       setLatency(end_time - startTime);
@@ -26,7 +35,7 @@ export function NetworkStatus() {
     } catch {
       setIsConnected(false);
     }
-  }, [connection]);
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -61,38 +70,37 @@ export function NetworkStatus() {
   };
 
   // Get network from connection config or default to localnet
-  const network = connection.rpcEndpoint.includes('devnet') 
-    ? 'devnet' 
-    : connection.rpcEndpoint.includes('mainnet') 
-      ? 'mainnet' 
+  const network = connection?.rpcEndpoint.includes('devnet')
+    ? 'devnet'
+    : connection?.rpcEndpoint.includes('mainnet')
+      ? 'mainnet'
       : 'localnet';
 
   const color = getNetworkColor(network);
   const label = getNetworkLabel(network);
 
-  // Render placeholder during SSR to prevent hydration mismatch
+  // Show placeholder during SSR and initial hydration
   if (!mounted) {
     return (
-      <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border" 
-        style={{ 
+      <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border"
+        style={{
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}
       >
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-surface-border" />
-          <span className="text-xs font-semibold text-foreground-muted truncate">Connecting...</span>
+          <div className="w-2 h-2 rounded-full bg-surface-border/50" />
+          <span className="text-xs font-semibold text-foreground-muted">Loading...</span>
         </div>
         <div className="h-4 w-px bg-surface-border" />
-        <span className="text-foreground-muted tabular-nums">Slot: -</span>
-        <span className="text-foreground-muted tabular-nums">0ms</span>
+        <span className="text-xs text-foreground-muted">--</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border" 
-      style={{ 
+    <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border"
+      style={{
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
       }}
@@ -101,17 +109,17 @@ export function NetworkStatus() {
       <div className="flex items-center gap-2">
         <div className="relative">
           {/* Outer ring */}
-          <div 
+          <div
             className="w-2 h-2 rounded-full"
-            style={{ 
+            style={{
               backgroundColor: isConnected ? color : '#ef4444',
               boxShadow: `0 0 6px ${isConnected ? color + '60' : '#ef444460'}`
             }}
           />
           {/* Pulse animation */}
           {isConnected && (
-            <div 
-              className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60" 
+            <div
+              className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60"
               style={{ backgroundColor: color }}
             />
           )}
@@ -123,8 +131,8 @@ export function NetworkStatus() {
       
       {/* Slot and latency */}
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-foreground-muted tabular-nums">Slot: <span className="text-foreground-secondary tabular-nums">{slot.toLocaleString()}</span></span>
-        <span className={`tabular-nums ${latency > 200 ? 'text-warning' : 'text-success'}`}>{latency}ms</span>
+        <span className="text-foreground-muted tabular-nums">Slot: <span className="text-foreground-secondary tabular-nums">{slot !== undefined ? slot.toLocaleString() : '--'}</span></span>
+        <span className={`tabular-nums ${(latency ?? 0) > 200 ? 'text-warning' : 'text-success'}`}>{latency !== undefined ? `${latency}ms` : '--'}</span>
       </div>
     </div>
   );

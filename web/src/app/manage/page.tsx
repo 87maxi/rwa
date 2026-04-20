@@ -1,25 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useSolanaConnection, useWalletBalance } from '@/hooks';
+import { ClientOnly } from '@/components/ClientOnly';
 
 export default function ManagePage() {
   const { connected } = useWallet();
   const { shortAddress } = useSolanaConnection();
   const { balance: solBalance } = useWalletBalance();
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'transfer' | 'mint' | 'burn' | 'freeze' | 'agents'>('transfer');
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Set mounted state on client side only to prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Form states
   const [recipient, setRecipient] = useState('');
@@ -161,9 +156,13 @@ export default function ManagePage() {
 
             {/* Right side - Network + Wallet */}
             <div className="navbar-actions flex items-center gap-3">
-              <NetworkStatus />
+              <ClientOnly fallback={<div className="w-24 h-10" />}>
+                <NetworkStatus />
+              </ClientOnly>
               <div className="navbar-divider" />
-              <WalletConnect />
+              <ClientOnly fallback={<div className="w-32 h-12" />}>
+                <WalletConnect />
+              </ClientOnly>
             </div>
           </div>
         </div>
@@ -176,12 +175,12 @@ export default function ManagePage() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div>
               <p className="text-sm text-foreground-tertiary mb-1">Connected Wallet</p>
-              <p className="font-mono text-foreground text-lg">{mounted ? shortAddress : 'Connecting...'}</p>
+              <p className="font-mono text-foreground text-lg">{connected ? shortAddress : 'Connecting...'}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-foreground-tertiary mb-1">SOL Balance</p>
               <p className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                {isLoading ? '...' : (mounted ? solBalance.toFixed(4) : '0.0000')} SOL
+                {isLoading ? '...' : (connected ? solBalance.toFixed(4) : '0.0000')} SOL
               </p>
             </div>
           </div>

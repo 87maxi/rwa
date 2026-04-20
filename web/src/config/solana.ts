@@ -15,7 +15,6 @@ export type NetworkType = 'localnet' | 'devnet' | 'mainnet';
  * Falls back to defaults for localnet, requires env vars for devnet/mainnet.
  */
 // getProgramIds is used internally for dynamic program ID resolution
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getProgramIds(network: NetworkType) {
   const defaults = {
     localnet: {
