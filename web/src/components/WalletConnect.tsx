@@ -2,42 +2,18 @@
 
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { getNetworkFromUrl } from '@/config/solana';
+import { useSolanaConnection } from '@/hooks';
 import '@solana/wallet-adapter-react-ui/styles.css';
-import { useState, useEffect } from 'react';
 
 export function WalletConnect() {
   const { connected, publicKey } = useWallet();
-  const [mounted, setMounted] = useState(false);
-  const [network, setNetwork] = useState<string>('localnet');
-
-  // Read localStorage only on client side to prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-    const savedNetwork = localStorage.getItem('solanaNetwork') || 'localnet';
-    setNetwork(getNetworkFromUrl(savedNetwork));
-  }, []);
+  const { networkType, networkColor, networkLabel, disconnect } = useSolanaConnection();
 
   // Format address for display
   const address = publicKey?.toString() || '';
   const shortAddress = address.length > 10 
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : address;
-
-  const networkColors: Record<string, string> = {
-    localnet: '#8b5cf6',
-    devnet: '#f59e0b',
-    mainnet: '#10b981',
-  };
-
-  const networkLabels: Record<string, string> = {
-    localnet: 'Local',
-    devnet: 'Devnet',
-    mainnet: 'Mainnet',
-  };
-
-  const networkColor = networkColors[network] || networkColors.localnet;
-  const networkLabel = networkLabels[network] || 'Local';
 
   // Custom styling for the wallet button
   const customStyles = `
@@ -102,16 +78,6 @@ export function WalletConnect() {
     }
   `;
 
-  // Render placeholder during SSR to prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="relative">
-        <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-        <WalletMultiButton className="solana-wallet-btn" />
-      </div>
-    );
-  }
-
   if (!connected) {
     return (
       <div className="relative">
@@ -166,10 +132,7 @@ export function WalletConnect() {
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
           }}
-          onClick={() => {
-            // Trigger disconnect when clicking the wallet info
-            document.dispatchEvent(new CustomEvent('wallet-disconnect'));
-          }}
+          onClick={disconnect}
         >
           <span className="text-sm font-mono text-foreground-secondary group-hover:text-foreground transition-colors tabular-nums">
             {shortAddress}
