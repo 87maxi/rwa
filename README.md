@@ -1,227 +1,558 @@
-# ERC-3643 RWA Token Platform
+# Solana RWA Token Platform
 
-A complete implementation of the ERC-3643 (T-REX) standard for compliant Real World Asset (RWA) tokenization with a Next.js frontend for token management.
+A complete implementation for compliant Real World Asset (RWA) tokenization on Solana, built with Anchor Framework and Next.js. Create and manage security tokens with built-in KYC/AML compliance, transfer restrictions, and regulatory controls.
 
-## Project Structure
+## 🎯 Features
+
+### Smart Contracts (Rust + Anchor)
+
+**Core Programs:**
+
+| Program | Description | Program ID (Localnet) |
+|---------|-------------|----------------------|
+| **solana-rwa** | Main token program for RWA token management | `7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L` |
+| **identity-registry** | On-chain identity verification and management | `3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5` |
+| **compliance-aggregator** | Modular compliance rules enforcement | `EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT` |
+
+**Operations:**
+- `initialize()` - Register new compliant token
+- `mint()` - Create new tokens (agents only)
+- `burn()` - Destroy tokens permanently
+- `transfer()` - Transfer between accounts
+- `freeze_account()` / `unfreeze_account()` - Freeze/unfreeze accounts
+- `add_agent()` / `remove_agent()` - Manage authorized agents
+
+### Web Application (Next.js + Solana Web3)
+
+- **Home Page** - Platform overview with feature cards
+- **Deploy Page** - Create new tokens with customizable parameters
+- **Manage Page** - Transfer, mint, burn, freeze tokens and manage agents
+- **Wallet Integration** - Phantom, Solflare, Ledger, Trezor, Coinbase
+- **Real-time Network Status** - Live slot number and connection status
+- **Dark Futuristic Theme** - Glassmorphism, gradients, animations
+
+## 📁 Project Structure
 
 ```
-/sc/              # Smart contracts (Foundry)
-  /src/           # Solidity source files
-  /test/          # Contract tests
-  /script/        # Deployment scripts
-/web/             # Next.js web application
+rwa/
+├── sc/                    # Ethereum Smart Contracts (Legacy - ERC-3643)
+│   ├── src/               # Solidity contracts
+│   ├── test/              # Foundry tests
+│   └── script/            # Deployment scripts
+│
+├── solana-rwa/            # Solana Smart Contracts (Anchor)
+│   ├── programs/          # Rust programs
+│   │   ├── solana-rwa/    # Main token program
+│   │   ├── identity-registry/    # Identity management
+│   │   └── compliance-aggregator # Compliance rules
+│   ├── tests/             # Integration tests (TypeScript)
+│   ├── Anchor.toml        # Anchor configuration
+│   ├── Cargo.toml         # Rust workspace configuration
+│   └── tsconfig.json      # TypeScript configuration
+│
+├── web/                   # Next.js Frontend Application
+│   ├── src/
+│   │   ├── app/           # App Router (Next.js 14)
+│   │   │   ├── layout.tsx # Root layout with SolanaProvider
+│   │   │   ├── page.tsx   # Home page
+│   │   │   ├── deploy/    # Token deployment page
+│   │   │   └── manage/    # Token management page
+│   │   ├── components/    # React components
+│   │   │   ├── WalletConnect.tsx      # Wallet connection
+│   │   │   ├── NetworkStatus.tsx      # Network indicator
+│   │   │   └── NotificationContainer.tsx # Notifications
+│   │   ├── hooks/         # Custom React hooks
+│   │   │   ├── useTokenActions.ts     # Token operations
+│   │   │   ├── useTokenState.ts       # Token state management
+│   │   │   ├── useSolanaConnection.ts # Connection management
+│   │   │   └── useWalletBalance.ts    # Balance tracking
+│   │   ├── providers/     # React context providers
+│   │   │   └── SolanaProvider.tsx     # Solana context
+│   │   ├── anchor/        # Anchor client
+│   │   │   └── client.ts              # Instruction builders
+│   │   ├── config/        # Configuration
+│   │   │   └── solana.ts              # Network & program IDs
+│   │   ├── utils/         # Utility functions
+│   │   │   └── solana.ts              # Solana helpers
+│   │   └── app/globals.css  # Global styles (TailwindCSS v4)
+│   ├── package.json       # Dependencies
+│   └── tsconfig.json      # TypeScript configuration
+│
+├── docs/                  # Documentation
+│   ├── USUARIO_GUIDE.md   # User-facing guide
+│   ├── ARQUITECTURA.md    # Architecture with UML diagrams
+│   └── DESPLIEGUE.md      # Deployment guide
+│
+├── README.md              # This file
+└── deploy.sh              # Deployment automation script
 ```
 
-## Features
+## 🏗️ Architecture
 
-### Smart Contracts
+### System Architecture Diagram
 
-**Core Contracts:**
-- `Token.sol` - Main ERC-3643 compliant token
-- `Identity.sol` - Identity contract with claims
-- `IdentityRegistry.sol` - Registry of investor identities
-- `TrustedIssuersRegistry.sol` - Registry of authorized claim issuers
-- `ClaimTopicsRegistry.sol` - Registry of required claim topics
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         USER BROWSER                               │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                    Next.js Frontend (Web)                     │  │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐  │  │
+│  │  │   Home Page │ │ Deploy Page │ │    Manage Page          │  │  │
+│  │  │  (Landing)  │ │  (Token)    │ │  (Transfer/Mint/Burn)   │  │  │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────────┘  │  │
+│  │                                                               │  │
+│  │  ┌─────────────────────────────────────────────────────────┐  │  │
+│  │  │              Shared Components                          │  │  │
+│  │  │  WalletConnect │ NetworkStatus │ NotificationContainer │  │  │
+│  │  └─────────────────────────────────────────────────────────┘  │  │
+│  │                                                               │  │
+│  │  ┌─────────────────────────────────────────────────────────┐  │  │
+│  │  │              Hooks Layer                                │  │  │
+│  │  │  useTokenActions │ useTokenState │ useSolanaConnection  │  │  │
+│  │  └─────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ RPC HTTP (localhost:8899)
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      SOLANA BLOCKCHAIN                             │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                    System Program                              │  │
+│  │              (Account Creation, Transfers)                     │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                              ▲                                      │
+│                              │                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │              Custom RWA Programs (Rust/Anchor)                 │  │
+│  │                                                               │  │
+│  │  ┌────────────────┐  ┌───────────────┐  ┌────────────────┐   │  │
+│  │  │  solana-rwa    │  │identity-registry│ │compliance-     │   │  │
+│  │  │  (Main Token)  │  │               │  │aggregator     │   │  │
+│  │  └────────────────┘  └───────────────┘  └────────────────┘   │  │
+│  │       │                        │                      │        │  │
+│  │       └────────────────────────┴──────────────────────┘        │  │
+│  │                            │                                    │  │
+│  └────────────────────────────┼────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-**Compliance Modules:**
-1. **MaxBalanceCompliance** - Limits maximum tokens per wallet (default: 1000)
-2. **MaxHoldersCompliance** - Limits total number of token holders
-3. **TransferLockCompliance** - Enforces lock-up period for token sales (default: 30 days)
+### Application Flow Diagram
 
-### Web Application
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    APPLICATION FLOW                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  User Opens App                     Frontend Loads                  │
+│         │                                │                          │
+│         ▼                                ▼                          │
+│  ┌─────────────┐                  ┌──────────────┐                │
+│  │  Home Page  │                  │ SolanaProvider│                │
+│  │             │                  │  - QueryClient│                │
+│  │  • Features │                  │  - Connection │                │
+│  │  • Deploy   │                  │  - Wallets    │                │
+│  │  • Manage   │                  └──────────────┘                │
+│  └──────┬──────┘                        │                         │
+│         │                               │                         │
+│         ▼                               ▼                         │
+│  ┌─────────────┐                  ┌──────────────┐                │
+│  │ Connect     │                  │ NetworkStatus │                │
+│  │ Wallet      │                  │ • Real-time   │                │
+│  │             │                  │   slot #      │                │
+│  └──────┬──────┘                  └──────────────┘                │
+│         │                               │                         │
+│         ▼                               ▼                         │
+│  ┌─────────────┐                  ┌──────────────┐                │
+│  │ Wallet      │◄────────────────│ useWallet     │                │
+│  │ Adapter     │                  │ • publicKey   │                │
+│  │             │                  │ • connected   │                │
+│  └──────┬──────┘                  └──────────────┘                │
+│         │                               │                         │
+│         ▼                               ▼                         │
+│  ┌─────────────────────────────────────────────────┐             │
+│  │              PAGE ROUTING                       │             │
+│  │                                                 │             │
+│  │  /deploy    →  Token Deployment Form            │             │
+│  │  /manage    →  Token Management Dashboard       │             │
+│  └──────────┬──────────────────────────────────────┘             │
+│             │                                                     │
+│             ▼                                                     │
+│  ┌─────────────────────────────────────────────────┐             │
+│  │         TOKEN DEPLOYMENT FLOW                   │             │
+│  │                                                 │             │
+│  │  1. Fill Form (name, symbol, decimals)          │             │
+│  │  2. Validate Inputs                             │             │
+│  │  3. buildInitializeInstruction()                │             │
+│  │  4. Create Transaction                          │             │
+│  │  5. Sign with Wallet                            │             │
+│  │  6. Send to RPC                                 │             │
+│  │  7. Confirm on-chain                            │             │
+│  │  8. Show Success + Transaction Hash             │             │
+│  └──────────────────┬──────────────────────────────┘             │
+│                     │                                             │
+│                     ▼                                             │
+│  ┌─────────────────────────────────────────────────┐             │
+│  │         TOKEN MANAGEMENT FLOW                   │             │
+│  │                                                 │             │
+│  │  Transfer:  from → to → amount                  │             │
+│  │  Mint:    agent → recipient → amount            │             │
+│  │  Burn:    agent → from → amount                 │             │
+│  │  Freeze:  agent → account                       │             │
+│  │  Agent:   owner → add/remove agent              │             │
+│  └──────────────────┬──────────────────────────────┘             │
+│                     │                                             │
+│                     ▼                                             │
+│  ┌─────────────────────────────────────────────────┐             │
+│  │         ON-CHAIN EXECUTION                      │             │
+│  │                                                 │             │
+│  │  Smart Contract (Anchor Program)                │             │
+│  │  • Validate signer permissions                  │             │
+│  │  • Check compliance rules                       │             │
+│  │  • Update TokenState account                    │             │
+│  │  • Emit events                                  │             │
+│  └─────────────────────────────────────────────────┘             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-- **Deploy Page** - Create new ERC-3643 tokens with custom compliance rules
-- **Manage Page** - Transfer tokens and manage investor identities
-- **Wallet Integration** - Connect with MetaMask and other Web3 wallets
-- **Compliance Dashboard** - Real-time compliance status monitoring
+### Smart Contract Data Model
 
-## Getting Started
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    TOKEN STATE ACCOUNT                             │
+│                    (Main On-Chain Data)                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  TokenState                                                         │
+│  ├── owner: Pubkey                 - Token owner                   │
+│  ├── name: String                  - Token name (max 32 chars)     │
+│  ├── symbol: String                - Token symbol (max 8 chars)    │
+│  ├── decimals: u8                  - Decimals (0-18)               │
+│  ├── total_supply: u64             - Total tokens minted           │
+│  ├── next_index: u64               - Next balance index            │
+│  │                                                               │
+│  ├── balances: Vec<BalanceEntry>   - Account balances             │
+│  │   ├── BalanceEntry { key, value }                              │
+│  │   └── BalanceEntry { key, value }                              │
+│  │                                                               │
+│  ├── frozen_accounts: Vec<FrozenEntry> - Frozen accounts          │
+│  │   ├── FrozenEntry { key, frozen: true }                        │
+│  │   └── FrozenEntry { key, frozen: false }                       │
+│  │                                                               │
+│  ├── agents: Vec<Pubkey>           - Authorized agents            │
+│  │   ├── Agent Pubkey #1                                          │
+│  │   └── Agent Pubkey #2                                          │
+│  │                                                               │
+│  └── compliance_modules: Vec<Pubkey> - Active compliance rules    │
+│      ├── Module Pubkey #1                                         │
+│      └── Module Pubkey #2                                         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- Foundry
-- MetaMask or compatible Web3 wallet
-- jq (for JSON processing)
+| Software | Version | Installation Command |
+|----------|---------|---------------------|
+| **Rust** | latest | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| **Cargo** | latest | Comes with Rust |
+| **Solana CLI** | v1.18+ | `sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"` |
+| **Anchor CLI** | 0.30.x | `cargo install --git https://github.com/coral-xyz/anchor avm --locked` |
+| **Node.js** | 18+ | `nvm install 18` |
+| **npm** | 9+ | Comes with Node.js |
+| **Git** | latest | `sudo apt install git` (Linux) |
 
-### Quick Start
-
-The easiest way to get started is using the automated deployment script:
-
-```bash
-# 1. Start Anvil in a separate terminal
-anvil
-
-# 2. Run the deployment script (from project root)
-./deploy.sh
-```
-
-This script will:
-- Clean and build the smart contracts
-- Deploy all contracts to the local Anvil network
-- Extract contract addresses
-- Create `.env.local` with all contract addresses
-- Create `src/config/contracts.ts` with TypeScript constants
-- Display a deployment summary
+### Quick Start (Recommended)
 
 ```bash
-# 3. Start the web application
-cd web
-npm run dev
-```
+# 1. Navigate to the solana-rwa directory
+cd solana-rwa
 
-Open http://localhost:3000 and connect MetaMask to localhost:8545 (Chain ID: 31337).
+# 2. Start local Solana validator (in a separate terminal)
+solana-test-validator --reset
 
-### Manual Deployment
+# 3. Build and deploy smart contracts
+anchor build
+anchor deploy
 
-#### Smart Contract Development
+# 4. Navigate to web directory
+cd ../web
 
-```bash
-cd sc
-
-# Install dependencies
-forge install
-
-# Build contracts
-forge build
-
-# Run tests
-forge test
-
-# Run tests with gas reporting
-forge test --gas-report
-
-# Deploy to local network (requires Anvil running)
-forge script script/Deploy.s.sol \
-  --rpc-url http://localhost:8545 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast
-```
-
-#### Web Application
-
-```bash
-cd web
-
-# Install dependencies
+# 5. Install dependencies
 npm install
 
-# Create .env.local with contract addresses
-cp .env.example .env.local
-# Edit .env.local with your deployed contract addresses
+# 6. Create environment file
+cp .env.local.example .env.local
 
-# Run development server
+# 7. Start development server
 npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
 ```
 
-The web application will be available at http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### MetaMask Configuration
+### Detailed Setup
 
-To use the deployed contracts with MetaMask:
+#### Step 1: Install Solana Tool Suite
 
-1. Add Localhost network:
-   - Network Name: Localhost
-   - RPC URL: http://localhost:8545
-   - Chain ID: 31337
-   - Currency Symbol: ETH
-
-2. Import test account (from Anvil):
-   - Private Key: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
-   - This account will have 10,000 ETH for testing
-
-## Compliance Rules
-
-### 1. Maximum Balance per Wallet
-- Default: 1000 tokens
-- Prevents concentration of ownership
-- Enforced on both transfers and minting
-
-### 2. Maximum Number of Holders
-- Configurable limit on total token holders
-- Prevents new holders once limit is reached
-- Automatically tracks holder count
-
-### 3. Transfer Lock Period
-- Default: 30 days
-- Prevents immediate token flipping
-- Lock period starts when tokens are received
-- Agent can perform forced transfers that bypass lock
-
-## Identity & Verification
-
-All token holders must have:
-1. Registered identity in the IdentityRegistry
-2. Valid KYC/AML claim from a trusted issuer
-3. Required claim topics (configured in ClaimTopicsRegistry)
-
-### Adding an Investor
-
-1. Deploy an Identity contract for the investor
-2. Register the identity in IdentityRegistry
-3. Add KYC/AML claim issued by a trusted issuer
-4. Investor can now receive and transfer tokens (subject to compliance)
-
-## Contract Roles
-
-- **DEFAULT_ADMIN_ROLE** - Can configure registries, pause token, manage roles
-- **AGENT_ROLE** - Can mint, burn, and perform forced transfers
-- **COMPLIANCE_ROLE** - Can add/remove compliance modules
-
-## Security Features
-
-- **Pausable** - Emergency stop mechanism for token transfers
-- **Frozen Accounts** - Ability to freeze individual accounts
-- **Access Control** - Role-based permissions for administrative functions
-- **Compliance Enforcement** - On-chain validation of all transfers
-- **Event Logging** - Comprehensive event logging for audit trails
-
-## Testing
-
-The test suite covers:
-- Token minting and burning
-- Transfer compliance checks
-- Identity verification
-- All three compliance rules
-- Account freezing and pausing
-- Forced transfers by agents
-
-Run tests:
 ```bash
-cd sc
-forge test -vv
+# Install Solana CLI
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
+
+# Reload shell
+source ~/.bashrc  # or ~/.zshrc
+
+# Verify installation
+solana --version
 ```
 
-## Deployment
+#### Step 2: Install Anchor Framework
 
-The deployment script (`Deploy.s.sol`) automatically:
-1. Deploys all registry contracts
-2. Deploys the token contract
-3. Deploys and configures compliance modules
-4. Sets up initial claim topics
-5. Links all contracts together
+```bash
+# Install Anchor Version Manager
+cargo install --git https://github.com/coral-xyz/anchor avm --locked
 
-## Frontend Integration
+# Install Anchor 0.30.x
+avm install 0.30.1
+avm use 0.30.1
 
-The web app uses:
-- **Wagmi** - React hooks for Ethereum
-- **Viem** - TypeScript client for Ethereum
-- **TanStack Query** - Async state management
-- **Tailwind CSS** - Styling
+# Verify installation
+anchor --version
+```
 
-Contract ABIs are automatically extracted from Foundry builds and stored in `/web/src/abis/`.
+#### Step 3: Clone and Configure Project
 
-## License
+```bash
+# Clone the repository
+git clone <repository-url>
+cd rwa
+
+# Install frontend dependencies
+cd web
+npm install
+cd ..
+
+# Install solana-rwa dependencies
+cd solana-rwa
+npm install
+cd ..
+```
+
+#### Step 4: Configure Environment
+
+```bash
+# Create .env.local in the web directory
+cd web
+cat > .env.local << EOF
+# Solana Network Configuration
+NEXT_PUBLIC_SOLANA_NETWORK=localnet
+NEXT_PUBLIC_SOLANA_RPC_ENDPOINT=http://localhost:8899
+
+# Program IDs (Localnet)
+NEXT_PUBLIC_SOLANA_RWA_PROGRAM_ID=7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L
+NEXT_PUBLIC_IDENTITY_REGISTRY_PROGRAM_ID=3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5
+NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_PROGRAM_ID=EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT
+EOF
+```
+
+#### Step 5: Start Local Blockchain
+
+```bash
+# In a new terminal, start the local validator
+cd solana-rwa
+solana-test-validator --reset
+```
+
+This starts:
+- RPC endpoint: `http://localhost:8899`
+- WebSocket: `ws://localhost:8899`
+- 8 validator nodes
+- Faucet for testing SOL
+
+#### Step 6: Deploy Smart Contracts
+
+```bash
+# In the solana-rwa directory (validator must be running)
+anchor build
+anchor deploy
+```
+
+This deploys all three programs:
+1. `solana-rwa` - Main token program
+2. `identity-registry` - Identity management
+3. `compliance-aggregator` - Compliance rules
+
+#### Step 7: Start Frontend
+
+```bash
+# In a new terminal
+cd web
+npm run dev
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
+
+### Wallet Configuration
+
+For local development, configure your wallet to connect to localhost:
+
+**Phantom Wallet:**
+1. Open Phantom extension
+2. Go to Settings → Developer → Custom RPC
+3. Set URL: `http://localhost:8899`
+4. Set Network: `Custom`
+
+**Solflare Wallet:**
+1. Open Solflare extension
+2. Go to Settings → Network
+3. Select `Custom RPC`
+4. Set URL: `http://localhost:8899`
+
+### Getting Test SOL
+
+```bash
+# Request airdrop to your wallet (localnet)
+solana airdrop 100  # 100 SOL to default wallet
+
+# Or use a specific keypair
+solana airdrop 100 --keypair /path/to/keypair.json
+```
+
+## 📖 Usage Guide
+
+### Deploying a Token
+
+1. Connect your wallet using the "Connect Wallet" button
+2. Navigate to the Deploy page
+3. Fill in the token configuration:
+   - **Token Name**: e.g., "Real Estate Token"
+   - **Symbol**: e.g., "RET"
+   - **Decimals**: 9 (default)
+   - **Initial Supply**: Optional (can mint later)
+4. Click "Deploy Token"
+5. Confirm the transaction in your wallet
+6. Wait for confirmation (~10-30 seconds)
+
+### Managing Tokens
+
+After deployment, use the Manage page to:
+
+| Action | Permission | Description |
+|--------|-----------|-------------|
+| **Transfer** | Anyone | Send tokens to another address |
+| **Mint** | Agent only | Create new tokens |
+| **Burn** | Agent only | Destroy tokens permanently |
+| **Freeze** | Agent only | Freeze an account (blocks transfers) |
+| **Add Agent** | Owner only | Add authorized agent |
+| **Remove Agent** | Owner only | Remove authorized agent |
+
+## 🔒 Security Features
+
+- **Role-Based Access Control** - Owner and Agent roles with distinct permissions
+- **Account Freezing** - Freeze non-compliant accounts
+- **Balance Tracking** - On-chain balance management
+- **Address Validation** - Client-side Solana address validation
+- **Transaction Signing** - All transactions signed via wallet
+- **Compliance Modules** - Extensible compliance framework
+
+## 🧪 Testing
+
+### Smart Contract Tests (Rust)
+
+```bash
+cd solana-rwa
+
+# Start test validator
+solana-test-validator --reset
+
+# Run Anchor tests
+anchor test
+
+# Or use TypeScript tests
+yarn run ts-mocha -p ./tsconfig.json -t 1000000 "tests/**/*.ts"
+```
+
+### Frontend
+
+```bash
+cd web
+
+# Run linting
+npm run lint
+
+# Build (verifies TypeScript)
+npm run build
+```
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [USUARIO_GUIDE.md](docs/USUARIO_GUIDE.md) | User-facing guide with step-by-step instructions |
+| [ARQUITECTURA.md](docs/ARQUITECTURA.md) | Technical architecture with UML diagrams |
+| [DESPLIEGUE.md](docs/DESPLIEGUE.md) | Detailed deployment guide with troubleshooting |
+
+## 🛠️ Tech Stack
+
+### Smart Contracts
+- **Language**: Rust
+- **Framework**: Anchor 0.30.x
+- **Testing**: Anchor Test Framework + TypeScript Mocha
+
+### Frontend
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript 5.x
+- **UI Library**: React 19
+- **Styling**: TailwindCSS v4
+- **Wallet**: @solana/wallet-adapter
+- **State**: @tanstack/react-query
+- **Blockchain**: @solana/web3.js
+
+## 📝 Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_SOLANA_NETWORK` | Target network | `localnet` |
+| `NEXT_PUBLIC_SOLANA_RPC_ENDPOINT` | RPC URL | `http://localhost:8899` |
+| `NEXT_PUBLIC_SOLANA_RWA_PROGRAM_ID` | Main token program ID | See Anchor.toml |
+| `NEXT_PUBLIC_IDENTITY_REGISTRY_PROGRAM_ID` | Identity registry program ID | See Anchor.toml |
+| `NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_PROGRAM_ID` | Compliance aggregator program ID | See Anchor.toml |
+
+## 🚦 Network Configuration
+
+| Network | RPC URL | Explorer |
+|---------|---------|----------|
+| **Localnet** | `http://localhost:8899` | Local |
+| **Devnet** | `https://api.devnet.solana.com` | [explorer.solana.com](https://explorer.solana.com/?cluster=devnet) |
+| **Mainnet** | `https://api.mainnet-beta.solana.com` | [explorer.solana.com](https://explorer.solana.com/) |
+
+## 📄 License
 
 MIT
 
-## Contributing
+## 🤝 Contributing
 
-This is an implementation of the ERC-3643 standard for educational and demonstration purposes.
-For production use, ensure proper security audits and legal compliance.
+This project is for educational and demonstration purposes. For production use:
+
+1. Conduct a professional security audit
+2. Ensure legal compliance with local regulations
+3. Implement proper key management
+4. Add multi-signature support for critical operations
+5. Set up monitoring and alerting
+
+## 📊 Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Smart Contracts | 3 Anchor programs |
+| Frontend Pages | 3 (Home, Deploy, Manage) |
+| Supported Wallets | 5+ (Phantom, Solflare, Ledger, etc.) |
+| Transaction Time | < 1 second |
+| Average Fee | < $0.01 |
+
+---
+
+**Built with Anchor Framework & Next.js on Solana Blockchain**
