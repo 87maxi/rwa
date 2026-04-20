@@ -24,19 +24,43 @@ export default function Home() {
       <div className="noise-overlay fixed inset-0 pointer-events-none" />
 
       {/* Navigation */}
-      <nav className="bg-surface/80 backdrop-blur-xl border-b border-surface-border sticky top-0 z-50">
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-surface-border/50 shadow-lg">
+        {/* Top gradient line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-secondary to-primary animate-gradientShift" />
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shadow-glow">
-                <span className="text-white font-bold text-sm">RWA</span>
-              </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Solana RWA Platform
-              </h1>
-            </div>
+            {/* Logo & Brand */}
             <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-3 group">
+                {/* Animated logo */}
+                <div className="relative w-10 h-10">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-300 opacity-50 blur-sm" />
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-glow">
+                    <span className="text-white font-bold text-sm tracking-wider">RWA</span>
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradientText">
+                    Solana RWA
+                  </h1>
+                  <p className="text-[10px] text-foreground-muted tracking-widest uppercase">Token Platform</p>
+                </div>
+              </Link>
+              
+              {/* Divider */}
+              <div className="hidden md:flex items-center px-3 py-1.5 bg-surface/50 rounded-full border border-surface-border/50">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+                  <span className="text-xs text-foreground-secondary">Solana</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right side - Network + Wallet */}
+            <div className="flex items-center gap-3">
               <NetworkStatus />
+              <div className="h-6 w-px bg-surface-border" />
               <WalletConnect />
             </div>
           </div>

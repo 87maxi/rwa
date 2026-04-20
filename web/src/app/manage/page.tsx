@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
+import { NetworkStatus } from '@/components/NetworkStatus';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useSolanaConnection, useWalletBalance } from '@/hooks';
 
@@ -124,22 +125,51 @@ export default function ManagePage() {
       <div className="noise-overlay fixed inset-0 pointer-events-none" />
 
       {/* Navigation */}
-      <nav className="bg-surface/80 backdrop-blur-xl border-b border-surface-border sticky top-0 z-50">
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-surface-border/50 shadow-lg">
+        {/* Top gradient line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-secondary to-primary animate-gradientShift" />
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back
+            {/* Left side - Back + Title */}
+            <div className="flex items-center gap-4">
+              <Link href="/" className="group flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-surface/50 border border-surface-border flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </div>
+                <span className="hidden sm:inline text-sm font-medium">Back</span>
               </Link>
-              <span className="text-foreground-muted">|</span>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Token Management
-              </h1>
+              
+              <div className="hidden md:flex items-center px-3 py-1.5 bg-surface/50 rounded-full border border-surface-border/50">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+                  <span className="text-xs text-foreground-secondary">Solana</span>
+                </div>
+              </div>
+
+              <div className="h-6 w-px bg-surface-border hidden md:block" />
+              
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-gradient-to-br from-secondary to-primary rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
+                  Manage Tokens
+                </h1>
+              </div>
             </div>
-            <WalletConnect />
+
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              <NetworkStatus />
+              <div className="h-6 w-px bg-surface-border" />
+              <WalletConnect />
+            </div>
           </div>
         </div>
       </nav>
