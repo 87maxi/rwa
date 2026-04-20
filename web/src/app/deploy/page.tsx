@@ -99,29 +99,10 @@ export default function DeployPage() {
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-18">
-            {/* Left side - Back + Title */}
+            {/* Left side - Logo & Brand with page title */}
             <div className="navbar-brand flex items-center gap-4">
-              <Link href="/" className="group flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-surface/50 border border-surface-border flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                </div>
-                <span className="hidden sm:inline text-sm font-medium">Back</span>
-              </Link>
-              
-              <div className="hidden md:flex navbar-badge">
-                <div className="relative">
-                  <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                  <div className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60 bg-success" />
-                </div>
-                <span className="text-success-light">Solana Active</span>
-              </div>
-
-              <div className="h-6 w-px bg-surface-border hidden md:block" />
-              
-              <div className="flex items-center gap-3">
-                {/* Enhanced logo with corner highlight */}
+              <Link href="/" className="flex items-center gap-3 group">
+                {/* Animated logo */}
                 <div className="relative w-11 h-11 flex-shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-500 opacity-40 blur-sm" />
                   <div className="relative w-11 h-11 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-glow">
@@ -132,15 +113,15 @@ export default function DeployPage() {
                   <div className="absolute top-1 left-1 w-3 h-3 rounded-tl-lg bg-white/20" />
                 </div>
                 <div>
-                  <h1 className="navbar-brand-text bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  <h1 className="navbar-brand-text bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradientText">
                     Deploy Token
                   </h1>
                   <p className="navbar-subtitle text-foreground-muted">Solana RWA Platform</p>
                 </div>
-              </div>
+              </Link>
             </div>
 
-            {/* Right side */}
+            {/* Right side - Network + Wallet */}
             <div className="navbar-actions flex items-center gap-3">
               <NetworkStatus />
               <div className="navbar-divider" />

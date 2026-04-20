@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
@@ -11,9 +11,15 @@ export default function ManagePage() {
   const { connected } = useWallet();
   const { shortAddress } = useSolanaConnection();
   const { balance: solBalance } = useWalletBalance();
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'transfer' | 'mint' | 'burn' | 'freeze' | 'agents'>('transfer');
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Set mounted state on client side only to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Form states
   const [recipient, setRecipient] = useState('');
@@ -128,42 +134,12 @@ export default function ManagePage() {
           ENHANCED NAVBAR WITH ANIMATED HEADER
           ============================================ */}
       <nav className="navbar-container sticky top-0 z-50 backdrop-blur-xl border-b border-surface-border/50">
-        {/* Animated gradient top line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-secondary to-primary animate-gradientShift" style={{ backgroundSize: '200% auto' }} />
-        
-        {/* Header animation - floating particles */}
-        <div className="absolute top-0 left-0 right-0 h-32 pointer-events-none overflow-hidden opacity-30">
-          <div className="absolute top-0 left-1/4 w-2 h-2 bg-primary rounded-full animate-float" style={{ animationDelay: '0s' }} />
-          <div className="absolute top-5 left-1/3 w-1.5 h-1.5 bg-secondary rounded-full animate-float" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-2 left-1/2 w-1 h-1 bg-primary-light rounded-full animate-float" style={{ animationDelay: '2s' }} />
-          <div className="absolute top-8 left-2/3 w-2 h-2 bg-secondary rounded-full animate-float" style={{ animationDelay: '0.5s' }} />
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-18">
-            {/* Left side - Back + Title */}
+            {/* Left side - Logo & Brand with page title */}
             <div className="navbar-brand flex items-center gap-4">
-              <Link href="/" className="group flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-surface/50 border border-surface-border flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                </div>
-                <span className="hidden sm:inline text-sm font-medium">Back</span>
-              </Link>
-              
-              <div className="hidden md:flex navbar-badge">
-                <div className="relative">
-                  <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                  <div className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60 bg-success" />
-                </div>
-                <span className="text-success-light">Solana Active</span>
-              </div>
-
-              <div className="h-6 w-px bg-surface-border hidden md:block" />
-              
-              <div className="flex items-center gap-3">
-                {/* Enhanced logo with corner highlight */}
+              <Link href="/" className="flex items-center gap-3 group">
+                {/* Animated logo */}
                 <div className="relative w-11 h-11 flex-shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-secondary to-primary rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-500 opacity-40 blur-sm" />
                   <div className="relative w-11 h-11 bg-gradient-to-br from-secondary to-primary rounded-xl flex items-center justify-center shadow-glow-secondary">
@@ -175,15 +151,15 @@ export default function ManagePage() {
                   <div className="absolute top-1 left-1 w-3 h-3 rounded-tl-lg bg-white/20" />
                 </div>
                 <div>
-                  <h1 className="navbar-brand-text bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
+                  <h1 className="navbar-brand-text bg-gradient-to-r from-secondary via-primary to-secondary bg-clip-text text-transparent animate-gradientText">
                     Manage Tokens
                   </h1>
                   <p className="navbar-subtitle text-foreground-muted">Solana RWA Platform</p>
                 </div>
-              </div>
+              </Link>
             </div>
 
-            {/* Right side */}
+            {/* Right side - Network + Wallet */}
             <div className="navbar-actions flex items-center gap-3">
               <NetworkStatus />
               <div className="navbar-divider" />
@@ -200,12 +176,12 @@ export default function ManagePage() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div>
               <p className="text-sm text-foreground-tertiary mb-1">Connected Wallet</p>
-              <p className="font-mono text-foreground text-lg">{shortAddress}</p>
+              <p className="font-mono text-foreground text-lg">{mounted ? shortAddress : 'Connecting...'}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-foreground-tertiary mb-1">SOL Balance</p>
               <p className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                {isLoading ? '...' : solBalance.toFixed(4)} SOL
+                {isLoading ? '...' : (mounted ? solBalance.toFixed(4) : '0.0000')} SOL
               </p>
             </div>
           </div>
