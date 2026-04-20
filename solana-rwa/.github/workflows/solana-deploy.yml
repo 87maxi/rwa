@@ -1,0 +1,246 @@
+name: Solana RWA - Build, Test & Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  ANCHOR_VERSION: 0.30.1
+  SOLANA_VERSION: 1.18.23
+
+# Cancel in-progress runs for same workflow/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===================================================================
+  # Build & Test (runs on every push/PR)
+  # ===================================================================
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/index
+          key: ${{ runner.os }}-cargo-index
+
+      - name: Cache Solana registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.solana
+          key: ${{ runner.os }}-solana-${{ env.SOLANA_VERSION }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.solana/bin" >> $GITHUB_PATH
+
+      - name: Verify Solana
+        run: solana --version
+
+      - name: Install Anchor CLI
+        run: cargo install anchor-cli --locked
+        # Note: anchor-cli installation may take several minutes
+
+      - name: Verify Anchor
+        run: anchor --version
+
+      - name: Install Surfpool CLI
+        run: curl -sL https://run.surfpool.run/ | bash
+
+      - name: Build Programs
+        run: |
+          cd solana-rwa
+          anchor build
+
+      - name: Start Surfpool Localnet
+        run: |
+          cd solana-rwa
+          surfpool start --ci --daemon --port 8899
+          # Wait for surfpool to be ready
+          for i in {1..30}; do
+            if curl -s -X POST -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"health"}' \
+              http://127.0.0.1:8899 > /dev/null 2>&1; then
+              echo "Surfpool is ready!"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Deploy via txtx Runbook
+        run: |
+          cd solana-rwa
+          surfpool run deployment --env localnet -u --manifest-file-path ./txtx.yml
+
+      - name: Run Anchor Tests
+        run: |
+          cd solana-rwa
+          anchor test --provider.url http://127.0.0.1:8899
+
+      - name: Verify Deployed Programs
+        run: |
+          solana config set --url http://127.0.0.1:8899
+          solana program list
+
+      - name: Stop Surfpool
+        if: always()
+        run: pkill -f surfpool || true
+
+  # ===================================================================
+  # Deploy to Devnet (runs only on main branch pushes)
+  # ===================================================================
+  deploy-devnet:
+    name: Deploy to Devnet
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: devnet
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.solana/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: cargo install anchor-cli --locked
+
+      - name: Install Surfpool CLI
+        run: curl -sL https://run.surfpool.run/ | bash
+
+      - name: Build Programs
+        run: |
+          cd solana-rwa
+          anchor build
+
+      - name: Configure Solana Keypair
+        run: |
+          echo "${{ secrets.DEVNET_KEYPAIR }}" > /tmp/devnet-keypair.json
+          chmod 600 /tmp/devnet-keypair.json
+          solana config set --url https://api.devnet.solana.com
+          solana config set --keypair /tmp/devnet-keypair.json
+
+      - name: Deploy to Devnet via txtx
+        run: |
+          cd solana-rwa
+          surfpool run deployment --env devnet -u --manifest-file-path ./txtx.yml
+        env:
+          DEVNET_KEYPAIR_PATH: /tmp/devnet-keypair.json
+
+      - name: Verify Deployment
+        run: |
+          solana program list
+
+      - name: Post Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Devnet" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================================================
+  # Deploy to Mainnet (manual trigger only)
+  # ===================================================================
+  deploy-mainnet:
+    name: Deploy to Mainnet
+    needs: test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: mainnet
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.solana/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: cargo install anchor-cli --locked
+
+      - name: Install Surfpool CLI
+        run: curl -sL https://run.surfpool.run/ | bash
+
+      - name: Build Programs
+        run: |
+          cd solana-rwa
+          anchor build
+
+      - name: Configure Mainnet Keypair
+        run: |
+          echo "${{ secrets.MAINNET_KEYPAIR }}" > /tmp/mainnet-keypair.json
+          chmod 600 /tmp/mainnet-keypair.json
+          solana config set --url https://api.mainnet-beta.solana.com
+          solana config set --keypair /tmp/mainnet-keypair.json
+
+      - name: Deploy to Mainnet via txtx
+        run: |
+          cd solana-rwa
+          surfpool run deployment --env mainnet -u --manifest-file-path ./txtx.yml
+        env:
+          MAINNET_KEYPAIR_PATH: /tmp/mainnet-keypair.json
+
+      - name: Verify Deployment
+        run: |
+          solana program list
+
+      - name: Post Deployment Summary
+        run: |
+          echo "## Mainnet Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Mainnet" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY
