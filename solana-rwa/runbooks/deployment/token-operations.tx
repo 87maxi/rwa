@@ -1,0 +1,175 @@
+################################################################
+# Solana RWA - Token Operations Runbook
+# Performs token operations after deployment:
+#   1. Mint tokens
+#   2. Transfer tokens
+#   3. Add/remove agents
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+# =============================================================================
+# Variables - Program IDs (must be provided from deployment or manual input)
+# =============================================================================
+
+variable "solana_rwa_id" {
+    description = "Program ID of solana_rwa (must be set before running)"
+    value = input.solana_rwa_program_id
+    editable = true
+}
+
+variable "compliance_aggregator_id" {
+    description = "Program ID of compliance_aggregator (must be set before running)"
+    value = input.compliance_aggregator_program_id
+    editable = true
+}
+
+variable "identity_registry_id" {
+    description = "Program ID of identity_registry (must be set before running)"
+    value = input.identity_registry_program_id
+    editable = true
+}
+
+# =============================================================================
+# Token Operations
+# =============================================================================
+
+# Mint tokens to a recipient
+action "mint_tokens" "svm::process_instructions" {
+    description = "Mint tokens to a recipient address"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "mint"
+        instruction_args = [input.recipient_wallet, input.mint_amount]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        agent {
+            public_key = signer.payer.public_key
+        }
+    }
+    signers = [signer.payer]
+}
+
+# Transfer tokens from one account to another
+action "transfer_tokens" "svm::process_instructions" {
+    description = "Transfer tokens between accounts"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "transfer"
+        instruction_args = [input.from_wallet, input.to_wallet, input.transfer_amount]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        from {
+            public_key = input.from_wallet
+        }
+        
+        to {
+            public_key = input.to_wallet
+        }
+    }
+    signers = [signer.payer]
+}
+
+# Add an agent to the token program
+action "add_agent" "svm::process_instructions" {
+    description = "Add an agent with mint/transfer permissions"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "add_agent"
+        instruction_args = [input.new_agent_pubkey]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+    }
+    signers = [signer.payer]
+}
+
+# Remove an agent from the token program
+action "remove_agent" "svm::process_instructions" {
+    description = "Remove an agent from the token program"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "remove_agent"
+        instruction_args = [input.agent_to_remove_pubkey]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+    }
+    signers = [signer.payer]
+}
+
+# Freeze a token account
+action "freeze_account" "svm::process_instructions" {
+    description = "Freeze a token account (prevent transfers)"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "freeze_account"
+        instruction_args = [input.account_to_freeze]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        from {
+            public_key = signer.authority.public_key
+        }
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# Unfreeze a token account
+action "unfreeze_account" "svm::process_instructions" {
+    description = "Unfreeze a token account (allow transfers)"
+    instruction {
+        program_idl = variable.solana_rwa_idl_data
+        instruction_name = "unfreeze_account"
+        instruction_args = [input.account_to_unfreeze]
+        
+        token_state {
+            public_key = input.token_state_account
+        }
+        
+        from {
+            public_key = signer.authority.public_key
+        }
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# =============================================================================
+# Outputs
+# =============================================================================
+
+output "mint_signature" {
+    description = "Transaction signature of mint operation"
+    value = action.mint_tokens.signature
+}
+
+output "transfer_signature" {
+    description = "Transaction signature of transfer operation"
+    value = action.transfer_tokens.signature
+}
+
+output "add_agent_signature" {
+    description = "Transaction signature of add agent operation"
+    value = action.add_agent.signature
+}
