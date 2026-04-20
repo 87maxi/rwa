@@ -2,13 +2,18 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import type { Connection } from '@solana/web3.js';
 
 export function NetworkStatus() {
   const { connection } = useConnection();
   const [slot, setSlot] = useState<number>(0);
   const [latency, setLatency] = useState<number>(0);
-  const [isConnected, setIsConnected] = useState<boolean>(true);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Set mounted state on client side only to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchSlot = useCallback(async () => {
     const startTime = Date.now();
@@ -24,6 +29,8 @@ export function NetworkStatus() {
   }, [connection]);
 
   useEffect(() => {
+    if (!mounted) return;
+    
     // Initial fetch
     fetchSlot();
     
@@ -31,7 +38,7 @@ export function NetworkStatus() {
     const interval = setInterval(fetchSlot, 5000);
     
     return () => clearInterval(interval);
-  }, [fetchSlot]);
+  }, [fetchSlot, mounted]);
 
   const getNetworkColor = (network: string): string => {
     const colors: Record<string, string> = {
@@ -62,6 +69,26 @@ export function NetworkStatus() {
 
   const color = getNetworkColor(network);
   const label = getNetworkLabel(network);
+
+  // Render placeholder during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border" 
+        style={{ 
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-surface-border" />
+          <span className="text-xs font-semibold text-foreground-muted truncate">Connecting...</span>
+        </div>
+        <div className="h-4 w-px bg-surface-border" />
+        <span className="text-foreground-muted tabular-nums">Slot: -</span>
+        <span className="text-foreground-muted tabular-nums">0ms</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border" 

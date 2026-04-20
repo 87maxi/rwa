@@ -4,15 +4,25 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { getNetworkFromUrl } from '@/config/solana';
 import '@solana/wallet-adapter-react-ui/styles.css';
+import { useState, useEffect } from 'react';
 
 export function WalletConnect() {
   const { connected, publicKey } = useWallet();
-  
-  const network = getNetworkFromUrl(
-    typeof window !== 'undefined' 
-      ? (localStorage.getItem('solanaNetwork') || 'localnet')
-      : 'localnet'
-  );
+  const [mounted, setMounted] = useState(false);
+  const [network, setNetwork] = useState<string>('localnet');
+
+  // Read localStorage only on client side to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+    const savedNetwork = localStorage.getItem('solanaNetwork') || 'localnet';
+    setNetwork(getNetworkFromUrl(savedNetwork));
+  }, []);
+
+  // Format address for display
+  const address = publicKey?.toString() || '';
+  const shortAddress = address.length > 10 
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : address;
 
   const networkColors: Record<string, string> = {
     localnet: '#8b5cf6',
@@ -28,12 +38,6 @@ export function WalletConnect() {
 
   const networkColor = networkColors[network] || networkColors.localnet;
   const networkLabel = networkLabels[network] || 'Local';
-
-  // Format address for display
-  const address = publicKey?.toString() || '';
-  const shortAddress = address.length > 10 
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : address;
 
   // Custom styling for the wallet button
   const customStyles = `
@@ -97,6 +101,16 @@ export function WalletConnect() {
       padding: 10px 16px !important;
     }
   `;
+
+  // Render placeholder during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="relative">
+        <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+        <WalletMultiButton className="solana-wallet-btn" />
+      </div>
+    );
+  }
 
   if (!connected) {
     return (
