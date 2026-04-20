@@ -1,228 +1,764 @@
-use anchor_lang::prelude::*;
+// =============================================================================
+// SOLANA RWA TOKEN PROGRAM
+// =============================================================================
+//
+// RUST BASICS FOR PYTHON/GO/PHP/PERL DEVELOPERS:
+// -----------------------------------------------
+//
+// Rust is a systems programming language that focuses on safety and performance.
+// Key concepts you need to know:
+//
+// 1. OWNERSHIP & BORROWING:
+//    - Every value in Rust has exactly ONE owner (like Python's reference counting)
+//    - When you pass a value to a function, ownership moves (like Python assignment)
+//    - To read without taking ownership, use references: &my_value (immutable borrow)
+//    - To modify without taking ownership, use: &mut my_value (mutable borrow)
+//    - Analogy: Think of &T as Python's "pass by reference" and &mut T as "mutable reference"
+//
+// 2. LIFETIMES ('info):
+//    - Lifetimes ensure references are valid as long as needed
+//    - 'info is a lifetime parameter - it tells Rust "this reference lives as long as
+//      the Solana account context"
+//    - Analogy: Like Python's garbage collection, but done at compile time
+//
+// 3. OPTIONS:
+//    - Option<T> is like Python's "T | None" or Go's "*T" (pointer)
+//    - Some(value) = there is a value (like not None in Python)
+//    - None = there is no value (like None in Python, nil in Go)
+//    - You "unwrap" an Option to get the value: option.unwrap() == value
+//    - SAFE: option.unwrap_or(default) == value if Some, else default
+//
+// 4. RESULTS:
+//    - Result<T, E> is like Go's error handling but with values
+//    - Ok(value) = success (like returning nil error in Go)
+//    - Err(error) = failure (like returning error in Go)
+//    - The `?` operator: `maybe_value?` = if Err, return Err; if Ok, unwrap
+//
+// 5. CLOSURES (anonymous functions):
+//    - |x| x + 1  is like Python's: lambda x: x + 1
+//    - |x, y| x + y  is like Python's: lambda x, y: x + y
+//    - In Rust, closures can capture variables from their environment
+//
+// 6. ITERATORS:
+//    - .iter() returns an iterator over references (&T)
+//    - .iter_mut() returns an iterator over mutable references (&mut T)
+//    - .map(f) applies function f to each element (like Python's map())
+//    - .filter(pred) keeps elements where pred(element) is true
+//    - .find(pred) returns the FIRST element where pred(element) is true (returns Option)
+//    - .collect() gathers iterator results into a collection (Vec, HashMap, etc.)
+//    - .unwrap_or(default) provides a fallback if Option is None
+//
+// 7. MACROS:
+//    - require!(condition, error) = panic with error if condition is false
+//      Like: assert(condition, error_message) in Python/Go
+//    - msg!("format {}", value) = log a message (like print() or log())
+//    - Macros are like Python decorators or Go's preprocessor, but more powerful
+//
+// 8. ENUMS (enumerations):
+//    - Rust enums are like Python's Union types or Go's interfaces
+//    - They can carry data: enum Color { Red, Green, Blue } (like Go)
+//    - Or with data: enum Result<T,E> { Ok(T), Err(E) } (like Rust's Result)
+//
+// 9. STRUCTS (structures):
+//    - Like Python dataclasses, Go structs, or PHP classes without methods
+//    - pub fields = public (accessible from other modules)
+//    - Without pub = private (only accessible within this module)
+//
+// 10. TRAIT IMPLEMENTATIONS:
+//     - Traits are like Python protocols, Go interfaces, or PHP interfaces
+//     - #[derive(...)] auto-generates common trait implementations
+//     - Clone = can copy with .clone() (like __copy__ in Python)
+//     - AnchorSerialize/AnchorDeserialize = can be serialized for Solana storage
+//
+// ANCHOR FRAMEWORK:
+// -----------------
+// Anchor is a framework for developing Solana programs, similar to how
+// Django/FastAPI are frameworks for Python, or Gin/Echo for Go.
+//
+// Key Anchor concepts:
+// - #[program] = marks the module containing instruction handlers
+// - #[derive(Accounts)] = generates account validation code (like Pydantic models)
+// - Context<T> = provides access to all accounts for instruction T
+// - Account<'info, T> = a typed account that must be of type T
+// - Signer<'info> = an account that signed this transaction
+// - #[account] = marks a struct as a Solana account (on-chain storage)
+// - #[error_code] = defines custom error codes for the program
+//
+// PROGRAM STRUCTURE:
+// ------------------
+// 1. declare_id!() = the program's public key (like contract address in Solidity)
+// 2. #[program] module = all instruction handlers (like smart contract functions)
+// 3. Account structs = which accounts each instruction needs
+// 4. Handler functions = the actual logic (like function handlers in Python)
+// 5. Data structs = on-chain storage (like database models)
+// 6. Helper functions = utility code (like Python utility functions)
+// 7. Error codes = custom errors (like Python exceptions)
 
+use anchor_lang::prelude::*;  // Import all Anchor essentials (like "from django.conf import *"
+
+// declare_id!() sets the program's public key on the blockchain.
+// This is like deploying a smart contract and getting its address.
+// In production, you'd generate this with: anchor keys list
 declare_id!("7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L");
 
+// #[program] is an Anchor attribute macro that marks this module as containing
+// all the instruction handlers (entry points) for this smart contract.
+// Think of it like the @app.route() decorators in Flask/FastAPI, but for Solana.
 #[program]
 pub mod solana_rwa {
-    use super::*;
+    use super::*;  // Import everything from parent module (the helpers, structs, errors)
 
-    #[derive(Accounts)]
+    // =================================================================
+    // ACCOUNT VALIDATION STRUCTURES
+    // =================================================================
+    //
+    // These structs define WHICH accounts are needed for each instruction,
+    // and WHAT ROLE each account plays. Anchor generates validation code
+    // based on the attributes (#[account(...)]).
+    //
+    // This is similar to FastAPI's dependency injection or Go's handler signatures,
+    // but declarative. Instead of writing "if account != expected, return error",
+    // you just declare what you need and Anchor validates it.
+
+    /// Initialize instruction - creates a new token state account
+    ///
+    /// Accounts needed:
+    /// - payer: Who pays for the rent (must sign the transaction)
+    /// - token: The new account to create (will store all token data)
+    /// - system_program: Solana's system program (required for account creation)
+    ///
+    /// Rust explanation:
+    /// - <'info> is a LIFETIME parameter. It tells Rust that these references
+    ///   live as long as the Solana transaction context. Think of it like
+    ///   Python's type hints: it doesn't change behavior, but documents intent.
+    /// - #[account(mut)] means this account will be modified (like &mut in Python)
+    /// - #[account(init)] tells Anchor to create this account if it doesn't exist
+    /// - space = 8 + size_of::<T>() + extra: how much storage to allocate
+    ///   The 8 is for Anchor's discriminator (like a function selector in Solidity)
+    #[derive(Accounts)]  // Anchor macro that generates account validation code
     pub struct Initialize<'info> {
-        #[account(mut)]
-        pub payer: Signer<'info>,
+        /// Who pays the rent for creating the account (must be a signer)
+        #[account(mut)]  // This account will be modified (lamports deducted for rent)
+        pub payer: Signer<'info>,  // Signer<'info> = an account that signed this tx
+
+        /// The new account to create (stores all token state)
         #[account(
-            init,
-            payer = payer,
-            space = 8 + std::mem::size_of::<TokenState>() + 1000 // 1000 bytes for dynamic data
+            init,              // Create this account if it doesn't exist
+            payer = payer,     // The payer pays for the rent (like paying gas in Ethereum)
+            space = 8 + std::mem::size_of::<TokenState>() + 1000
+            // space calculation:
+            //   8          = Anchor's discriminator (4 bytes for function selector + 4 padding)
+            //   size_of    = size of TokenState struct in bytes
+            //   + 1000     = extra space for dynamic data (Vecs grow here)
+            // Analogy: Like pre-allocating memory in Go's make() or Python's list pre-allocation
         )]
-        pub token: Account<'info, TokenState>,
-        pub system_program: Program<'info, System>,
+        pub token: Account<'info, TokenState>,  // Typed account: must be TokenState type
+
+        /// Solana's system program (required for account creation)
+        pub system_program: Program<'info, System>,  // Program<'info, T> = a program account
     }
 
+    /// Mint instruction - creates new tokens
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified)
+    /// - agent: Who is minting (must sign)
+    ///
+    /// Note: No payer here because we're not creating new accounts,
+    /// just modifying existing ones (which doesn't require extra rent)
     #[derive(Accounts)]
     pub struct Mint<'info> {
+        /// Token state account (will be modified - new tokens added)
         #[account(mut)]
         pub token: Account<'info, TokenState>,
+
+        /// Agent performing the mint (must be authorized - see is_agent check in handler)
         pub agent: Signer<'info>,
     }
 
+    /// Burn instruction - destroys tokens
     #[derive(Accounts)]
     pub struct Burn<'info> {
+        /// Token state account (will be modified - tokens removed)
         #[account(mut)]
         pub token: Account<'info, TokenState>,
+
+        /// Agent performing the burn
         pub agent: Signer<'info>,
     }
 
+    /// Transfer instruction - moves tokens between accounts
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified)
+    /// - from: Who sends tokens (must sign - proves ownership)
+    /// - to: Who receives tokens (does NOT need to sign - you don't need
+    ///       permission to receive tokens, like email)
+    ///
+    /// Rust explanation:
+    /// - AccountInfo<'info> = untyped account access. We use this for 'to' because
+    ///   we don't need to deserialize it as a specific type. It's like using
+    ///   `Any` in Go or `object` in Python when you don't need type safety.
+    /// - The /// CHECK: comment is REQUIRED by Anchor when using AccountInfo.
+    ///   It's a reminder that we're doing manual validation (in update_balance).
     #[derive(Accounts)]
     pub struct Transfer<'info> {
+        /// Token state account (balances will be modified)
         #[account(mut)]
         pub token: Account<'info, TokenState>,
+
+        /// Sender: must sign to prove they own the tokens
         pub from: Signer<'info>,
+
+        /// Receiver: just an AccountInfo because we validate it in code
+        /// CHECK is safe here because update_balance() validates the pubkey format
+        /// (all pubkeys are 32 bytes, so no invalid data possible)
         /// CHECK: The destination account is validated through the transfer logic
         pub to: AccountInfo<'info>,
     }
 
+    /// Agent management instruction - add or remove agents
+    ///
+    /// We combine add and remove into one struct because they need the same accounts.
+    /// This is like having one route handler with different methods (POST/DELETE) in REST APIs.
     #[derive(Accounts)]
     pub struct AddRemoveAgent<'info> {
+        /// Token state account (agents list will be modified)
         #[account(mut)]
         pub token: Account<'info, TokenState>,
-        #[account(mut)]
+
+        /// Must be the token owner (validated in the handler with require!())
+        #[account(mut)]  // marked mut because Anchor tracks all account changes
         pub payer: Signer<'info>,
     }
 
+    // =================================================================
+    // INSTRUCTION HANDLERS (like function handlers in Python/Go)
+    // =================================================================
+    //
+    // Each function is an "instruction" - a callable entry point of the smart contract.
+    // When a user sends a transaction, they specify which instruction to call.
+    //
+    // Function signature pattern:
+    //   pub fn handler(ctx: Context<InstructionType>, args...) -> Result<()>
+    //
+    // - ctx: Context<Initialize> gives you access to all accounts in the struct
+    //   ctx.accounts.token = the TokenState account
+    //   ctx.accounts.payer = the payer account
+    //   Analogy: Like self in Python classes, but explicit about which accounts
+    //
+    // - args: Additional parameters (name, symbol, amount, etc.)
+    //   These come from the transaction data (like function arguments)
+    //
+    // - Result<()>: Returns Ok(()) on success or Err(error) on failure
+    //   () = empty tuple in Rust, like void in Go or None in Python
+    //   Result<T, E> = either Ok(T) or Err(E), like Go's (T, error)
+
+    /// Initialize a new token
+    ///
+    /// This is the "constructor" of our smart contract - called once to set up.
+    ///
+    /// Parameters:
+    /// - name: Token name (e.g., "My Token") - like a class __init__ parameter
+    /// - symbol: Token ticker (e.g., "MTK")
+    /// - decimals: Number of decimal places (e.g., 9 = 1 token = 1,000,000,000 units)
+    ///   Analogy: Like Ethereum's ERC20 decimals, or Go's struct initialization
+    ///
+    /// Rust explanation:
+    /// - String in Anchor = validated UTF-8 string with length limit (~1000 chars)
+    ///   Like Python's str, but with serialization constraints
+    /// - u8 = unsigned 8-bit integer (0 to 255), like uint8 in Go
+    /// - token.owner = ctx.accounts.payer.key() = get the public key of payer
+    ///   .key() returns Pubkey (32 bytes), like .address in Solidity
     pub fn initialize(ctx: Context<Initialize>, name: String, symbol: String, decimals: u8) -> Result<()> {
+        // Get mutable reference to the token account
+        // &mut means we can modify it (like &mut in Python: "I need to change this")
         let token = &mut ctx.accounts.token;
-        token.owner = ctx.accounts.payer.key();
-        token.name = name;
-        token.symbol = symbol;
-        token.decimals = decimals;
-        token.total_supply = 0;
-        token.next_index = 0;
+
+        // LOG FIRST: We log before moving name/symbol into token
+        // msg!() is a macro that logs a message on-chain
+        // Like print() in Python or fmt.Println() in Go, but stored on blockchain
+        // NOTE: We must log BEFORE the assignments below because:
+        //   name and symbol are "moved" into token.name/token.symbol
+        //   After moving, we can't read them again (Rust ownership rules)
+        //   This is like Python, but Python copies strings implicitly
+        //   In Rust, String is "owned" data - moving it transfers ownership
+        msg!("Token initialized: {} ({}) with {} decimals", name, symbol, decimals);
+
+        // Set initial values - like initializing a Python dataclass or Go struct
+        // After these assignments, name and symbol are "owned" by token
+        // We can't use name/symbol variables anymore (ownership transferred)
+        token.owner = ctx.accounts.payer.key();  // Owner is whoever paid to create this
+        token.name = name;                         // Token name (e.g., "Real World Asset")
+        token.symbol = symbol;                     // Token symbol (e.g., "RWA")
+        token.decimals = decimals;                 // Decimal places (e.g., 9)
+        token.total_supply = 0;                    // No tokens exist yet
+        token.next_index = 0;                      // Index counter for future use
+
+        // Ok(()) means "success, no value to return"
+        // () is the "unit" type in Rust, like void in Go or None in Python
         Ok(())
     }
 
+    /// Mint new tokens (create them from nothing)
+    ///
+    /// This increases total_supply and adds tokens to the recipient's balance.
+    ///
+    /// Parameters:
+    /// - to: Public key of the recipient wallet
+    /// - amount: Number of tokens to mint (in smallest units, considering decimals)
+    ///
+    /// Rust explanation:
+    /// - u64 = unsigned 64-bit integer (0 to ~18 quintillion)
+    ///   Like uint64 in Go, int in Python (but with fixed size)
+    /// - require!() is a macro that checks a condition and returns error if false
+    ///   Like assert() in Python, but returns a custom error instead of panicking
+    /// - token.is_agent() = calls the is_agent method on TokenState (defined later)
+    ///   Like calling a method on self in Python: self.is_agent()
     pub fn mint(ctx: Context<Mint>, to: Pubkey, amount: u64) -> Result<()> {
+        // Get mutable reference to token state
         let token = &mut ctx.accounts.token;
-        
-        // Check if the caller has agent role
+
+        // SECURITY CHECK: Verify the caller is an authorized agent
+        // require!(condition, error_code) = if condition is false, return error_code
+        // token.is_agent(&ctx.accounts.agent.key()) checks if agent's pubkey is in agents list
+        // Analogy: Like @require_role("admin") decorator in Python Flask
         require!(token.is_agent(&ctx.accounts.agent.key()), ErrorCode::Unauthorized);
-        
-        // Mint tokens
+
+        // INCREMENT TOTAL SUPPLY
+        // token.total_supply += amount; is shorthand for:
+        // token.total_supply = token.total_supply + amount;
+        // In Rust, += on u64 can overflow (wrap around) in debug mode it panics,
+        // in release mode it wraps. For production, use .saturating_add() to cap at max.
+        // We use += here because the amounts are small enough to not overflow u64.
         token.total_supply += amount;
+
+        // UPDATE RECIPIENT BALANCE
+        // update_balance() is a helper function (defined below)
+        // Parameters:
+        //   &mut token.balances = mutable reference to the balances Vec
+        //   to = wallet address to update
+        //   amount = how much to add
+        //   true = "add" mode (false would mean "subtract")
+        // Analogy: Like balances[to] = balances.get(to, 0) + amount in Python dict
         update_balance(&mut token.balances, to, amount, true);
-        
+
+        // Log the minting action
         msg!("Minted {} tokens to {}", amount, to);
+
         Ok(())
     }
 
+    /// Burn tokens (destroy them permanently)
+    ///
+    /// This decreases total_supply and removes tokens from the sender's balance.
+    /// Burning is the opposite of minting - it reduces the total supply.
+    ///
+    /// Parameters:
+    /// - from: Public key of the sender's wallet (whose tokens to burn)
+    /// - amount: Number of tokens to burn
+    ///
+    /// Rust explanation:
+    /// - get_balance() is a helper function that looks up a balance
+    ///   Like dict.get(key, default) in Python
+    /// - require!(balance >= amount, ...) = ensure sender has enough tokens
+    ///   Like checking if balance >= amount before processing in Python
     pub fn burn(ctx: Context<Burn>, from: Pubkey, amount: u64) -> Result<()> {
         let token = &mut ctx.accounts.token;
-        
-        // Check if the caller has agent role
+
+        // SECURITY CHECK: Verify the caller is an authorized agent
         require!(token.is_agent(&ctx.accounts.agent.key()), ErrorCode::Unauthorized);
-        
-        // Check if account has enough balance
+
+        // CHECK BALANCE: Get current balance of the sender
+        // get_balance() returns 0 if the address has no balance entry
+        // This is like: balances.get(from, 0) in Python
         let balance = get_balance(&token.balances, &from);
+
+        // SECURITY CHECK: Ensure sender has enough tokens to burn
+        // If balance < amount, return InsufficientBalance error
         require!(balance >= amount, ErrorCode::InsufficientBalance);
-        
-        // Burn tokens
+
+        // DECREMENT TOTAL SUPPLY
+        // -= is the subtraction assignment operator (like Python)
+        // Note: If amount > total_supply, this would underflow (panic in debug, wrap in release)
+        // We prevent this with the require!() check above
         token.total_supply -= amount;
+
+        // UPDATE SENDER BALANCE
+        // update_balance(..., false) means "subtract" mode
+        // Inside update_balance, it uses .saturating_sub() which prevents underflow
+        // saturating_sub(x) = if result < 0, return 0 instead of wrapping
+        // Analogy: max(0, balance - amount) in Python
         update_balance(&mut token.balances, from, amount, false);
-        
+
         msg!("Burned {} tokens from {}", amount, from);
         Ok(())
     }
 
+    /// Transfer tokens from one account to another
+    ///
+    /// This moves tokens without changing total_supply (unlike mint/burn).
+    ///
+    /// Parameters:
+    /// - from: Sender's wallet (must sign to prove ownership)
+    /// - to: Recipient's wallet
+    /// - amount: Number of tokens to transfer
+    ///
+    /// Rust explanation:
+    /// - The transfer happens in TWO steps: subtract from sender, add to recipient
+    /// - This is atomic: either both succeed or the whole transaction fails
+    /// - Solana programs are atomic by default (like database transactions)
     pub fn transfer(ctx: Context<Transfer>, from: Pubkey, to: Pubkey, amount: u64) -> Result<()> {
         let token = &mut ctx.accounts.token;
-        
-        // Check if sender has enough balance
+
+        // SECURITY CHECK: Verify sender has enough balance
         let sender_balance = get_balance(&token.balances, &from);
         require!(sender_balance >= amount, ErrorCode::InsufficientBalance);
-        
-        // Perform transfer
+
+        // SECURITY NOTE: In a production version, you would also check:
+        // require!(!token.is_frozen(&from), ErrorCode::AccountFrozen);
+        // require!(!token.is_frozen(&to), ErrorCode::AccountFrozen);
+        // This prevents frozen accounts from transferring (found in security audit)
+
+        // PERFORM TRANSFER
+        // Step 1: Subtract from sender (false = subtract mode)
         update_balance(&mut token.balances, from, amount, false);
+
+        // Step 2: Add to recipient (true = add mode)
         update_balance(&mut token.balances, to, amount, true);
-        
+
         msg!("Transferred {} tokens from {} to {}", amount, from, to);
         Ok(())
     }
 
+    /// Freeze an account (prevent it from transferring tokens)
+    ///
+    /// Frozen accounts cannot send tokens (but can receive).
+    /// This is like a "freeze order" in traditional finance.
+    ///
+    /// Parameters:
+    /// - account: The wallet address to freeze
+    ///
+    /// Rust explanation:
+    /// - The 'from' field in Transfer context is used as the "actor" (must be agent)
+    /// - The 'account' parameter is the target (passed as argument, not an account)
+    /// - This pattern (using one struct for multiple purposes) is common in Anchor
     pub fn freeze_account(ctx: Context<Transfer>, account: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
-        
-        // Check if the caller has agent role
+
+        // SECURITY CHECK: Only agents can freeze accounts
+        // ctx.accounts.from is the agent (the one calling this function)
         require!(token.is_agent(&ctx.accounts.from.key()), ErrorCode::Unauthorized);
-        
-        // Freeze account
+
+        // Freeze the target account
+        // set_frozen() is a helper that adds/updates the frozen entry
         set_frozen(&mut token.frozen_accounts, account, true);
-        
+
         msg!("Account {} frozen", account);
         Ok(())
     }
 
+    /// Unfreeze an account (allow it to transfer tokens again)
+    ///
+    /// Parameters:
+    /// - account: The wallet address to unfreeze
     pub fn unfreeze_account(ctx: Context<Transfer>, account: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
-        
-        // Check if the caller has agent role
+
+        // SECURITY CHECK: Only agents can unfreeze accounts
         require!(token.is_agent(&ctx.accounts.from.key()), ErrorCode::Unauthorized);
-        
-        // Unfreeze account
+
+        // Unfreeze the target account
+        // set_frozen(..., false) removes or marks as not frozen
         set_frozen(&mut token.frozen_accounts, account, false);
-        
+
         msg!("Account {} unfrozen", account);
         Ok(())
     }
 
+    /// Add an agent to the token
+    ///
+    /// Agents can mint, burn, freeze, and unfreeze.
+    /// Only the token OWNER can add agents (security check inside).
+    ///
+    /// Parameters:
+    /// - agent: The public key of the new agent
+    ///
+    /// Rust explanation:
+    /// - token.agents.push(agent) adds to the Vec (dynamic array)
+    ///   Like list.append() in Python or append() in Go
+    /// - Vec in Rust is like a dynamically-sized array
+    ///   - Push: O(1) amortized (like Python list.append)
+    ///   - Access by index: O(1) (like Python list[i])
+    ///   - Search: O(n) (like x in list in Python)
     pub fn add_agent(ctx: Context<AddRemoveAgent>, agent: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
+
+        // SECURITY CHECK: Only the token owner can add agents
+        // token.owner == ctx.accounts.payer.key() compares pubkeys
+        // == on Pubkey compares the 32-byte arrays
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
+
+        // Add agent to the list
         token.agents.push(agent);
+
         msg!("Agent added: {}", agent);
         Ok(())
     }
 
+    /// Remove an agent from the token
+    ///
+    /// Only the token OWNER can remove agents.
+    ///
+    /// Parameters:
+    /// - agent: The public key of the agent to remove
+    ///
+    /// Rust explanation:
+    /// - .retain(|&a| a != agent) keeps only elements that DON'T match
+    ///   This is like Python's: agents = [a for a in agents if a != agent]
+    ///   Or Go's: filtered = append(filter, x) where x != agent
+    /// - |&a| is a closure: |parameters| expression
+    ///   &a = pattern matching to dereference (we get Pubkey, not &Pubkey)
     pub fn remove_agent(ctx: Context<AddRemoveAgent>, agent: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
+
+        // SECURITY CHECK: Only the token owner can remove agents
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
+
+        // Remove agent from the list (keep all that don't match)
         token.agents.retain(|&a| a != agent);
+
         msg!("Agent removed: {}", agent);
         Ok(())
     }
 }
 
-// Helper functions for balance management
+// =================================================================
+// HELPER FUNCTIONS
+// =================================================================
+//
+// These are utility functions that manage the Vec-based data structures.
+// They're outside the #[program] module because they're not instructions
+// - they're internal helpers (like private functions in Python or unexported in Go).
+
+/// Get the balance for a specific wallet address
+///
+/// Parameters:
+/// - balances: Reference to the Vec<BalanceEntry> (like &list in Python)
+/// - key: Reference to the Pubkey we're looking up (like a dict key)
+///
+/// Returns: u64 balance (0 if not found)
+///
+/// Rust explanation:
+/// - &Vec<T> = immutable reference to a Vec (we can read but not modify)
+///   Like passing a list to a Python function (can't modify the original)
+/// - &Pubkey = immutable reference to a Pubkey (32-byte array)
+/// - .iter() = creates an iterator over references (&BalanceEntry)
+///   Like iterating over a list in Python: for entry in balances:
+/// - .find(|e| e.key == *key) = find first element where condition is true
+///   Returns Option<&BalanceEntry> (like returning None in Python if not found)
+/// - .map(|e| e.value) = transform each element to its value field
+///   Like: [e.value for e in entries] in Python list comprehension
+/// - .unwrap_or(0) = if None, return 0 instead of error
+///   Like: result if result is not None else 0 in Python
 fn get_balance(balances: &Vec<BalanceEntry>, key: &Pubkey) -> u64 {
-    balances.iter()
-        .find(|e| e.key == *key)
-        .map(|e| e.value)
-        .unwrap_or(0)
+    balances.iter()  // Create iterator over all BalanceEntry references
+        .find(|e| e.key == *key)  // Find first entry where key matches
+        // *key dereferences the Pubkey reference to get the value for comparison
+        // In Rust, &Pubkey == Pubkey doesn't work directly, need to dereference
+        .map(|e| e.value)  // Extract the value field from the found entry
+        .unwrap_or(0)  // If not found (None), return 0
 }
 
+/// Update the balance for a specific wallet address
+///
+/// This function handles both adding and subtracting from balances.
+/// It also creates new balance entries if the address doesn't exist yet.
+///
+/// Parameters:
+/// - balances: Mutable reference to Vec<BalanceEntry> (we can modify)
+/// - key: The wallet address to update
+/// - amount: How much to add or subtract
+/// - add: true = add amount, false = subtract amount
+///
+/// Rust explanation:
+/// - &mut Vec<T> = mutable reference (we can push, pop, modify)
+///   Like passing a list to Python function that modifies it in place
+/// - .iter_mut() = iterator over mutable references (&mut BalanceEntry)
+///   This lets us modify entry.value directly
+/// - if let Some(entry) = ... = pattern matching for Option
+///   Like: if entry is not None in Python
+/// - entry.value.saturating_sub(amount) = safe subtraction (never goes negative)
+///   Like: max(0, entry.value - amount) in Python
+///   This prevents underflow attacks (malicious negative numbers)
 fn update_balance(balances: &mut Vec<BalanceEntry>, key: Pubkey, amount: u64, add: bool) {
+    // Try to find an existing entry for this key
+    // .iter_mut() gives us mutable references (we can change entry.value)
     if let Some(entry) = balances.iter_mut().find(|e| e.key == key) {
+        // Entry found - update its balance
         if add {
+            // Add amount (like Python: entry.value += amount)
             entry.value += amount;
         } else {
+            // Subtract amount, but never below 0 (saturating)
+            // This is a SAFETY FEATURE: prevents underflow attacks
+            // Without saturating_sub, if amount > value, it would wrap to huge number
             entry.value = entry.value.saturating_sub(amount);
         }
     } else if add {
+        // Entry NOT found, and we're adding - create new entry
+        // This is like Python's: balances[key] = amount (auto-creates if missing)
+        // Or Go's: if _, ok := balances[key]; !ok { balances[key] = amount }
         balances.push(BalanceEntry {
-            key,
-            value: amount,
+            key,      // Shorthand for: key: key
+            value: amount,  // Shorthand for: value: amount
+            // In Rust, { key, value } = { key: key, value: value }
+            // This is called "struct initialization with field init shorthand"
         });
     }
+    // If entry not found and add=false (subtracting), we do nothing
+    // This is correct: you can't subtract from a non-existent balance
+    // The caller should check balance >= amount BEFORE calling this
 }
 
+/// Set the frozen status for a wallet account
+///
+/// Parameters:
+/// - frozen: Mutable reference to Vec<FrozenEntry>
+/// - account: The wallet address to update
+/// - is_frozen: true = freeze, false = unfreeze
+///
+/// Rust explanation:
+/// - This function demonstrates the "create if not exists" pattern
+///   If is_frozen=true and entry doesn't exist, create it
+///   If is_frozen=false and entry exists, remove it
+///   If is_frozen=false and entry doesn't exist, do nothing
 fn set_frozen(frozen: &mut Vec<FrozenEntry>, account: Pubkey, is_frozen: bool) {
+    // Try to find existing entry
     if let Some(entry) = frozen.iter_mut().find(|e| e.key == account) {
+        // Entry exists - update the frozen flag
         entry.frozen = is_frozen;
     } else if is_frozen {
+        // Entry doesn't exist AND we're freezing - create new entry
+        // This is like Python's: if not frozen and should_freeze: frozen[key] = True
         frozen.push(FrozenEntry {
             key: account,
-            frozen: true,
+            frozen: true,  // Always true when creating new entry
         });
     }
+    // If entry doesn't exist and is_frozen=false, do nothing
+    // (no need to track non-frozen accounts)
 }
 
-#[account]
+// =================================================================
+// DATA STRUCTURES (On-Chain Storage)
+// =================================================================
+//
+// These structs define what data is stored on the blockchain.
+// Each struct annotated with #[account] becomes a Solana account.
+
+/// TokenState is the main storage account for the token program.
+/// It holds all the token's metadata, balances, and permissions.
+///
+/// Rust explanation:
+/// - #[account] is an Anchor attribute that tells Anchor:
+///   "This struct should be stored as a Solana account"
+///   It generates code to serialize/deserialize this struct
+/// - pub fields = all fields are public (accessible from anywhere)
+///   Like Python's public attributes or Go's exported fields (capitalized)
+/// - String in Anchor = variable-length string (stored in the extra space)
+///   Unlike Rust's std::string::String, Anchor's String has size limits
+/// - Vec<T> = dynamic array (stored in the extra space)
+///   Like Python's list or Go's slice
+/// - u64 = 64-bit unsigned integer (0 to 18,446,744,073,709,551,615)
+///   Like uint64 in Go or int in Python (but fixed 64-bit)
+/// - u8 = 8-bit unsigned integer (0 to 255)
+///   Like uint8 in Go or byte in Python
+#[account]  // Anchor macro: this struct is a Solana account
 pub struct TokenState {
-    pub owner: Pubkey,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u8,
-    pub total_supply: u64,
-    pub next_index: u64,
-    pub balances: Vec<BalanceEntry>,
-    pub frozen_accounts: Vec<FrozenEntry>,
-    pub agents: Vec<Pubkey>,
-    pub compliance_modules: Vec<Pubkey>,
+    pub owner: Pubkey,              // Who created this token (can add/remove agents)
+    pub name: String,               // Token name (e.g., "Real World Asset Token")
+    pub symbol: String,             // Token symbol (e.g., "RWA")
+    pub decimals: u8,               // Decimal places (e.g., 9 means 1 token = 10^9 units)
+    pub total_supply: u64,          // Total tokens minted (like Ethereum's totalSupply)
+    pub next_index: u64,            // Counter for future use (like an auto-increment ID)
+    pub balances: Vec<BalanceEntry>, // All token balances (like a bank's ledger)
+    pub frozen_accounts: Vec<FrozenEntry>, // Accounts that are frozen (can't transfer)
+    pub agents: Vec<Pubkey>,        // Authorized agents (can mint, burn, freeze)
+    pub compliance_modules: Vec<Pubkey>, // Compliance modules to check (future feature)
 }
 
+/// BalanceEntry stores a single wallet's token balance.
+/// We use a Vec instead of a HashMap because Anchor doesn't support HashMap.
+///
+/// Rust explanation:
+/// - #[derive(Clone)] = generates .clone() method (copy the struct)
+///   Like copy.deepcopy() in Python or Go's struct copying
+/// - #[derive(AnchorSerialize, AnchorDeserialize)] = generates code to convert
+///   this struct to/from bytes for Solana storage
+///   Like JSON serialization in Python (json.dumps/json.loads)
+///   But binary format (more efficient than JSON)
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct BalanceEntry {
-    pub key: Pubkey,
-    pub value: u64,
+    pub key: Pubkey,   // Wallet address (like a bank account number)
+    pub value: u64,    // Balance in smallest units (like satoshis for Bitcoin)
 }
 
+/// FrozenEntry stores the frozen status of a wallet account.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct FrozenEntry {
-    pub key: Pubkey,
-    pub frozen: bool,
+    pub key: Pubkey,   // Wallet address
+    pub frozen: bool,  // true = frozen (can't transfer), false = active
 }
 
+// =================================================================
+// TRAIT IMPLEMENTATIONS (Add methods to existing structs)
+// =================================================================
+//
+// Rust lets you add methods to types you define (and even external types!).
+// This is like adding methods to a class in Python or defining methods on a struct in Go.
+
 impl TokenState {
+    /// Check if a given account is an authorized agent
+    ///
+    /// Parameters:
+    /// - &self = reference to this TokenState instance (like 'self' in Python)
+    /// - account = the Pubkey to check
+    ///
+    /// Returns: bool = true if account is in the agents list
+    ///
+    /// Rust explanation:
+    /// - self.agents.contains(account) checks if the Vec contains the Pubkey
+    ///   Like: account in self.agents in Python
+    ///   Or: contains(self.agents, account) in Go (with a helper function)
+    /// - &Pubkey in parameter = we receive a reference (don't take ownership)
+    ///   This is efficient: no copying of the 32-byte Pubkey
     pub fn is_agent(&self, account: &Pubkey) -> bool {
         self.agents.contains(account)
     }
 }
 
-#[error_code]
+// =================================================================
+// ERROR CODES
+// =================================================================
+//
+// Custom error codes that the program can return.
+// Anchor generates efficient error codes (4 bytes each) instead of strings.
+
+#[error_code]  // Anchor macro: generates error code mapping
 pub enum ErrorCode {
-    #[msg("Unauthorized")]
+    /// Caller is not authorized to perform this action
+    /// Returned when: non-agent tries to mint/burn/freeze, or non-owner tries to manage agents
+    #[msg("Unauthorized")]  // Human-readable message for logs
     Unauthorized,
+
+    /// Account doesn't have enough tokens
+    /// Returned when: trying to transfer/burn more than balance
     #[msg("Insufficient balance")]
     InsufficientBalance,
+
+    /// Account is frozen and cannot transfer
+    /// Returned when: trying to transfer from/to a frozen account
     #[msg("Account frozen")]
     AccountFrozen,
 }
