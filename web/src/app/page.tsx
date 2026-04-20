@@ -39,7 +39,7 @@ export default function Home() {
             <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"> Tokens</span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Create and manage ERC-3643 compliant security tokens on Solana with built-in KYC/AML compliance,
+            Create and manage compliant security tokens on Solana with built-in KYC/AML compliance,
             transfer restrictions, and regulatory controls.
           </p>
         </div>

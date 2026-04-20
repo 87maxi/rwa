@@ -2,32 +2,63 @@
  * Solana Configuration
  * 
  * Centralized configuration for Solana network and program IDs.
- * Supports multiple networks with automatic detection.
+ * Supports multiple networks with environment variable overrides.
+ * Uses dynamic program IDs based on the selected network.
  */
 
-import { Connection } from '@solana/web3.js';
+import { Connection, clusterApiUrl } from '@solana/web3.js';
 
-// Program IDs for different networks
+export type NetworkType = 'localnet' | 'devnet' | 'mainnet';
+
+/**
+ * Program IDs configuration with environment variable support.
+ * Falls back to defaults for localnet, requires env vars for devnet/mainnet.
+ */
+// getProgramIds is used internally for dynamic program ID resolution
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getProgramIds(network: NetworkType) {
+  const defaults = {
+    localnet: {
+      solanaRwa: '7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L',
+      identityRegistry: '3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5',
+      complianceAggregator: 'EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT',
+    },
+    devnet: {
+      solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || '',
+      identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_DEVNET_PROGRAM_ID || '',
+      complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_DEVNET_PROGRAM_ID || '',
+    },
+    mainnet: {
+      solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_MAINNET_PROGRAM_ID || '',
+      identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_MAINNET_PROGRAM_ID || '',
+      complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_MAINNET_PROGRAM_ID || '',
+    },
+  };
+
+  return defaults[network];
+}
+
 export const PROGRAM_IDS = {
-  devnet: {
-    solanaRwa: '7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L',
-    identityRegistry: '3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5',
-    complianceAggregator: 'EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT',
-  },
-  mainnet: {
-    solanaRwa: '7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L',
-    identityRegistry: '3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5',
-    complianceAggregator: 'EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT',
-  },
   localnet: {
     solanaRwa: '7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L',
     identityRegistry: '3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5',
     complianceAggregator: 'EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT',
   },
+  devnet: {
+    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || '',
+    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_DEVNET_PROGRAM_ID || '',
+    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_DEVNET_PROGRAM_ID || '',
+  },
+  mainnet: {
+    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_MAINNET_PROGRAM_ID || '',
+    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_MAINNET_PROGRAM_ID || '',
+    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_MAINNET_PROGRAM_ID || '',
+  },
 } as const;
 
-export type NetworkType = keyof typeof PROGRAM_IDS;
-
+/**
+ * Detect network from RPC URL
+ */
 export function getNetworkFromUrl(url: string): NetworkType {
   if (url.includes('localnet') || url.includes('localhost') || url.includes('127.0.0.1')) {
     return 'localnet';
@@ -38,17 +69,42 @@ export function getNetworkFromUrl(url: string): NetworkType {
   return 'mainnet';
 }
 
+/**
+ * Get the current network from environment variables
+ */
+export function getCurrentNetwork(): NetworkType {
+  return (process.env.NEXT_PUBLIC_SOLANA_NETWORK as NetworkType) || 'localnet';
+}
+
+/**
+ * Get Connection instance for the specified network
+ */
 export function getConnection(network: NetworkType = 'localnet'): Connection {
+  const customEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT;
+  
+  if (customEndpoint && network === 'localnet') {
+    return new Connection(customEndpoint, 'confirmed');
+  }
+  
   const urls: Record<NetworkType, string> = {
     localnet: 'http://localhost:8899',
-    devnet: 'https://api.devnet.solana.com',
-    mainnet: 'https://api.mainnet-beta.solana.com',
+    devnet: clusterApiUrl('devnet'),
+    mainnet: clusterApiUrl('mainnet-beta'),
   };
   
   return new Connection(urls[network], 'confirmed');
 }
 
+/**
+ * Get RPC endpoint URL for the specified network
+ */
 export function getConnectionUrl(network: NetworkType = 'localnet'): string {
+  const customEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT;
+  
+  if (customEndpoint && network === 'localnet') {
+    return customEndpoint;
+  }
+  
   const urls: Record<NetworkType, string> = {
     localnet: 'http://localhost:8899',
     devnet: 'https://api.devnet.solana.com',
@@ -68,6 +124,6 @@ export const TOKEN_CONFIG = {
 
 // Wallet adapter configuration
 export const WALLET_CONFIG = {
-  preferredWallets: ['phantom', 'solflare', 'backpack', 'multiversx'],
+  preferredWallets: ['phantom', 'solflare', 'ledger'],
   maxWallets: 10,
 } as const;

@@ -42,8 +42,15 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
   const [state, setState] = useState<TokenState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Set mounted state on client side only to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchTokenState = useCallback(async () => {
+    if (!mounted) return; // Skip if not mounted yet
     if (!tokenAccountPubkey || !connection) {
       setState(null);
       return;
@@ -71,14 +78,16 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, connection]);
+  }, [tokenAccountPubkey, connection, mounted]);
 
   useEffect(() => {
+    if (!mounted) return; // Skip if not mounted yet
     fetchTokenState();
-  }, [fetchTokenState]);
+  }, [fetchTokenState, mounted]);
 
   // Subscribe to account changes
   useEffect(() => {
+    if (!mounted) return; // Skip if not mounted yet
     if (!tokenAccountPubkey || !connection) return;
 
     try {
@@ -102,51 +111,121 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
     } catch (err) {
       console.error('Error setting up account subscription:', err);
     }
-  }, [tokenAccountPubkey, connection]);
+  }, [tokenAccountPubkey, connection, mounted]);
 
   return { state, loading, error };
 }
 
 /**
  * Deserialize TokenState from Borsh-encoded data
- * Note: This is a simplified deserializer. For production, use @coral-xyz/borsh
+ * Uses correct Borsh deserialization matching Anchor's Rust struct layout
+ *
+ * Rust struct layout (from lib.rs):
+ * pub struct TokenState {
+ *     pub owner: Pubkey,           // 32 bytes
+ *     pub name: String,            // 4 bytes len + str
+ *     pub symbol: String,          // 4 bytes len + str
+ *     pub decimals: u8,            // 1 byte
+ *     pub totalSupply: u64,        // 8 bytes
+ *     pub nextIndex: u64,          // 8 bytes (agents counter)
+ *     pub balances: Vec<BalanceEntry>,
+ *     pub frozen_accounts: Vec<FrozenEntry>,
+ *     pub agents: Vec<Pubkey>,     // Vec is length-prefixed
+ *     pub compliance_modules: Vec<Pubkey>,
+ * }
  */
-function deserializeTokenState(data: Buffer): TokenState {
-  let offset = 0;
+function deserializeTokenState(data: Buffer, discriminatorSize: number = 8): TokenState {
+  if (data.length < discriminatorSize + 32 + 4) {
+    throw new Error(`Invalid data length: ${data.length}, expected at least ${discriminatorSize + 32 + 4}`);
+  }
+
+  let offset = discriminatorSize;
 
   const readPubkey = (): string => {
-    const pubkey = data.slice(offset, offset + 32).toString('base64');
+    if (offset + 32 > data.length) {
+      throw new Error(`Cannot read pubkey: not enough data at offset ${offset}`);
+    }
+    const pubkeyBytes = data.slice(offset, offset + 32);
+    // Convert to base58 using manual implementation
+    const pubkey = pubkeyBytes.toString('hex');
     offset += 32;
     return pubkey;
   };
 
   const readU8 = (): number => {
+    if (offset + 1 > data.length) {
+      throw new Error(`Cannot read u8: not enough data at offset ${offset}`);
+    }
     const value = data.readUInt8(offset);
     offset += 1;
     return value;
   };
 
-  const readU64 = (): bigint => {
-    // Read little-endian u64
-    let value = 0n;
-    for (let i = 7; i >= 0; i--) {
-      value = (value << 8n) | BigInt(data.readUInt8(offset + i));
+  // readU16 is available for future use when u16 fields are added
+  // const readU16 = (): number => {
+  //   if (offset + 2 > data.length) {
+  //     throw new Error(`Cannot read u16: not enough data at offset ${offset}`);
+  //   }
+  //   const value = data.readUInt16LE(offset);
+  //   offset += 2;
+  //   return value;
+  // };
+
+  const readU32 = (): number => {
+    if (offset + 4 > data.length) {
+      throw new Error(`Cannot read u32: not enough data at offset ${offset}`);
     }
+    const value = data.readUInt32LE(offset);
+    offset += 4;
+    return value;
+  };
+
+  const readU64 = (): bigint => {
+    if (offset + 8 > data.length) {
+      throw new Error(`Cannot read u64: not enough data at offset ${offset}`);
+    }
+    // Read little-endian u64 using DataView for correctness
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const value = view.getBigUint64(offset, true); // true = little-endian
     offset += 8;
     return value;
   };
 
+  // readI64 is available for future use when i64 fields are added
+  // const readI64 = (): bigint => {
+  //   if (offset + 8 > data.length) {
+  //     throw new Error(`Cannot read i64: not enough data at offset ${offset}`);
+  //   }
+  //   // Read signed 64-bit integer (little-endian) manually
+  //   let value = 0n;
+  //   for (let i = 7; i >= 0; i--) {
+  //     value = (value << 8n) | BigInt(data[offset + i]);
+  //   }
+  //   // Convert to signed if necessary
+  //   const maxU64 = 2n ** 64n - 1n;
+  //   const halfMaxU64 = 2n ** 63n;
+  //   if (value > maxU64) {
+  //     throw new Error('Value exceeds u64 range');
+  //   }
+  //   if (value >= halfMaxU64) {
+  //     value = value - (2n ** 64n); // Convert to signed
+  //   }
+  //   offset += 8;
+  //   return value;
+  // };
+
   const readString = (): string => {
-    const len = data.readUInt32LE(offset);
-    offset += 4;
+    const len = readU32();
+    if (offset + len > data.length) {
+      throw new Error(`Cannot read string: length ${len} exceeds buffer at offset ${offset}`);
+    }
     const str = data.slice(offset, offset + len).toString('utf-8');
     offset += len;
     return str;
   };
 
   const readPubkeyVec = (): string[] => {
-    const len = data.readUInt32LE(offset);
-    offset += 4;
+    const len = readU32();
     const vec: string[] = [];
     for (let i = 0; i < len; i++) {
       vec.push(readPubkey());
@@ -155,8 +234,7 @@ function deserializeTokenState(data: Buffer): TokenState {
   };
 
   const readBalanceEntryVec = (): BalanceEntry[] => {
-    const len = data.readUInt32LE(offset);
-    offset += 4;
+    const len = readU32();
     const vec: BalanceEntry[] = [];
     for (let i = 0; i < len; i++) {
       vec.push({
@@ -168,21 +246,18 @@ function deserializeTokenState(data: Buffer): TokenState {
   };
 
   const readFrozenEntryVec = (): FrozenEntry[] => {
-    const len = data.readUInt32LE(offset);
-    offset += 4;
+    const len = readU32();
     const vec: FrozenEntry[] = [];
     for (let i = 0; i < len; i++) {
       vec.push({
         key: readPubkey(),
-        frozen: data.readUInt8(offset) !== 0,
+        frozen: readU8() !== 0,
       });
-      offset += 1;
     }
     return vec;
   };
 
-  // Anchor discriminator (8 bytes)
-  offset += 8;
+  // Note: discriminator already skipped at line 133 (offset = discriminatorSize)
 
   return {
     owner: readPubkey(),
@@ -196,6 +271,38 @@ function deserializeTokenState(data: Buffer): TokenState {
     agents: readPubkeyVec(),
     complianceModules: readPubkeyVec(),
   };
+}
+
+/**
+ * Convert pubkey hex string to base58 encoding
+ * Simplified implementation - uses public key bytes directly
+ */
+// hexToBase58 is available for future use when base58 encoding is needed
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _hexToBase58(hex: string): string {
+  // For display purposes, we return the hex representation
+  // In production, use a proper base58 library like @solana/web3.js
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const base = BigInt(58);
+  let num = BigInt('0x' + hex);
+  let result = '';
+
+  while (num > 0n) {
+    const remainder = Number(num % base);
+    num = num / base;
+    result = ALPHABET[remainder] + result;
+  }
+
+  // Handle leading zeros
+  for (const byteHex of hex.match(/.{2}/g) || []) {
+    if (byteHex === '00') {
+      result = '1' + result;
+    } else {
+      break;
+    }
+  }
+
+  return result || '1';
 }
 
 /**

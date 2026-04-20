@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
@@ -12,8 +12,21 @@ import {
   CoinbaseWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type NetworkType } from '@/config/solana';
+import { useSolanaNotification, useWalletErrorHandling } from '@/hooks/useSolanaNotification';
 import '@solana/wallet-adapter-react-ui/styles.css';
+
+// React Query configuration for Solana queries
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 2,
+      staleTime: 5000,
+    },
+  },
+});
 
 interface SolanaProviderProps {
   children: React.ReactNode;
@@ -22,45 +35,56 @@ interface SolanaProviderProps {
 }
 
 export function SolanaProvider({ children, network = 'localnet', endpoint }: SolanaProviderProps) {
-  const [networkUrl, setNetworkUrl] = useState<string>('');
+  // Initialize notification system
+  const { error: showError } = useSolanaNotification();
 
-  // Determine network URL based on configuration
-  useEffect(() => {
-    if (endpoint) {
-      setNetworkUrl(endpoint);
-    } else {
-      const urls: Record<NetworkType, string> = {
-        localnet: 'http://localhost:8899',
-        devnet: 'https://api.devnet.solana.com',
-        mainnet: 'https://api.mainnet-beta.solana.com',
-      };
-      setNetworkUrl(urls[network]);
-    }
-  }, [network, endpoint]);
+  // Handle wallet errors with user-friendly messages
+  const handleWalletError = useWalletErrorHandling((message: string) => {
+    showError(message);
+  });
+
+  // Error handler for WalletProvider
+  const handleError = useCallback(
+    (error: unknown) => {
+      console.error('[SolanaProvider] Wallet error:', error);
+      handleWalletError(error);
+    },
+    [handleWalletError]
+  );
 
   // Determine Solana network type for RPC
   const solanaNetwork = useMemo(() => {
-    if (networkUrl.includes('localhost') || networkUrl.includes('127.0.0.1')) {
+    if (endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'))) {
       return WalletAdapterNetwork.Devnet; // Use Devnet as fallback, we'll override endpoint
     }
-    if (networkUrl.includes('devnet')) {
+    if (network === 'devnet') {
       return WalletAdapterNetwork.Devnet;
     }
-    if (networkUrl.includes('mainnet')) {
+    if (network === 'mainnet') {
       return WalletAdapterNetwork.Mainnet;
     }
     return WalletAdapterNetwork.Devnet;
-  }, [networkUrl]);
+  }, [network, endpoint]);
 
   // Final RPC endpoint
   const finalEndpoint = useMemo(() => {
     // Always use the custom endpoint if provided or configured
-    if (networkUrl.includes('localhost') || networkUrl.includes('127.0.0.1')) {
-      return networkUrl;
+    if (endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'))) {
+      return endpoint;
+    }
+    // urls is defined for potential future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _urls: Record<NetworkType, string> = {
+      localnet: 'http://localhost:8899',
+      devnet: 'https://api.devnet.solana.com',
+      mainnet: 'https://api.mainnet-beta.solana.com',
+    };
+    if (endpoint) {
+      return endpoint;
     }
     // For public networks, use cluster API URL
     return clusterApiUrl(solanaNetwork);
-  }, [networkUrl, solanaNetwork]);
+  }, [endpoint, solanaNetwork]);
 
   // Available wallets - agnostic support for multiple Solana wallets
   const wallets = useMemo(
@@ -76,17 +100,19 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
   );
 
   return (
-    <ConnectionProvider endpoint={finalEndpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <QueryClientProvider client={queryClient}>
+      <ConnectionProvider endpoint={finalEndpoint}>
+        <WalletProvider wallets={wallets} autoConnect onError={handleError}>
+          <WalletModalProvider>{children}</WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </QueryClientProvider>
   );
 }
 
 // Network selector hook
-export function useNetworkSelector() {
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkType>('localnet');
+export function useNetworkSelector(initialNetwork: NetworkType = 'localnet') {
+  const [selectedNetwork, setSelectedNetwork] = React.useState<NetworkType>(initialNetwork);
 
   const switchNetwork = (network: NetworkType) => {
     setSelectedNetwork(network);

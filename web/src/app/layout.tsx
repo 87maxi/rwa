@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SolanaProvider } from "@/providers/SolanaProvider";
+import { NotificationContainer } from "@/components/NotificationContainer";
+import { NetworkStatus } from "@/components/NetworkStatus";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,12 +27,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SolanaProvider network="localnet">
           {children}
+          <NotificationContainer />
+          <NetworkStatus />
         </SolanaProvider>
       </body>
     </html>
