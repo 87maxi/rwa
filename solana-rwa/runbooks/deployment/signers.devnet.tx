@@ -1,3 +1,5 @@
+# Devnet Signers - Testing Environment
+# Uses web wallet for browser-based signing at runtime
 
 signer "payer" "svm::web_wallet" {
     description = "Pays fees for program deployments and operations"

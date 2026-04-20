@@ -1,3 +1,5 @@
+# Localnet Signers - Development Environment
+# Uses secret key for direct access (security not critical in development)
 
 signer "payer" "svm::secret_key" {
     description = "Pays fees for program deployments and operations"

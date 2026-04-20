@@ -1,5 +1,9 @@
 ################################################################
-# Manage solana-rwa deployment through Crypto Infrastructure as Code
+# Solana RWA - Complete Deployment & Initialization Runbook
+# Deploys and initializes all three programs:
+#   1. compliance_aggregator (no dependencies)
+#   2. identity_registry (depends on compliance_aggregator)
+#   3. solana_rwa (depends on both)
 ################################################################
 
 addon "svm" {
@@ -7,35 +11,178 @@ addon "svm" {
     network_id = input.network_id
 }
 
+# =============================================================================
+# PHASE 1: Deploy Programs
+# =============================================================================
+
 action "deploy_compliance_aggregator" "svm::deploy_program" {
     description = "Deploy compliance_aggregator program"
-    program = svm::get_program_from_anchor_project("compliance_aggregator") 
+    program = svm::get_program_from_anchor_project("compliance_aggregator")
     authority = signer.authority
     payer = signer.payer
-    // Optional: if you want to deploy the program via a cheatcode when targeting a Surfnet, set `instant_surfnet_deployment = true`
-    // Deploying via a cheatcode will write the program data directly to the program account, rather than sending transactions.
-    // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
-    // instant_surfnet_deployment = true
+    // For localnet, use instant deployment (cheatcode)
+    // This writes program data directly to account instead of transactions
+    instant_surfnet_deployment = true
 }
 
 action "deploy_identity_registry" "svm::deploy_program" {
     description = "Deploy identity_registry program"
-    program = svm::get_program_from_anchor_project("identity_registry") 
+    program = svm::get_program_from_anchor_project("identity_registry")
     authority = signer.authority
     payer = signer.payer
-    // Optional: if you want to deploy the program via a cheatcode when targeting a Surfnet, set `instant_surfnet_deployment = true`
-    // Deploying via a cheatcode will write the program data directly to the program account, rather than sending transactions.
-    // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
-    // instant_surfnet_deployment = true
+    instant_surfnet_deployment = true
 }
 
 action "deploy_solana_rwa" "svm::deploy_program" {
-    description = "Deploy solana_rwa program"
-    program = svm::get_program_from_anchor_project("solana_rwa") 
+    description = "Deploy solana_rwa (token) program"
+    program = svm::get_program_from_anchor_project("solana_rwa")
     authority = signer.authority
     payer = signer.payer
-    // Optional: if you want to deploy the program via a cheatcode when targeting a Surfnet, set `instant_surfnet_deployment = true`
-    // Deploying via a cheatcode will write the program data directly to the program account, rather than sending transactions.
-    // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
-    // instant_surfnet_deployment = true
+    instant_surfnet_deployment = true
+}
+
+# =============================================================================
+# PHASE 2: Initialize Programs
+# =============================================================================
+
+# Store program IDs as variables for later use
+variable "compliance_aggregator_id" {
+    description = "Program ID of deployed compliance_aggregator"
+    value = action.deploy_compliance_aggregator.program_id
+}
+
+variable "identity_registry_id" {
+    description = "Program ID of deployed identity_registry"
+    value = action.deploy_identity_registry.program_id
+}
+
+variable "solana_rwa_id" {
+    description = "Program ID of deployed solana_rwa"
+    value = action.deploy_solana_rwa.program_id
+}
+
+# Initialize Compliance Aggregator
+action "init_compliance_aggregator" "svm::process_instructions" {
+    description = "Initialize compliance_aggregator program state"
+    instruction {
+        program_idl = action.deploy_compliance_aggregator.program_idl
+        instruction_name = "initialize"
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+        
+        authority {
+            public_key = signer.authority.public_key
+        }
+        
+        system_program = svm::system_program_id()
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# Initialize Identity Registry
+action "init_identity_registry" "svm::process_instructions" {
+    description = "Initialize identity_registry program state"
+    instruction {
+        program_idl = action.deploy_identity_registry.program_idl
+        instruction_name = "initialize"
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+        
+        authority {
+            public_key = signer.authority.public_key
+        }
+        
+        system_program = svm::system_program_id()
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# Initialize Solana RWA Token
+action "init_solana_rwa" "svm::process_instructions" {
+    description = "Initialize solana_rwa token with name, symbol, and decimals"
+    instruction {
+        program_idl = action.deploy_solana_rwa.program_idl
+        instruction_name = "initialize"
+        instruction_args = [
+            input.token_name,
+            input.token_symbol,
+            input.token_decimals
+        ]
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+        
+        authority {
+            public_key = signer.authority.public_key
+        }
+        
+        system_program = svm::system_program_id()
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# =============================================================================
+# PHASE 3: Setup Agents (Optional)
+# =============================================================================
+
+action "add_agent_to_solana_rwa" "svm::process_instructions" {
+    description = "Add an agent to solana_rwa program (optional)"
+    instruction {
+        program_idl = action.deploy_solana_rwa.program_idl
+        instruction_name = "add_agent"
+        instruction_args = [input.agent_pubkey]
+        
+        payer {
+            public_key = signer.payer.public_key
+        }
+        
+        authority {
+            public_key = signer.authority.public_key
+        }
+    }
+    signers = [signer.payer, signer.authority]
+}
+
+# =============================================================================
+# Outputs - Display deployment results
+# =============================================================================
+
+output "deployment_summary" {
+    description = "Summary of all deployed programs"
+    value = "compliance_aggregator: ${action.deploy_compliance_aggregator.program_id}\nidentity_registry: ${action.deploy_identity_registry.program_id}\nsolana_rwa: ${action.deploy_solana_rwa.program_id}"
+}
+
+output "compliance_aggregator_program_id" {
+    description = "Program ID of compliance_aggregator"
+    value = action.deploy_compliance_aggregator.program_id
+}
+
+output "identity_registry_program_id" {
+    description = "Program ID of identity_registry"
+    value = action.deploy_identity_registry.program_id
+}
+
+output "solana_rwa_program_id" {
+    description = "Program ID of solana_rwa"
+    value = action.deploy_solana_rwa.program_id
+}
+
+output "compliance_aggregator_init_signature" {
+    description = "Transaction signature of compliance_aggregator initialization"
+    value = action.init_compliance_aggregator.signature
+}
+
+output "identity_registry_init_signature" {
+    description = "Transaction signature of identity_registry initialization"
+    value = action.init_identity_registry.signature
+}
+
+output "solana_rwa_init_signature" {
+    description = "Transaction signature of solana_rwa initialization"
+    value = action.init_solana_rwa.signature
 }

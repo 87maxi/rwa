@@ -1,5 +1,5 @@
-
-// For mainnet deployment, use web wallets, hardware wallets or multisig to improve key security.
+# Mainnet Signers - Production Environment
+# For mainnet deployment, use web wallets, hardware wallets or multisig to improve key security.
 
 signer "payer" "svm::web_wallet" {
     description = "Pays fees for program deployments and operations"
@@ -11,4 +11,10 @@ signer "authority" "svm::web_wallet" {
     description = "Can upgrade programs and manage critical ops"
     // expected_address = input.expected_payer_address
     // See documentation for other options (squads, etc): https://docs.surfpool.run/iac/svm/signers
+    // For mainnet, consider using squads multisig:
+    // signer "authority" "svm::squads" {
+    //     multisig_pda = "..."
+    //     threshold = 2
+    //     members = ["key1", "key2", "key3"]
+    // }
 }

@@ -2,16 +2,77 @@
 name: solana-rwa
 id: solana-rwa
 runbooks:
+  # Main deployment runbook - deploys and initializes all programs
   - name: deployment
-    description: Deploy programs
-    location: runbooks/deployment
+    description: Deploy and initialize all Solana RWA programs (solana_rwa, identity_registry, compliance_aggregator)
+    location: ./runbooks/deployment
+    state:
+      location: .surfpool/state
+
+  # Token operations runbook - mint, transfer, manage agents
+  - name: token-operations
+    description: Token operations (mint, transfer, add/remove agents, freeze/unfreeze accounts)
+    location: ./runbooks/deployment
+    # No state management for operations - they run each time
+
+  # Upgrade runbook - upgrade deployed programs
+  - name: upgrade
+    description: Upgrade deployed programs to new versions
+    location: ./runbooks/deployment
+    state:
+      location: .surfpool/state
+
+  # Surfnet setup runbook - configure local environment
+  - name: setup-surfnet
+    description: Configure Surfnet environment (balances, token accounts, program authorities)
+    location: ./runbooks/deployment
+    # No state management for setup
+
+# Input variables available to all runbooks, grouped by environment
 environments:
   localnet:
-      network_id: localnet
-      rpc_api_url: http://127.0.0.1:8899
-  devnet:
-      network_id: devnet
-      rpc_api_url: https://api.devnet.solana.com
-      payer_keypair_json: ~/.config/solana/id.json
-      authority_keypair_json: ~/.config/solana/id.json
+    network_id: localnet
+    rpc_api_url: http://127.0.0.1:8899
+    payer_keypair_json: ~/.config/solana/id.json
+    authority_keypair_json: ~/.config/solana/id.json
+    # Token initialization parameters
+    token_name: "RWA Token"
+    token_symbol: "RWA"
+    token_decimals: 9
+    # Agent to add (optional, leave empty to skip)
+    agent_pubkey: ""
+    # Program IDs for token operations (set after deployment)
+    solana_rwa_program_id: ""
+    identity_registry_program_id: ""
+    compliance_aggregator_program_id: ""
+    token_program_id: ""
+    # Token state account (set after initialization)
+    token_state_account: ""
 
+  devnet:
+    network_id: devnet
+    rpc_api_url: https://api.devnet.solana.com
+    token_name: "RWA Token Devnet"
+    token_symbol: "RWAD"
+    token_decimals: 9
+    agent_pubkey: ""
+    solana_rwa_program_id: ""
+    identity_registry_program_id: ""
+    compliance_aggregator_program_id: ""
+    token_program_id: ""
+    token_state_account: ""
+    expected_payer_address: ""
+
+  mainnet:
+    network_id: mainnet
+    rpc_api_url: https://api.mainnet-beta.solana.com
+    token_name: "RWA Token"
+    token_symbol: "RWA"
+    token_decimals: 9
+    agent_pubkey: ""
+    solana_rwa_program_id: ""
+    identity_registry_program_id: ""
+    compliance_aggregator_program_id: ""
+    token_program_id: ""
+    token_state_account: ""
+    expected_payer_address: ""
