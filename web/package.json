@@ -22,9 +22,7 @@
     "bn.js": "^5.2.3",
     "next": "15.5.5",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "viem": "^2.38.2",
-    "wagmi": "^2.18.1"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
