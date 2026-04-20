@@ -4,172 +4,117 @@ import { useEffect, useState, useCallback } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import type { Connection } from '@solana/web3.js';
 
-/**
- * NetworkStatus component - Displays real-time network status
- * Shows current network, slot number, and connection status
- */
 export function NetworkStatus() {
-  const { connection }: { connection: Connection } = useConnection();
-  const [networkType, setNetworkType] = useState<'localnet' | 'devnet' | 'mainnet'>('localnet');
+  const { connection } = useConnection();
   const [slot, setSlot] = useState<number>(0);
-  const [connected, setConnected] = useState<boolean>(false);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [mounted, setMounted] = useState<boolean>(false);
+  const [latency, setLatency] = useState<number>(0);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
 
   const fetchSlot = useCallback(async () => {
+    const startTime = Date.now();
     try {
-      const currentSlot = await connection.getSlot();
-      setSlot(currentSlot);
-      setConnected(true);
-      setLastUpdate(new Date());
+      const slotNumber = await connection.getSlot();
+      const end_time = Date.now();
+      setSlot(slotNumber);
+      setLatency(end_time - startTime);
+      setIsConnected(true);
     } catch {
-      setConnected(false);
+      setIsConnected(false);
     }
   }, [connection]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    
-    // Detect network type from connection config
-    const endpoint = connection.rpcEndpoint;
-    if (endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) {
-      setNetworkType('localnet');
-    } else if (endpoint.includes('devnet')) {
-      setNetworkType('devnet');
-    } else if (endpoint.includes('mainnet')) {
-      setNetworkType('mainnet');
-    }
-
     // Initial fetch
     fetchSlot();
-
-    // Poll slot every 5 seconds
+    
+    // Update every 5 seconds
     const interval = setInterval(fetchSlot, 5000);
-
+    
     return () => clearInterval(interval);
-  }, [connection, fetchSlot, mounted]);
+  }, [fetchSlot]);
 
-  const networkLabel = getNetworkLabel(networkType);
-  const networkColor = getNetworkColor(networkType);
+  const getNetworkColor = (network: string): string => {
+    const colors: Record<string, string> = {
+      localnet: '#8b5cf6',
+      devnet: '#f59e0b',
+      mainnet: '#10b981',
+      unknown: '#64748b',
+    };
+    return colors[network] || colors.unknown;
+  };
 
-  if (!mounted) return null;
+  const getNetworkLabel = (network: string): string => {
+    const labels: Record<string, string> = {
+      localnet: 'Localnet',
+      devnet: 'Devnet',
+      mainnet: 'Mainnet',
+      unknown: 'Unknown',
+    };
+    return labels[network] || labels.unknown;
+  };
+
+  // Get network from connection config or default to localnet
+  const network = connection.rpcEndpoint.includes('devnet') 
+    ? 'devnet' 
+    : connection.rpcEndpoint.includes('mainnet') 
+      ? 'mainnet' 
+      : 'localnet';
+
+  const color = getNetworkColor(network);
+  const label = getNetworkLabel(network);
 
   return (
-    <div className="fixed bottom-4 left-4 z-40">
-      <div
-        className={`
-          relative backdrop-blur-xl rounded-xl shadow-2xl
-          px-4 py-2.5 min-w-72 overflow-hidden
-          animate-[fadeInUp_0.3s_ease-out]
-          border
-        `}
-        style={{
-          background: `linear-gradient(135deg, ${networkColor}10 0%, ${networkColor}05 100%)`,
-          borderColor: `${networkColor}30`
-        }}
-      >
-        {/* Animated border glow */}
-        <div className="absolute inset-0 rounded-xl" style={{ boxShadow: `inset 0 0 20px ${networkColor}10` }} />
-        
-        {/* Scanning line animation */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r-transparent via-primary to-transparent opacity-50"
-             style={{
-               background: `linear-gradient(90deg, transparent, ${networkColor}, transparent)`,
-               animation: 'shimmer 3s ease-in-out infinite'
-             }}
-        />
-        
-        <div className="relative flex items-center gap-3">
-          {/* Status indicator */}
-          <div className="relative flex-shrink-0">
-            <div
-              className={`
-                w-2.5 h-2.5 rounded-full
-                ${connected ? 'bg-success' : 'bg-error'}
-                ${connected ? 'animate-pulse' : ''}
-              `}
+    <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface/50 border border-surface-border" 
+      style={{ 
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      {/* Connection status */}
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          {/* Outer ring */}
+          <div 
+            className="w-2 h-2 rounded-full"
+            style={{ 
+              backgroundColor: isConnected ? color : '#ef4444',
+              boxShadow: `0 0 6px ${isConnected ? color + '60' : '#ef444460'}`
+            }}
+          />
+          {/* Pulse animation */}
+          {isConnected && (
+            <div 
+              className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60" 
+              style={{ backgroundColor: color }}
             />
-            {connected && (
-              <div
-                className={`
-                  absolute inset-0 rounded-full
-                  bg-success animate-ping
-                  opacity-50
-                `}
-              />
-            )}
-          </div>
-          
-          {/* Network info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-foreground truncate">{networkLabel}</span>
-              <span className="text-[10px] text-foreground-muted font-mono">
-                #{slot.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-foreground-muted">
-              <span className={connected ? 'text-success' : 'text-error'}>
-                {connected ? '● Connected' : '○ Disconnected'}
-              </span>
-              <span className="hidden sm:inline opacity-50">
-                {lastUpdate.toLocaleTimeString()}
-              </span>
-            </div>
-          </div>
-
-          {/* Network icon */}
-          <div className="flex-shrink-0">
-            <svg className="w-4 h-4 text-foreground-muted" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-            </svg>
-          </div>
+          )}
         </div>
+        <span className="text-xs font-semibold text-foreground truncate">{label}</span>
+      </div>
+      
+      <div className="h-4 w-px bg-surface-border" />
+      
+      {/* Slot and latency */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-foreground-muted tabular-nums">Slot: <span className="text-foreground-secondary tabular-nums">{slot.toLocaleString()}</span></span>
+        <span className={`tabular-nums ${latency > 200 ? 'text-warning' : 'text-success'}`}>{latency}ms</span>
       </div>
     </div>
   );
 }
 
-function getNetworkLabel(network: 'localnet' | 'devnet' | 'mainnet'): string {
-  const labels: Record<string, string> = {
-    localnet: 'Localnet',
-    devnet: 'Devnet',
-    mainnet: 'Mainnet',
-  };
-  return labels[network] || 'Unknown';
-}
-
-function getNetworkColor(network: 'localnet' | 'devnet' | 'mainnet'): string {
-  const colors: Record<string, string> = {
-    localnet: '#8b5cf6',
-    devnet: '#f59e0b',
-    mainnet: '#10b981',
-  };
-  return colors[network] || colors.localnet;
-}
-
-/**
- * NetworkBadge component - Compact network status badge
- */
 export function NetworkBadge({ network }: { network?: 'localnet' | 'devnet' | 'mainnet' }) {
-  const net = network || 'localnet';
-  const label = getNetworkLabel(net);
-  const color = getNetworkColor(net);
+  const color = network === 'mainnet' ? '#10b981' : network === 'devnet' ? '#f59e0b' : '#8b5cf6';
+  const label = network === 'mainnet' ? 'Mainnet' : network === 'devnet' ? 'Devnet' : 'Localnet';
 
   return (
-    <span
-      className={`
-        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
-        border backdrop-blur-sm
-      `}
-      style={{
-        background: `${color}10`,
+    <div 
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
+      style={{ 
+        background: `${color}15`,
         borderColor: `${color}30`,
-        color: color
+        color: color,
+        border: '1.5px solid'
       }}
     >
       <span
@@ -177,6 +122,6 @@ export function NetworkBadge({ network }: { network?: 'localnet' | 'devnet' | 'm
         style={{ backgroundColor: color }}
       />
       {label}
-    </span>
+    </div>
   );
 }

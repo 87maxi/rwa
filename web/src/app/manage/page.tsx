@@ -124,50 +124,69 @@ export default function ManagePage() {
       <div className="fixed inset-0 grid-pattern pointer-events-none opacity-50" />
       <div className="noise-overlay fixed inset-0 pointer-events-none" />
 
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-surface-border/50 shadow-lg">
-        {/* Top gradient line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-secondary to-primary animate-gradientShift" />
+      {/* ============================================
+          ENHANCED NAVBAR WITH ANIMATED HEADER
+          ============================================ */}
+      <nav className="navbar-container sticky top-0 z-50 backdrop-blur-xl border-b border-surface-border/50">
+        {/* Animated gradient top line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-secondary to-primary animate-gradientShift" style={{ backgroundSize: '200% auto' }} />
         
+        {/* Header animation - floating particles */}
+        <div className="absolute top-0 left-0 right-0 h-32 pointer-events-none overflow-hidden opacity-30">
+          <div className="absolute top-0 left-1/4 w-2 h-2 bg-primary rounded-full animate-float" style={{ animationDelay: '0s' }} />
+          <div className="absolute top-5 left-1/3 w-1.5 h-1.5 bg-secondary rounded-full animate-float" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-2 left-1/2 w-1 h-1 bg-primary-light rounded-full animate-float" style={{ animationDelay: '2s' }} />
+          <div className="absolute top-8 left-2/3 w-2 h-2 bg-secondary rounded-full animate-float" style={{ animationDelay: '0.5s' }} />
+        </div>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-18">
             {/* Left side - Back + Title */}
-            <div className="flex items-center gap-4">
+            <div className="navbar-brand flex items-center gap-4">
               <Link href="/" className="group flex items-center gap-2 text-foreground-tertiary hover:text-foreground transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-surface/50 border border-surface-border flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-10 h-10 rounded-xl bg-surface/50 border border-surface-border flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </div>
                 <span className="hidden sm:inline text-sm font-medium">Back</span>
               </Link>
               
-              <div className="hidden md:flex items-center px-3 py-1.5 bg-surface/50 rounded-full border border-surface-border/50">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
-                  <span className="text-xs text-foreground-secondary">Solana</span>
+              <div className="hidden md:flex navbar-badge">
+                <div className="relative">
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                  <div className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-60 bg-success" />
                 </div>
+                <span className="text-success-light">Solana Active</span>
               </div>
 
               <div className="h-6 w-px bg-surface-border hidden md:block" />
               
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-gradient-to-br from-secondary to-primary rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+              <div className="flex items-center gap-3">
+                {/* Enhanced logo with corner highlight */}
+                <div className="relative w-11 h-11 flex-shrink-0">
+                  <div className="absolute inset-0 bg-gradient-to-br from-secondary to-primary rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-500 opacity-40 blur-sm" />
+                  <div className="relative w-11 h-11 bg-gradient-to-br from-secondary to-primary rounded-xl flex items-center justify-center shadow-glow-secondary">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div className="absolute top-1 left-1 w-3 h-3 rounded-tl-lg bg-white/20" />
                 </div>
-                <h1 className="text-lg font-bold bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
-                  Manage Tokens
-                </h1>
+                <div>
+                  <h1 className="navbar-brand-text bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">
+                    Manage Tokens
+                  </h1>
+                  <p className="navbar-subtitle text-foreground-muted">Solana RWA Platform</p>
+                </div>
               </div>
             </div>
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
+            <div className="navbar-actions flex items-center gap-3">
               <NetworkStatus />
-              <div className="h-6 w-px bg-surface-border" />
+              <div className="navbar-divider" />
               <WalletConnect />
             </div>
           </div>
@@ -175,17 +194,17 @@ export default function ManagePage() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 relative z-10">
+      <main className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Wallet Info */}
-        <div className="glass-card p-6 mb-8 animate-fadeInUp">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="glass-card p-8 mb-12 animate-fadeInUp">
+          <div className="flex flex-wrap items-center justify-between gap-6">
             <div>
               <p className="text-sm text-foreground-tertiary mb-1">Connected Wallet</p>
-              <p className="font-mono text-foreground">{shortAddress}</p>
+              <p className="font-mono text-foreground text-lg">{shortAddress}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-foreground-tertiary mb-1">SOL Balance</p>
-              <p className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <p className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 {isLoading ? '...' : solBalance.toFixed(4)} SOL
               </p>
             </div>
@@ -194,32 +213,34 @@ export default function ManagePage() {
 
         {/* Tabs */}
         <div className="glass-card overflow-hidden animate-fadeInUp">
-          <div className="border-b border-surface-border">
-            <nav className="flex overflow-x-auto">
+          {/* Enhanced Tab Navigation */}
+          <div className="border-b border-surface-border" style={{ background: 'rgba(10, 10, 46, 0.3)' }}>
+            <div className="tab-container overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                  className={`tab-button ${
                     activeTab === tab.id
-                      ? 'border-primary text-primary-light bg-primary/5'
-                      : 'border-transparent text-foreground-tertiary hover:text-foreground-secondary hover:border-primary/50'
+                      ? 'tab-button-active'
+                      : 'tab-button-inactive'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                   </svg>
                   {tab.label}
                 </button>
               ))}
-            </nav>
+            </div>
           </div>
 
           {/* Transfer Tab */}
           {activeTab === 'transfer' && (
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Transfer Tokens</h3>
-              <form onSubmit={handleTransfer} className="max-w-lg space-y-4">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Transfer Tokens</h3>
+              <p className="text-foreground-tertiary mb-8">Send tokens to another Solana address.</p>
+              <form onSubmit={handleTransfer} className="max-w-lg space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">Recipient Address</label>
                   <input
@@ -227,7 +248,7 @@ export default function ManagePage() {
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
@@ -239,14 +260,14 @@ export default function ManagePage() {
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow hover:shadow-glow-secondary"
+                  className="w-full px-6 py-4 btn-primary bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold shadow-glow hover:shadow-glow-secondary min-h-[56px]"
                 >
                   {isLoading ? 'Processing...' : 'Transfer Tokens'}
                 </button>
@@ -256,9 +277,10 @@ export default function ManagePage() {
 
           {/* Mint Tab */}
           {activeTab === 'mint' && (
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Mint New Tokens</h3>
-              <form onSubmit={handleMint} className="max-w-lg space-y-4">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Mint New Tokens</h3>
+              <p className="text-foreground-tertiary mb-8">Create new tokens and send to a recipient.</p>
+              <form onSubmit={handleMint} className="max-w-lg space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">Recipient Address</label>
                   <input
@@ -266,7 +288,7 @@ export default function ManagePage() {
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
@@ -278,14 +300,14 @@ export default function ManagePage() {
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:from-primary-dark hover:to-secondary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow hover:shadow-glow-secondary"
+                  className="w-full px-6 py-4 btn-primary bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold shadow-glow hover:shadow-glow-secondary min-h-[56px]"
                 >
                   {isLoading ? 'Processing...' : 'Mint Tokens'}
                 </button>
@@ -295,9 +317,10 @@ export default function ManagePage() {
 
           {/* Burn Tab */}
           {activeTab === 'burn' && (
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Burn Tokens</h3>
-              <form onSubmit={handleBurn} className="max-w-lg space-y-4">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Burn Tokens</h3>
+              <p className="text-foreground-tertiary mb-8">Permanently remove tokens from circulation.</p>
+              <form onSubmit={handleBurn} className="max-w-lg space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">From Address</label>
                   <input
@@ -305,7 +328,7 @@ export default function ManagePage() {
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
                     required
                   />
                 </div>
@@ -317,14 +340,14 @@ export default function ManagePage() {
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
                     step="0.000000001"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-error focus:border-transparent transition-all hover:border-error/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-error to-warning text-white rounded-lg font-medium hover:from-error-light hover:to-warning-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-4 btn-primary bg-gradient-to-r from-error to-warning text-white rounded-xl font-semibold min-h-[56px]"
                 >
                   {isLoading ? 'Processing...' : 'Burn Tokens'}
                 </button>
@@ -334,9 +357,10 @@ export default function ManagePage() {
 
           {/* Freeze Tab */}
           {activeTab === 'freeze' && (
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Freeze/Unfreeze Account</h3>
-              <form onSubmit={handleFreeze} className="max-w-lg space-y-4">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Freeze/Unfreeze Account</h3>
+              <p className="text-foreground-tertiary mb-8">Toggle the freeze status of a token account.</p>
+              <form onSubmit={handleFreeze} className="max-w-lg space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">Account Address</label>
                   <input
@@ -344,14 +368,14 @@ export default function ManagePage() {
                     value={accountToFreeze}
                     onChange={(e) => setAccountToFreeze(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-warning focus:border-transparent transition-all hover:border-warning/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-warning focus:border-transparent transition-all hover:border-warning/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-warning to-error text-white rounded-lg font-medium hover:from-warning-light hover:to-error-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-4 btn-primary bg-gradient-to-r from-warning to-error text-white rounded-xl font-semibold min-h-[56px]"
                 >
                   {isLoading ? 'Processing...' : 'Toggle Freeze Status'}
                 </button>
@@ -361,12 +385,12 @@ export default function ManagePage() {
 
           {/* Agents Tab */}
           {activeTab === 'agents' && (
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Manage Agents</h3>
-              <p className="text-foreground-secondary mb-6">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold text-foreground mb-2">Manage Agents</h3>
+              <p className="text-foreground-secondary mb-8">
                 Agents are authorized addresses that can perform token operations on your behalf.
               </p>
-              <form onSubmit={handleAddAgent} className="max-w-lg space-y-4">
+              <form onSubmit={handleAddAgent} className="max-w-lg space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">Agent Address</label>
                   <input
@@ -374,14 +398,14 @@ export default function ManagePage() {
                     value={agentAddress}
                     onChange={(e) => setAgentAddress(e.target.value)}
                     placeholder="Enter Solana address"
-                    className="w-full px-4 py-3 rounded-lg bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-success focus:border-transparent transition-all hover:border-success/50"
+                    className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-success focus:border-transparent transition-all hover:border-success/50"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-success to-secondary text-white rounded-lg font-medium hover:from-success-light hover:to-secondary-light transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-4 btn-primary bg-gradient-to-r from-success to-secondary text-white rounded-xl font-semibold min-h-[56px]"
                 >
                   {isLoading ? 'Processing...' : 'Add Agent'}
                 </button>
@@ -392,13 +416,15 @@ export default function ManagePage() {
 
         {/* Transaction Status */}
         {transactionHash && (
-          <div className="mt-6 bg-success/10 border border-success/20 rounded-xl p-4 animate-fadeInUp">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
+          <div className="mt-8 bg-success/10 border border-success/20 rounded-2xl p-6 animate-fadeInUp">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
               <div>
-                <p className="font-medium text-success-light">Transaction Submitted!</p>
+                <p className="font-semibold text-success-light">Transaction Submitted!</p>
                 <p className="text-sm text-success-light/80 font-mono">{transactionHash}</p>
               </div>
             </div>
