@@ -28,6 +28,22 @@
 
 use anchor_lang::prelude::*;  // Import Anchor essentials
 
+// =================================================================
+// CONSTANTS
+// =================================================================
+
+/// Maximum length for identity name (prevents excessive storage)
+pub const MAX_NAME_LENGTH: usize = 32;
+
+/// Maximum length for identity symbol
+pub const MAX_SYMBOL_LENGTH: usize = 10;
+
+/// Maximum length for metadata URI
+pub const MAX_METADATA_URI_LENGTH: usize = 256;
+
+/// Maximum length for identity data string
+pub const MAX_IDENTITY_DATA_LENGTH: usize = 128;
+
 // declare_id!() = the program's on-chain address
 // This is like deploying a smart contract and getting its address
 declare_id!("3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5");
@@ -75,8 +91,8 @@ pub mod identity_registry {
         #[account(
             init,              // Create if doesn't exist
             payer = payer,     // Payer funds the account
-            space = 8 + std::mem::size_of::<IdentityRegistryState>() + 1000
-            // space = 8 (discriminator) + struct size + 1000 (extra for Vec growth)
+            space = 8 + std::mem::size_of::<IdentityRegistryState>() + 5000
+            // space = 8 (discriminator) + struct size + 5000 (extra for Vec growth, supports 20+ entries)
         )]
         pub registry: Account<'info, IdentityRegistryState>,
 
@@ -173,7 +189,7 @@ pub mod identity_registry {
         Ok(())
     }
 
-    /// Register a new identity mapping
+    /// Register a new identity mapping (Pubkey-based)
     ///
     /// Maps a wallet address to an identity credential.
     ///
@@ -194,6 +210,7 @@ pub mod identity_registry {
         identity: Pubkey,  // Identity credential
     ) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
+        let caller = ctx.accounts.owner.key();
 
         // SECURITY CHECK: Prevent duplicate registrations
         // registry.is_registered(&wallet) checks if wallet is already in the list
@@ -219,19 +236,88 @@ pub mod identity_registry {
 
         // INCREMENT COUNTER
         // next_index is like an auto-increment ID in databases
-        // We're not using it currently, but it's useful for:
-        // - Generating unique IDs
+        // Used for:
         // - Tracking registration order
-        // - Versioning
+        // - Versioning and auditing
+        // Note: IdentityEntry doesn't store index; use next_index for sequential tracking
         registry.next_index += 1;
 
-        msg!("Identity registered for wallet: {}", wallet);
+        // Emit event for audit trail
+        emit!(IdentityRegisteredEvent {
+            wallet,
+            identity,
+            registered_by: caller,
+        });
+
+        msg!("Identity registered for wallet: {} (by {})", wallet, caller);
+        Ok(())
+    }
+
+    /// Register a new identity with string-based identity data (MEDIUM-01: with length validation)
+    ///
+    /// Maps a wallet address to a detailed identity record with string fields.
+    /// This function validates all string lengths to prevent excessive storage usage.
+    ///
+    /// Parameters:
+    /// - wallet: The Solana wallet address being registered
+    /// - name: Human-readable name (max 32 chars)
+    /// - symbol: Short symbol/identifier (max 10 chars)
+    /// - identity_data: Additional identity data (max 128 chars)
+    /// - metadata_uri: URI to metadata (max 256 chars)
+    ///
+    /// MEDIUM-01 FIX: All string parameters are validated against maximum lengths
+    pub fn register_identity_with_data(
+        ctx: Context<RegisterIdentity>,
+        wallet: Pubkey,   // Wallet address to register
+        name: String,     // Human-readable name
+        symbol: String,   // Short symbol
+        identity_data: String, // Additional identity data
+        metadata_uri: String,  // Metadata URI
+    ) -> Result<()> {
+        let registry = &mut ctx.accounts.registry;
+        let caller = ctx.accounts.owner.key();
+
+        // MEDIUM-01: String length validation
+        require!(name.len() <= MAX_NAME_LENGTH, ErrorCode::StringTooLong);
+        require!(symbol.len() <= MAX_SYMBOL_LENGTH, ErrorCode::StringTooLong);
+        require!(identity_data.len() <= MAX_IDENTITY_DATA_LENGTH, ErrorCode::StringTooLong);
+        require!(metadata_uri.len() <= MAX_METADATA_URI_LENGTH, ErrorCode::StringTooLong);
+
+        // SECURITY CHECK: Prevent duplicate registrations
+        require!(!registry.is_registered(&wallet), ErrorCode::WalletAlreadyRegistered);
+
+        // ADD TO REGISTERED ADDRESSES LIST
+        registry.registered_addresses.push(wallet);
+
+        // ADD TO IDENTITY MAP (using wallet as identity key for backward compatibility)
+        registry.identity_map.push(IdentityEntry {
+            wallet,
+            identity: wallet, // Using wallet as identity key; full data stored in events
+        });
+
+        // INCREMENT COUNTER
+        registry.next_index += 1;
+
+        // Emit event with full identity data for audit trail
+        emit!(IdentityRegisteredWithDataEvent {
+            wallet,
+            name,
+            symbol,
+            identity_data,
+            metadata_uri,
+            registered_by: caller,
+        });
+
+        msg!("Identity with data registered for wallet: {} (by {})", wallet, caller);
         Ok(())
     }
 
     /// Update an existing identity mapping
     ///
     /// Changes the identity credential for an already-registered wallet.
+    ///
+    /// SECURITY: Only the identity owner (wallet) or the registry admin can update.
+    /// This prevents unauthorized parties from modifying identity records.
     ///
     /// Parameters:
     /// - wallet: The wallet address to update
@@ -249,9 +335,28 @@ pub mod identity_registry {
         new_identity: Pubkey, // New identity value
     ) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
+        let caller = ctx.accounts.owner.key();
 
         // SECURITY CHECK: Wallet must be registered
         require!(registry.is_registered(&wallet), ErrorCode::WalletNotRegistered);
+
+        // CRIT-02 FIX: Ownership verification
+        // Only the identity owner (wallet) or the registry admin can update the identity
+        let is_identity_owner = wallet == caller;
+        let is_registry_admin = registry.owner == caller;
+
+        require!(
+            is_identity_owner || is_registry_admin,
+            ErrorCode::NotIdentityOwner
+        );
+
+        // Emit event for audit trail
+        emit!(IdentityUpdatedEvent {
+            wallet,
+            new_identity,
+            updated_by: caller,
+            is_admin_override: is_registry_admin,
+        });
 
         // FIND AND UPDATE THE ENTRY
         // Iterate through all entries, find the one with matching wallet
@@ -264,7 +369,7 @@ pub mod identity_registry {
             }
         }
 
-        msg!("Identity updated for wallet: {}", wallet);
+        msg!("Identity updated for wallet: {} (by {})", wallet, caller);
         Ok(())
     }
 
@@ -290,9 +395,27 @@ pub mod identity_registry {
         wallet: Pubkey,  // Which wallet to remove
     ) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
+        let caller = ctx.accounts.owner.key();
 
         // SECURITY CHECK: Wallet must be registered
         require!(registry.is_registered(&wallet), ErrorCode::WalletNotRegistered);
+
+        // CRIT-02 FIX: Ownership verification
+        // Only the identity owner (wallet) or the registry admin can remove the identity
+        let is_identity_owner = wallet == caller;
+        let is_registry_admin = registry.owner == caller;
+
+        require!(
+            is_identity_owner || is_registry_admin,
+            ErrorCode::NotIdentityOwner
+        );
+
+        // Emit event for audit trail
+        emit!(IdentityRemovedEvent {
+            wallet,
+            removed_by: caller,
+            was_admin_override: is_registry_admin,
+        });
 
         // REMOVE FROM REGISTERED ADDRESSES
         // Keep only addresses that don't match the wallet
@@ -308,7 +431,7 @@ pub mod identity_registry {
         // entry.wallet accesses the wallet field through the reference
         // Rust automatically dereferences (like Python's implicit deref)
 
-        msg!("Identity removed for wallet: {}", wallet);
+        msg!("Identity removed for wallet: {} (by {})", wallet, caller);
         Ok(())
     }
 
@@ -423,4 +546,54 @@ pub enum ErrorCode {
     /// Returned when: trying to update/remove a wallet that's not in the registry
     #[msg("Wallet not registered")]
     WalletNotRegistered,
+
+    /// Caller is not the identity owner or registry admin
+    /// Returned when: unauthorized party tries to update or remove an identity
+    #[msg("Caller is not the identity owner or registry admin")]
+    NotIdentityOwner,
+
+    /// String length exceeds maximum allowed
+    /// Returned when: identity_data, name, symbol, or metadata_uri exceeds the maximum length
+    #[msg("String length exceeds maximum allowed")]
+    StringTooLong,
+}
+
+// =================================================================
+// EVENTS
+// =================================================================
+
+/// Event emitted when a new identity is registered
+#[event]
+pub struct IdentityRegisteredEvent {
+    pub wallet: Pubkey,
+    pub identity: Pubkey,
+    pub registered_by: Pubkey,
+}
+
+/// Event emitted when an identity is updated
+#[event]
+pub struct IdentityUpdatedEvent {
+    pub wallet: Pubkey,
+    pub new_identity: Pubkey,
+    pub updated_by: Pubkey,
+    pub is_admin_override: bool,
+}
+
+/// Event emitted when an identity is removed
+#[event]
+pub struct IdentityRemovedEvent {
+    pub wallet: Pubkey,
+    pub removed_by: Pubkey,
+    pub was_admin_override: bool,
+}
+
+/// Event emitted when a new identity is registered with string-based data (MEDIUM-01)
+#[event]
+pub struct IdentityRegisteredWithDataEvent {
+    pub wallet: Pubkey,
+    pub name: String,
+    pub symbol: String,
+    pub identity_data: String,
+    pub metadata_uri: String,
+    pub registered_by: Pubkey,
 }
