@@ -18,14 +18,21 @@ describe('Solana RWA Token Program', () => {
   let tokenState: anchor.web3.Keypair;
 
   before(async () => {
-    // Airdrop to owner and agent
-    await connection.requestAirdrop(owner.publicKey, LAMPORTS_PER_SOL);
-    await connection.requestAirdrop(agent.publicKey, LAMPORTS_PER_SOL);
+    // Airdrop to owner and agent (100 SOL each for rent exemption)
+    const ownerSig = await connection.requestAirdrop(owner.publicKey, 100 * LAMPORTS_PER_SOL);
+    const agentSig = await connection.requestAirdrop(agent.publicKey, 100 * LAMPORTS_PER_SOL);
+    const recipientSig = await connection.requestAirdrop(recipient.publicKey, 100 * LAMPORTS_PER_SOL);
+    await connection.confirmTransaction(ownerSig);
+    await connection.confirmTransaction(agentSig);
+    await connection.confirmTransaction(recipientSig);
   });
 
   beforeEach(async () => {
     // Create new token state account before each test
     tokenState = anchor.web3.Keypair.generate();
+    // Airdrop to tokenState account itself for rent
+    const sig = await connection.requestAirdrop(tokenState.publicKey, LAMPORTS_PER_SOL);
+    await connection.confirmTransaction(sig);
   });
 
   describe('Initialization', () => {
