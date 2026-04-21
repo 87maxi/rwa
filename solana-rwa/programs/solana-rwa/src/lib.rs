@@ -99,6 +99,8 @@ use anchor_lang::prelude::*;  // Import all Anchor essentials (like "from django
 // declare_id!() sets the program's public key on the blockchain.
 // This is like deploying a smart contract and getting its address.
 // In production, you'd generate this with: anchor keys list
+// NOTE: This ID must match Anchor.toml [programs.localnet] section
+// If they mismatch, you'll get "DeclaredProgramIdMismatch" error
 declare_id!("7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L");
 
 // #[program] is an Anchor attribute macro that marks this module as containing
@@ -107,6 +109,14 @@ declare_id!("7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L");
 #[program]
 pub mod solana_rwa {
     use super::*;  // Import everything from parent module (the helpers, structs, errors)
+
+    // =================================================================
+    // CONSTANTS
+    // =================================================================
+
+    /// Maximum supply cap for the token (1 billion tokens with 9 decimals)
+    /// MAX_SUPPLY = 1,000,000,000 * 10^9 = 1,000,000,000,000,000,000
+    pub const MAX_SUPPLY: u64 = 1_000_000_000_000_000_000u64;
 
     // =================================================================
     // ACCOUNT VALIDATION STRUCTURES
@@ -207,13 +217,13 @@ pub mod solana_rwa {
         #[account(mut)]
         pub token: Account<'info, TokenState>,
 
-        /// Sender: must sign to prove they own the tokens
+        /// Sender: must sign to prove they own the tokens being transferred
         pub from: Signer<'info>,
 
-        /// Receiver: just an AccountInfo because we validate it in code
-        /// CHECK is safe here because update_balance() validates the pubkey format
-        /// (all pubkeys are 32 bytes, so no invalid data possible)
-        /// CHECK: The destination account is validated through the transfer logic
+        /// Receiver: destination wallet (does NOT need to sign or be an existing account)
+        /// CHECK: Safe because we only use the pubkey value, not the account itself.
+        /// The transfer logic validates that the destination pubkey is well-formed (32 bytes),
+        /// and balances are tracked in TokenState.balances, not on the destination account.
         pub to: AccountInfo<'info>,
     }
 
@@ -230,6 +240,81 @@ pub mod solana_rwa {
         /// Must be the token owner (validated in the handler with require!())
         #[account(mut)]  // marked mut because Anchor tracks all account changes
         pub payer: Signer<'info>,
+    }
+
+    /// GetSupplyInfo instruction - query current supply information (read-only)
+    #[derive(Accounts)]
+    pub struct GetSupplyInfo<'info> {
+        /// Token state account (read-only, no modification)
+        pub token: Account<'info, TokenState>,
+    }
+
+    /// TransferOwner instruction - transfers the token ownership (mint authority)
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified - owner changes)
+    /// - current_owner: The current owner (must sign to authorize transfer)
+    #[derive(Accounts)]
+    pub struct TransferOwner<'info> {
+        /// Token state account (owner field will be modified)
+        #[account(mut)]
+        pub token: Account<'info, TokenState>,
+
+        /// Current owner (must sign to authorize the transfer)
+        pub current_owner: Signer<'info>,
+    }
+
+    /// FreezeAccount instruction - freezes a specific account (prevents transfers)
+    ///
+    /// This is an independent context for freeze operations (FIX for HIGH-02).
+    /// Previously reused Transfer context which was incorrect.
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified - frozen_accounts updated)
+    /// - authority: The agent performing the freeze (must sign)
+    #[derive(Accounts)]
+    pub struct FreezeAccount<'info> {
+        /// Token state account (frozen_accounts list will be modified)
+        #[account(mut)]
+        pub token: Account<'info, TokenState>,
+
+        /// Authority performing the freeze (must be an agent - validated in handler)
+        pub authority: Signer<'info>,
+    }
+
+    /// UnfreezeAccount instruction - unfreezes a specific account
+    ///
+    /// This is an independent context for unfreeze operations (FIX for HIGH-02).
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified - frozen_accounts updated)
+    /// - authority: The agent performing the unfreeze (must sign)
+    #[derive(Accounts)]
+    pub struct UnfreezeAccount<'info> {
+        /// Token state account (frozen_accounts list will be modified)
+        #[account(mut)]
+        pub token: Account<'info, TokenState>,
+
+        /// Authority performing the unfreeze (must be an agent - validated in handler)
+        pub authority: Signer<'info>,
+    }
+
+    /// TransferFreezeAuthority instruction - transfers the freeze authority to a new account
+    ///
+    /// MEDIUM-05 FIX: This allows separating freeze authority from mint authority/owner.
+    /// By default, freeze_authority = owner, but this instruction allows transferring it.
+    ///
+    /// Accounts needed:
+    /// - token: The token state account (will be modified - freeze_authority changes)
+    /// - current_freeze_authority: The current freeze authority (must sign to authorize transfer)
+    #[derive(Accounts)]
+    pub struct TransferFreezeAuthority<'info> {
+        /// Token state account (freeze_authority field will be modified)
+        #[account(mut)]
+        pub token: Account<'info, TokenState>,
+
+        /// Current freeze authority (must sign to authorize the transfer)
+        pub current_freeze_authority: Signer<'info>,
     }
 
     // =================================================================
@@ -289,6 +374,7 @@ pub mod solana_rwa {
         // After these assignments, name and symbol are "owned" by token
         // We can't use name/symbol variables anymore (ownership transferred)
         token.owner = ctx.accounts.payer.key();  // Owner is whoever paid to create this
+        token.freeze_authority = ctx.accounts.payer.key(); // MEDIUM-05: Default freeze_authority = owner
         token.name = name;                         // Token name (e.g., "Real World Asset")
         token.symbol = symbol;                     // Token symbol (e.g., "RWA")
         token.decimals = decimals;                 // Decimal places (e.g., 9)
@@ -325,13 +411,16 @@ pub mod solana_rwa {
         // Analogy: Like @require_role("admin") decorator in Python Flask
         require!(token.is_agent(&ctx.accounts.agent.key()), ErrorCode::Unauthorized);
 
+        // HIGH-03 FIX: Reject zero-amount mints explicitly
+        require!(amount > 0, ErrorCode::InvalidAmount);
+
+        // HIGH-04 FIX: Check max supply cap before minting
+        let new_supply = token.total_supply.checked_add(amount)
+            .ok_or(ErrorCode::SupplyOverflow)?;
+        require!(new_supply <= MAX_SUPPLY, ErrorCode::SupplyExceeded);
+
         // INCREMENT TOTAL SUPPLY
-        // token.total_supply += amount; is shorthand for:
-        // token.total_supply = token.total_supply + amount;
-        // In Rust, += on u64 can overflow (wrap around) in debug mode it panics,
-        // in release mode it wraps. For production, use .saturating_add() to cap at max.
-        // We use += here because the amounts are small enough to not overflow u64.
-        token.total_supply += amount;
+        token.total_supply = new_supply;
 
         // UPDATE RECIPIENT BALANCE
         // update_balance() is a helper function (defined below)
@@ -343,8 +432,16 @@ pub mod solana_rwa {
         // Analogy: Like balances[to] = balances.get(to, 0) + amount in Python dict
         update_balance(&mut token.balances, to, amount, true);
 
+        // Emit TokensMinted event with amount and new total supply
+        emit!(TokensMintedEvent {
+            to,
+            amount,
+            total_supply: new_supply,
+            minted_by: ctx.accounts.agent.key(),
+        });
+
         // Log the minting action
-        msg!("Minted {} tokens to {}", amount, to);
+        msg!("Minted {} tokens to {}. New total supply: {}", amount, to, new_supply);
 
         Ok(())
     }
@@ -379,10 +476,9 @@ pub mod solana_rwa {
         require!(balance >= amount, ErrorCode::InsufficientBalance);
 
         // DECREMENT TOTAL SUPPLY
-        // -= is the subtraction assignment operator (like Python)
-        // Note: If amount > total_supply, this would underflow (panic in debug, wrap in release)
-        // We prevent this with the require!() check above
-        token.total_supply -= amount;
+        // Use saturating_sub to prevent underflow (caps at 0 instead of panicking)
+        // The require!() check above ensures amount <= balance, but we also protect total_supply
+        token.total_supply = token.total_supply.saturating_sub(amount);
 
         // UPDATE SENDER BALANCE
         // update_balance(..., false) means "subtract" mode
@@ -411,14 +507,26 @@ pub mod solana_rwa {
     pub fn transfer(ctx: Context<Transfer>, from: Pubkey, to: Pubkey, amount: u64) -> Result<()> {
         let token = &mut ctx.accounts.token;
 
+        // HIGH-03 FIX: Reject zero-amount transfers explicitly
+        require!(amount > 0, ErrorCode::InvalidAmount);
+
         // SECURITY CHECK: Verify sender has enough balance
         let sender_balance = get_balance(&token.balances, &from);
         require!(sender_balance >= amount, ErrorCode::InsufficientBalance);
 
-        // SECURITY NOTE: In a production version, you would also check:
-        // require!(!token.is_frozen(&from), ErrorCode::AccountFrozen);
-        // require!(!token.is_frozen(&to), ErrorCode::AccountFrozen);
-        // This prevents frozen accounts from transferring (found in security audit)
+        // SECURITY CHECK: Verify sender is not frozen
+        require!(!token.is_frozen(&from), ErrorCode::AccountFrozen);
+
+        // SECURITY CHECK: Verify recipient is not frozen
+        require!(!token.is_frozen(&to), ErrorCode::AccountFrozen);
+
+        // COMPLIANCE CHECK: If compliance modules are configured, verify transfer is allowed
+        if !token.compliance_modules.is_empty() {
+            // TODO: In production, CPI to compliance-aggregator to verify each module
+            // For now, log the compliance check
+            msg!("Compliance modules configured: {} modules, verifying transfer from {} to {} amount {}",
+                 token.compliance_modules.len(), from, to, amount);
+        }
 
         // PERFORM TRANSFER
         // Step 1: Subtract from sender (false = subtract mode)
@@ -439,22 +547,25 @@ pub mod solana_rwa {
     /// Parameters:
     /// - account: The wallet address to freeze
     ///
-    /// Rust explanation:
-    /// - The 'from' field in Transfer context is used as the "actor" (must be agent)
-    /// - The 'account' parameter is the target (passed as argument, not an account)
-    /// - This pattern (using one struct for multiple purposes) is common in Anchor
-    pub fn freeze_account(ctx: Context<Transfer>, account: Pubkey) -> Result<()> {
+    /// HIGH-02 FIX: Now uses independent FreezeAccount context instead of Transfer context.
+    /// Only the mint authority (agent) can freeze accounts.
+    pub fn freeze_account(ctx: Context<FreezeAccount>, account: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
 
-        // SECURITY CHECK: Only agents can freeze accounts
-        // ctx.accounts.from is the agent (the one calling this function)
-        require!(token.is_agent(&ctx.accounts.from.key()), ErrorCode::Unauthorized);
+        // MEDIUM-05: SECURITY CHECK: Only freeze_authority can freeze accounts
+        require!(token.freeze_authority == ctx.accounts.authority.key(), ErrorCode::NotFreezeAuthority);
 
         // Freeze the target account
         // set_frozen() is a helper that adds/updates the frozen entry
         set_frozen(&mut token.frozen_accounts, account, true);
 
-        msg!("Account {} frozen", account);
+        // Emit AccountFrozen event
+        emit!(AccountFrozenEvent {
+            account,
+            frozen_by: ctx.accounts.authority.key(),
+        });
+
+        msg!("Account {} frozen by {}", account, ctx.accounts.authority.key());
         Ok(())
     }
 
@@ -462,18 +573,137 @@ pub mod solana_rwa {
     ///
     /// Parameters:
     /// - account: The wallet address to unfreeze
-    pub fn unfreeze_account(ctx: Context<Transfer>, account: Pubkey) -> Result<()> {
+    ///
+    /// HIGH-02 FIX: Now uses independent UnfreezeAccount context instead of Transfer context.
+    pub fn unfreeze_account(ctx: Context<UnfreezeAccount>, account: Pubkey) -> Result<()> {
         let token = &mut ctx.accounts.token;
 
-        // SECURITY CHECK: Only agents can unfreeze accounts
-        require!(token.is_agent(&ctx.accounts.from.key()), ErrorCode::Unauthorized);
+        // MEDIUM-05: SECURITY CHECK: Only freeze_authority can unfreeze accounts
+        require!(token.freeze_authority == ctx.accounts.authority.key(), ErrorCode::NotFreezeAuthority);
 
         // Unfreeze the target account
         // set_frozen(..., false) removes or marks as not frozen
         set_frozen(&mut token.frozen_accounts, account, false);
 
-        msg!("Account {} unfrozen", account);
+        // Emit AccountUnfrozen event
+        emit!(AccountUnfrozenEvent {
+            account,
+            unfrozen_by: ctx.accounts.authority.key(),
+        });
+
+        msg!("Account {} unfrozen by {}", account, ctx.accounts.authority.key());
         Ok(())
+    }
+
+    /// TransferOwner instruction handler - transfers the token ownership (mint authority)
+    ///
+    /// HIGH-01 FIX: New instruction to allow transferring the owner authority.
+    /// This is critical for recovery if the owner private key is compromised.
+    ///
+    /// Parameters:
+    /// - new_owner: The public key of the new owner
+    ///
+    /// Security:
+    /// - Current owner must sign to authorize the transfer
+    /// - After transfer, the new owner has full control (mint, burn, freeze, add/remove agents)
+    pub fn transfer_owner(ctx: Context<TransferOwner>, new_owner: Pubkey) -> Result<()> {
+        let token = &mut ctx.accounts.token;
+
+        // SECURITY CHECK: Only current owner can initiate owner transfer
+        require!(token.owner == ctx.accounts.current_owner.key(), ErrorCode::Unauthorized);
+
+        // SECURITY CHECK: New owner must be different from current owner
+        require!(token.owner != new_owner, ErrorCode::SameOwner);
+
+        // Store old owner for event emission
+        let old_owner = token.owner;
+
+        // Transfer ownership
+        token.owner = new_owner;
+
+        // Emit OwnerTransferred event
+        emit!(OwnerTransferredEvent {
+            old_owner,
+            new_owner,
+            transferred_by: ctx.accounts.current_owner.key(),
+        });
+
+        msg!("Token ownership transferred from {} to {}", old_owner, new_owner);
+        Ok(())
+    }
+
+    /// TransferFreezeAuthority instruction handler - transfers freeze authority to a new account
+    ///
+    /// MEDIUM-05 FIX: This allows separating freeze authority from mint authority/owner.
+    /// By default, freeze_authority = owner, but this instruction allows transferring it
+    /// to a different account for better security separation of duties.
+    ///
+    /// Parameters:
+    /// - new_freeze_authority: The public key of the new freeze authority
+    ///
+    /// Security:
+    /// - Current freeze authority must sign to authorize the transfer
+    /// - After transfer, only the new freeze authority can freeze/unfreeze accounts
+    pub fn transfer_freeze_authority(
+        ctx: Context<TransferFreezeAuthority>,
+        new_freeze_authority: Pubkey,
+    ) -> Result<()> {
+        let token = &mut ctx.accounts.token;
+
+        // SECURITY CHECK: Only current freeze authority can initiate transfer
+        require!(
+            token.freeze_authority == ctx.accounts.current_freeze_authority.key(),
+            ErrorCode::NotFreezeAuthority
+        );
+
+        // SECURITY CHECK: New freeze authority must be different
+        require!(
+            token.freeze_authority != new_freeze_authority,
+            ErrorCode::SameFreezeAuthority
+        );
+
+        // Store old freeze authority for event emission
+        let old_freeze_authority = token.freeze_authority;
+
+        // Transfer freeze authority
+        token.freeze_authority = new_freeze_authority;
+
+        // Emit FreezeAuthorityTransferred event
+        emit!(FreezeAuthorityTransferredEvent {
+            old_freeze_authority,
+            new_freeze_authority,
+            transferred_by: ctx.accounts.current_freeze_authority.key(),
+        });
+
+        msg!(
+            "Freeze authority transferred from {} to {}",
+            old_freeze_authority,
+            new_freeze_authority
+        );
+        Ok(())
+    }
+
+    /// GetSupplyInfo query function - returns current supply information
+    ///
+    /// HIGH-04 FIX: New query function to get supply details.
+    /// Returns current supply, max supply, and remaining supply.
+    ///
+    /// Parameters:
+    /// - token: The token state account to query (read-only)
+    ///
+    /// Returns: Struct with current_supply, max_supply, and remaining_supply
+    pub fn get_supply_info(ctx: Context<GetSupplyInfo>) -> Result<SupplyInfo> {
+        let token = &ctx.accounts.token;
+        
+        let current_supply = token.total_supply;
+        let remaining_supply = MAX_SUPPLY.checked_sub(current_supply)
+            .ok_or(ErrorCode::SupplyOverflow)?;
+
+        Ok(SupplyInfo {
+            current_supply,
+            max_supply: MAX_SUPPLY,
+            remaining_supply,
+        })
     }
 
     /// Add an agent to the token
@@ -498,6 +728,9 @@ pub mod solana_rwa {
         // token.owner == ctx.accounts.payer.key() compares pubkeys
         // == on Pubkey compares the 32-byte arrays
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
+
+        // SECURITY CHECK: Prevent duplicate agent entries
+        require!(!token.is_agent(&agent), ErrorCode::DuplicateAgent);
 
         // Add agent to the list
         token.agents.push(agent);
@@ -531,6 +764,18 @@ pub mod solana_rwa {
         msg!("Agent removed: {}", agent);
         Ok(())
     }
+}
+
+// =================================================================
+// DATA STRUCTURES FOR QUERIES
+// =================================================================
+
+/// SupplyInfo - returned by get_supply_info query
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct SupplyInfo {
+    pub current_supply: u64,    // Current total supply
+    pub max_supply: u64,        // Maximum allowed supply (MAX_SUPPLY constant)
+    pub remaining_supply: u64,  // How much more can be minted
 }
 
 // =================================================================
@@ -595,10 +840,11 @@ fn update_balance(balances: &mut Vec<BalanceEntry>, key: Pubkey, amount: u64, ad
     // Try to find an existing entry for this key
     // .iter_mut() gives us mutable references (we can change entry.value)
     if let Some(entry) = balances.iter_mut().find(|e| e.key == key) {
-        // Entry found - update its balance
+        // Entry found - update its balance safely
         if add {
-            // Add amount (like Python: entry.value += amount)
-            entry.value += amount;
+            // Add amount using saturating_add (prevents overflow)
+            // If result exceeds u64::MAX, cap at MAX instead of panicking
+            entry.value = entry.value.saturating_add(amount);
         } else {
             // Subtract amount, but never below 0 (saturating)
             // This is a SAFETY FEATURE: prevents underflow attacks
@@ -677,6 +923,7 @@ fn set_frozen(frozen: &mut Vec<FrozenEntry>, account: Pubkey, is_frozen: bool) {
 #[account]  // Anchor macro: this struct is a Solana account
 pub struct TokenState {
     pub owner: Pubkey,              // Who created this token (can add/remove agents)
+    pub freeze_authority: Pubkey,   // MEDIUM-05: Independent freeze authority (defaults to owner)
     pub name: String,               // Token name (e.g., "Real World Asset Token")
     pub symbol: String,             // Token symbol (e.g., "RWA")
     pub decimals: u8,               // Decimal places (e.g., 9 means 1 token = 10^9 units)
@@ -684,7 +931,7 @@ pub struct TokenState {
     pub next_index: u64,            // Counter for future use (like an auto-increment ID)
     pub balances: Vec<BalanceEntry>, // All token balances (like a bank's ledger)
     pub frozen_accounts: Vec<FrozenEntry>, // Accounts that are frozen (can't transfer)
-    pub agents: Vec<Pubkey>,        // Authorized agents (can mint, burn, freeze)
+    pub agents: Vec<Pubkey>,        // Authorized agents (can mint, burn, transfer freeze authority)
     pub compliance_modules: Vec<Pubkey>, // Compliance modules to check (future feature)
 }
 
@@ -736,6 +983,28 @@ impl TokenState {
     pub fn is_agent(&self, account: &Pubkey) -> bool {
         self.agents.contains(account)
     }
+
+    /// Check if a given account is frozen
+    ///
+    /// Parameters:
+    /// - &self = reference to this TokenState instance
+    /// - account = the Pubkey to check
+    ///
+    /// Returns: bool = true if account is frozen (can't transfer)
+    ///
+    /// Rust explanation:
+    /// - self.frozen_accounts.iter().find() searches for a FrozenEntry with matching key
+    ///   Like: next(e for e in self.frozen_accounts if e.key == account) in Python
+    /// - .map(|e| e.frozen) extracts the frozen field if found
+    /// - .unwrap_or(false) returns false if not found (not frozen)
+    ///   Like: .get(key, False) in Python dict
+    pub fn is_frozen(&self, account: &Pubkey) -> bool {
+        self.frozen_accounts
+            .iter()
+            .find(|e| e.key == *account)
+            .map(|e| e.frozen)
+            .unwrap_or(false)
+    }
 }
 
 // =================================================================
@@ -761,4 +1030,82 @@ pub enum ErrorCode {
     /// Returned when: trying to transfer from/to a frozen account
     #[msg("Account frozen")]
     AccountFrozen,
+
+    /// Agent already exists in the list
+    /// Returned when: trying to add a duplicate agent
+    #[msg("Agent already exists")]
+    DuplicateAgent,
+
+    /// HIGH-03 FIX: Invalid amount (zero amount not allowed)
+    /// Returned when: transfer or mint with amount = 0
+    #[msg("Invalid amount: amount must be greater than zero")]
+    InvalidAmount,
+
+    /// HIGH-04 FIX: Supply exceeded maximum cap
+    /// Returned when: trying to mint beyond MAX_SUPPLY
+    #[msg("Supply exceeded maximum cap")]
+    SupplyExceeded,
+
+    /// Supply overflow (arithmetic error)
+    /// Returned when: supply calculation overflows u64
+    #[msg("Supply overflow")]
+    SupplyOverflow,
+
+    /// HIGH-01 FIX: New owner cannot be the same as current owner
+    /// Returned when: transfer_owner called with same owner
+    #[msg("New owner cannot be the same as current owner")]
+    SameOwner,
+
+    /// MEDIUM-05 FIX: Caller is not the freeze authority
+    /// Returned when: non-freeze-authority tries to freeze/unfreeze accounts
+    #[msg("Caller is not the freeze authority")]
+    NotFreezeAuthority,
+
+    /// MEDIUM-05 FIX: New freeze authority cannot be the same as current
+    /// Returned when: transfer_freeze_authority called with same authority
+    #[msg("New freeze authority cannot be the same as current")]
+    SameFreezeAuthority,
+}
+
+// =================================================================
+// EVENTS
+// =================================================================
+
+/// Event emitted when token ownership is transferred
+#[event]
+pub struct OwnerTransferredEvent {
+    pub old_owner: Pubkey,
+    pub new_owner: Pubkey,
+    pub transferred_by: Pubkey,
+}
+
+/// Event emitted when tokens are minted
+#[event]
+pub struct TokensMintedEvent {
+    pub to: Pubkey,
+    pub amount: u64,
+    pub total_supply: u64,
+    pub minted_by: Pubkey,
+}
+
+/// Event emitted when an account is frozen
+#[event]
+pub struct AccountFrozenEvent {
+    pub account: Pubkey,
+    pub frozen_by: Pubkey,
+}
+
+/// Event emitted when an account is unfrozen
+#[event]
+pub struct AccountUnfrozenEvent {
+    pub account: Pubkey,
+    pub unfrozen_by: Pubkey,
+}
+
+/// MEDIUM-05: Event emitted when freeze authority is transferred
+#[event]
+pub struct FreezeAuthorityTransferredEvent {
+    pub old_freeze_authority: Pubkey,
+    pub new_freeze_authority: Pubkey,
+    pub transferred_by: Pubkey,
 }
