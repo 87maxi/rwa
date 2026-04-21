@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TOKEN_CONFIG } from '@/config/solana';
+import { useTokenActions } from '@/hooks/useTokenActions';
 
 interface TokenConfig {
   name: string;
@@ -20,6 +21,7 @@ export default function DeployPage() {
   const { connected, publicKey } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tokenConfig, setTokenConfig] = useState<TokenConfig>({
     name: TOKEN_CONFIG.defaultName,
     symbol: TOKEN_CONFIG.defaultSymbol,
@@ -29,17 +31,38 @@ export default function DeployPage() {
     freezeAuthority: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Use the connected wallet's public key as the token account pubkey for initialization
+  // After initialization, this will be the PDA for the token state
+  const tokenAccountPubkey = publicKey?.toString() ?? null;
+  const tokenActions = useTokenActions(tokenAccountPubkey);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
+    setErrorMessage(null);
     setIsLoading(true);
-    // Simulate token deployment (in production, use actual Anchor SDK)
-    setTimeout(() => {
-      setTransactionHash('7xRpWNRcGJYr7nE3dXZvQ2RmFbHcJwYpLsGvNuTaDxM');
+    setTransactionHash(null);
+
+    try {
+      const result = await tokenActions.initializeToken(
+        tokenConfig.name,
+        tokenConfig.symbol,
+        tokenConfig.decimals
+      );
+
+      if (result.success && result.signature) {
+        setTransactionHash(result.signature);
+      } else if (result.error) {
+        setErrorMessage(result.error);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setErrorMessage(errorMessage);
+    } finally {
       setIsLoading(false);
-    }, 3000);
-  };
+    }
+  }, [connected, publicKey, tokenConfig, tokenActions]);
 
   if (!connected) {
     return (
@@ -158,6 +181,23 @@ export default function DeployPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 space-y-8">
+            {/* Error Message */}
+            {errorMessage && (
+              <div className="bg-error/10 border border-error/20 rounded-2xl p-4 animate-fadeInUp">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-error/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-error" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm8-8a2 2 0 10-4 0 2 2 0 004 0zM7.93 15.07l1.41-1.41A7 7 0 0010 14c-3.03 0-5.66-1.94-6.72-4.72l-1.41 1.41A9 9 0 0110 16a9 9 0 01-6.07-2.93zM12 7.93l-1.41 1.41A7 7 0 0010 6c3.03 0 5.66 1.94 6.72 4.72l1.41-1.41A9 9 0 0110 4a9 9 0 01-6.07 2.93l1.41 1.41A7 7 0 0112 7.93z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-error-light text-sm">Deployment Failed</p>
+                    <p className="text-sm text-error-light/80 mt-1">{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Token Name */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
