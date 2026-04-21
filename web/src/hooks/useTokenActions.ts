@@ -12,10 +12,51 @@ import {
   buildUnfreezeInstruction,
   buildAddAgentInstruction,
   buildRemoveAgentInstruction,
+  buildTransferOwnerInstruction,
+  buildTransferFreezeAuthorityInstruction,
+  buildGetSupplyInfoInstruction,
+  buildComplianceInitializeInstruction,
+  buildComplianceAddModuleInstruction,
+  buildComplianceRemoveModuleInstruction,
+  buildComplianceRebalanceInstruction,
+  buildComplianceGetStateInstruction,
+  buildIdentityInitializeInstruction,
+  buildIdentityRegisterInstruction,
+  buildIdentityRegisterWithDataInstruction,
+  buildIdentityUpdateInstruction,
+  buildIdentityRemoveInstruction,
+  buildIdentityGetInstruction,
   executeLegacyTransaction,
+} from '@/anchor/client';
+import {
+  parseSupplyInfo,
+  parseAggregatorState,
+  parseIdentityInfo,
 } from '@/anchor/client';
 import { getCurrentNetwork, PROGRAM_IDS } from '@/config/solana';
 import { isValidSolanaAddress } from '@/utils/solana';
+
+// Supply info return type
+export interface SupplyInfo {
+  currentSupply: bigint;
+  maxSupply: bigint;
+  remainingSupply: bigint;
+}
+
+// Aggregator state return type
+export interface AggregatorState {
+  owner: string;
+  totalUniqueTokens: number;
+  totalModuleEntries: number;
+  tokenModuleCount: number;
+  nextIndex: bigint;
+}
+
+// Identity state return type
+export interface IdentityInfo {
+  wallet: string;
+  identity: string;
+}
 
 // Token action result
 export interface TransactionResult {
@@ -458,6 +499,775 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     }
   }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
 
+  // Transfer owner
+  const transferOwner = useCallback(async (
+    newOwner: string
+  ): Promise<TransactionResult> => {
+    if (!tokenAccountPubkey || !publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    }
+
+    if (!isValidSolanaAddress(tokenAccountPubkey)) {
+      return { signature: null, loading: false, error: 'Invalid token account address', success: false };
+    }
+    if (!isValidSolanaAddress(newOwner)) {
+      return { signature: null, loading: false, error: 'Invalid new owner address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const programId = getProgramPublicKey();
+      const tokenState = new PublicKey(tokenAccountPubkey);
+      const newOwnerPubkey = new PublicKey(newOwner);
+
+      const { keys, data } = buildTransferOwnerInstruction(
+        tokenState,
+        publicKey,
+        newOwnerPubkey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+
+  // Transfer freeze authority
+  const transferFreezeAuthority = useCallback(async (
+    newFreezeAuthority: string
+  ): Promise<TransactionResult> => {
+    if (!tokenAccountPubkey || !publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    }
+
+    if (!isValidSolanaAddress(tokenAccountPubkey)) {
+      return { signature: null, loading: false, error: 'Invalid token account address', success: false };
+    }
+    if (!isValidSolanaAddress(newFreezeAuthority)) {
+      return { signature: null, loading: false, error: 'Invalid new freeze authority address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const programId = getProgramPublicKey();
+      const tokenState = new PublicKey(tokenAccountPubkey);
+      const newFreezeAuthorityPubkey = new PublicKey(newFreezeAuthority);
+
+      const { keys, data } = buildTransferFreezeAuthorityInstruction(
+        tokenState,
+        publicKey,
+        newFreezeAuthorityPubkey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+
+  // Get supply info (read-only query)
+  const getSupplyInfo = useCallback(async (): Promise<SupplyInfo | null> => {
+    if (!tokenAccountPubkey) {
+      return null;
+    }
+
+    try {
+      const programId = getProgramPublicKey();
+      const tokenState = new PublicKey(tokenAccountPubkey);
+
+      const { keys, data } = buildGetSupplyInfoInstruction(
+        tokenState,
+        programId
+      );
+
+      // Create instruction for query
+      const instruction = new TransactionInstruction({
+        keys,
+        data,
+        programId,
+      });
+
+      // Simulate the transaction to get the return data
+      const transaction = new Transaction();
+      transaction.add(instruction);
+      const simulation = await connection.simulateTransaction(transaction);
+
+      if (simulation.value.err) {
+        throw new Error(simulation.value.err.toString());
+      }
+
+      // Extract return data from simulation
+      if (!simulation.value.returnData) {
+        console.warn('No return data in supply info response');
+        return null;
+      }
+
+      // The return data comes as base64 encoded bytes
+      const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
+      
+      if (decodedData.length < 24) {
+        console.warn('Invalid supply info data length:', decodedData.length);
+        return null;
+      }
+
+      const supplyInfo = parseSupplyInfo(decodedData);
+      console.log('Supply info:', supplyInfo);
+      return supplyInfo;
+    } catch (err) {
+      console.error('Error getting supply info:', err);
+      return null;
+    }
+  }, [tokenAccountPubkey, getProgramPublicKey, connection]);
+
+  // Compliance: Initialize aggregator
+  const initializeComplianceAggregator = useCallback(async (
+    aggregatorAccount: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(aggregatorAccount)) {
+      return { signature: null, loading: false, error: 'Invalid aggregator account address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.complianceAggregator;
+      if (!programIdStr) {
+        throw new Error('Compliance aggregator program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const aggregatorState = new PublicKey(aggregatorAccount);
+
+      const { keys, data } = buildComplianceInitializeInstruction(
+        aggregatorState,
+        publicKey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Compliance: Add module
+  const addComplianceModule = useCallback(async (
+    aggregatorAccount: string,
+    tokenProgramId: string,
+    moduleProgramId: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(aggregatorAccount)) {
+      return { signature: null, loading: false, error: 'Invalid aggregator account address', success: false };
+    }
+    if (!isValidSolanaAddress(tokenProgramId)) {
+      return { signature: null, loading: false, error: 'Invalid token program address', success: false };
+    }
+    if (!isValidSolanaAddress(moduleProgramId)) {
+      return { signature: null, loading: false, error: 'Invalid module program address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.complianceAggregator;
+      if (!programIdStr) {
+        throw new Error('Compliance aggregator program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const aggregatorState = new PublicKey(aggregatorAccount);
+      const token = new PublicKey(tokenProgramId);
+      const module = new PublicKey(moduleProgramId);
+
+      const { keys, data } = buildComplianceAddModuleInstruction(
+        aggregatorState,
+        publicKey,
+        token,
+        module,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Compliance: Remove module
+  const removeComplianceModule = useCallback(async (
+    aggregatorAccount: string,
+    tokenProgramId: string,
+    moduleProgramId: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(aggregatorAccount)) {
+      return { signature: null, loading: false, error: 'Invalid aggregator account address', success: false };
+    }
+    if (!isValidSolanaAddress(tokenProgramId)) {
+      return { signature: null, loading: false, error: 'Invalid token program address', success: false };
+    }
+    if (!isValidSolanaAddress(moduleProgramId)) {
+      return { signature: null, loading: false, error: 'Invalid module program address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.complianceAggregator;
+      if (!programIdStr) {
+        throw new Error('Compliance aggregator program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const aggregatorState = new PublicKey(aggregatorAccount);
+      const token = new PublicKey(tokenProgramId);
+      const module = new PublicKey(moduleProgramId);
+
+      const { keys, data } = buildComplianceRemoveModuleInstruction(
+        aggregatorState,
+        publicKey,
+        token,
+        module,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Compliance: Rebalance modules
+  const rebalanceModules = useCallback(async (
+    aggregatorAccount: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(aggregatorAccount)) {
+      return { signature: null, loading: false, error: 'Invalid aggregator account address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.complianceAggregator;
+      if (!programIdStr) {
+        throw new Error('Compliance aggregator program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const aggregatorState = new PublicKey(aggregatorAccount);
+
+      const { keys, data } = buildComplianceRebalanceInstruction(
+        aggregatorState,
+        publicKey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Compliance: Get state (read-only query)
+  const getAggregatorState = useCallback(async (
+    aggregatorAccount: string
+  ): Promise<AggregatorState | null> => {
+    if (!aggregatorAccount) {
+      return null;
+    }
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.complianceAggregator;
+      if (!programIdStr) {
+        return null;
+      }
+      const programId = new PublicKey(programIdStr);
+      const aggregatorState = new PublicKey(aggregatorAccount);
+
+      const { keys, data } = buildComplianceGetStateInstruction(
+        aggregatorState,
+        programId
+      );
+
+      // Create instruction for query
+      const instruction = new TransactionInstruction({
+        keys,
+        data,
+        programId,
+      });
+
+      // Simulate the transaction to get the return data
+      const transaction = new Transaction();
+      transaction.add(instruction);
+      const simulation = await connection.simulateTransaction(transaction);
+
+      if (simulation.value.err) {
+        throw new Error(simulation.value.err.toString());
+      }
+
+      // Extract return data from simulation
+      if (!simulation.value.returnData) {
+        console.warn('No return data in aggregator state response');
+        return null;
+      }
+
+      // The return data comes as base64 encoded bytes
+      const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
+      
+      if (decodedData.length < 52) {
+        console.warn('Invalid aggregator state data length:', decodedData.length);
+        return null;
+      }
+
+      const state = parseAggregatorState(decodedData);
+      console.log('Aggregator state:', state);
+      return state;
+    } catch (err) {
+      console.error('Error getting aggregator state:', err);
+      return null;
+    }
+  }, [connection]);
+
+  // Identity: Initialize registry
+  const initializeIdentityRegistry = useCallback(async (
+    registryAccount: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(registryAccount)) {
+      return { signature: null, loading: false, error: 'Invalid registry account address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        throw new Error('Identity registry program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+
+      const { keys, data } = buildIdentityInitializeInstruction(
+        registryState,
+        publicKey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Identity: Register identity
+  const registerIdentity = useCallback(async (
+    registryAccount: string,
+    wallet: string,
+    identity: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(registryAccount)) {
+      return { signature: null, loading: false, error: 'Invalid registry account address', success: false };
+    }
+    if (!isValidSolanaAddress(wallet)) {
+      return { signature: null, loading: false, error: 'Invalid wallet address', success: false };
+    }
+    if (!isValidSolanaAddress(identity)) {
+      return { signature: null, loading: false, error: 'Invalid identity address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        throw new Error('Identity registry program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+      const walletPubkey = new PublicKey(wallet);
+      const identityPubkey = new PublicKey(identity);
+
+      const { keys, data } = buildIdentityRegisterInstruction(
+        registryState,
+        publicKey,
+        publicKey,
+        walletPubkey,
+        identityPubkey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Identity: Register identity with data
+  const registerIdentityWithData = useCallback(async (
+    registryAccount: string,
+    wallet: string,
+    name: string,
+    symbol: string,
+    identityData: string,
+    metadataUri: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(registryAccount)) {
+      return { signature: null, loading: false, error: 'Invalid registry account address', success: false };
+    }
+    if (!isValidSolanaAddress(wallet)) {
+      return { signature: null, loading: false, error: 'Invalid wallet address', success: false };
+    }
+
+    // Validate string lengths per smart contract constraints
+    if (name.length > 32) {
+      return { signature: null, loading: false, error: 'Name too long (max 32 chars)', success: false };
+    }
+    if (symbol.length > 10) {
+      return { signature: null, loading: false, error: 'Symbol too long (max 10 chars)', success: false };
+    }
+    if (identityData.length > 128) {
+      return { signature: null, loading: false, error: 'Identity data too long (max 128 chars)', success: false };
+    }
+    if (metadataUri.length > 256) {
+      return { signature: null, loading: false, error: 'Metadata URI too long (max 256 chars)', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        throw new Error('Identity registry program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+      const walletPubkey = new PublicKey(wallet);
+
+      const { keys, data } = buildIdentityRegisterWithDataInstruction(
+        registryState,
+        publicKey,
+        publicKey,
+        walletPubkey,
+        name,
+        symbol,
+        identityData,
+        metadataUri,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Identity: Update identity
+  const updateIdentity = useCallback(async (
+    registryAccount: string,
+    wallet: string,
+    newIdentity: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(registryAccount)) {
+      return { signature: null, loading: false, error: 'Invalid registry account address', success: false };
+    }
+    if (!isValidSolanaAddress(wallet)) {
+      return { signature: null, loading: false, error: 'Invalid wallet address', success: false };
+    }
+    if (!isValidSolanaAddress(newIdentity)) {
+      return { signature: null, loading: false, error: 'Invalid new identity address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        throw new Error('Identity registry program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+      const walletPubkey = new PublicKey(wallet);
+      const newIdentityPubkey = new PublicKey(newIdentity);
+
+      const { keys, data } = buildIdentityUpdateInstruction(
+        registryState,
+        publicKey,
+        walletPubkey,
+        newIdentityPubkey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Identity: Remove identity
+  const removeIdentity = useCallback(async (
+    registryAccount: string,
+    wallet: string
+  ): Promise<TransactionResult> => {
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+    }
+
+    if (!isValidSolanaAddress(registryAccount)) {
+      return { signature: null, loading: false, error: 'Invalid registry account address', success: false };
+    }
+    if (!isValidSolanaAddress(wallet)) {
+      return { signature: null, loading: false, error: 'Invalid wallet address', success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+    setSignature(null);
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        throw new Error('Identity registry program ID not configured');
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+      const walletPubkey = new PublicKey(wallet);
+
+      const { keys, data } = buildIdentityRemoveInstruction(
+        registryState,
+        publicKey,
+        walletPubkey,
+        programId
+      );
+
+      const transaction = new Transaction();
+      transaction.add(createInstruction(keys, data, programId));
+
+      const sig = await executeLegacyTransaction(connection, transaction, []);
+      setSignature(sig);
+      return { signature: sig, loading: false, error: null, success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      return { signature: null, loading: false, error: errorMessage, success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, connection, createInstruction]);
+
+  // Identity: Get identity (read-only query)
+  const getIdentity = useCallback(async (
+    registryAccount: string,
+    wallet: string
+  ): Promise<IdentityInfo | null> => {
+    if (!registryAccount || !wallet) {
+      return null;
+    }
+
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.identityRegistry;
+      if (!programIdStr) {
+        return null;
+      }
+      const programId = new PublicKey(programIdStr);
+      const registryState = new PublicKey(registryAccount);
+      const walletPubkey = new PublicKey(wallet);
+
+      const { keys, data } = buildIdentityGetInstruction(
+        registryState,
+        walletPubkey,
+        programId
+      );
+
+      // Create instruction for query
+      const instruction = new TransactionInstruction({
+        keys,
+        data,
+        programId,
+      });
+
+      // Simulate the transaction to get the return data
+      const transaction = new Transaction();
+      transaction.add(instruction);
+      const simulation = await connection.simulateTransaction(transaction);
+
+      if (simulation.value.err) {
+        throw new Error(simulation.value.err.toString());
+      }
+
+      // Extract return data from simulation
+      if (!simulation.value.returnData) {
+        console.warn('No return data in identity response');
+        return null;
+      }
+
+      // The return data comes as base64 encoded bytes
+      const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
+      
+      if (decodedData.length < 64) {
+        console.warn('Invalid identity data length:', decodedData.length);
+        return null;
+      }
+
+      const identityInfo = parseIdentityInfo(decodedData);
+      console.log('Identity info:', identityInfo);
+      return identityInfo;
+    } catch (err) {
+      console.error('Error getting identity:', err);
+      return null;
+    }
+  }, [connection]);
+
   return {
     initializeToken,
     mintTokens,
@@ -467,6 +1277,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     unfreezeAccount,
     addAgent,
     removeAgent,
+    transferOwner,
+    transferFreezeAuthority,
+    getSupplyInfo,
+    initializeComplianceAggregator,
+    addComplianceModule,
+    removeComplianceModule,
+    rebalanceModules,
+    getAggregatorState,
+    initializeIdentityRegistry,
+    registerIdentity,
+    registerIdentityWithData,
+    updateIdentity,
+    removeIdentity,
+    getIdentity,
     loading,
     error,
     signature,
