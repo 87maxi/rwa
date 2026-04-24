@@ -26,7 +26,7 @@ import {
   buildIdentityUpdateInstruction,
   buildIdentityRemoveInstruction,
   buildIdentityGetInstruction,
-  executeLegacyTransaction,
+  executeTransaction,
 } from '@/anchor/client';
 import {
   parseSupplyInfo,
@@ -71,7 +71,7 @@ export interface TransactionResult {
  */
 export function useTokenActions(tokenAccountPubkey: string | null) {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -83,6 +83,59 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     setError(null);
     setSignature(null);
   };
+
+  /**
+   * Sign and send a transaction using the wallet adapter.
+   * Returns the transaction signature on success.
+   */
+  const signAndSend = useCallback(async (
+    transaction: Transaction,
+    programId: PublicKey
+  ): Promise<string> => {
+    if (!publicKey) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
+    }
+    if (!signTransaction) {
+      throw new Error('Wallet does not support transaction signing. Please use a wallet like Phantom or Solflare.');
+    }
+
+    // Get latest blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+    // Set transaction fields
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    transaction.feePayer = publicKey;
+
+    try {
+      // Sign with wallet
+      const signedTransaction = await signTransaction(transaction);
+
+      // Send pre-signed transaction (signers=[] because wallet already signed)
+      const sig = await connection.sendTransaction(signedTransaction, [], {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+
+      // Confirm
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        'confirmed'
+      );
+
+      return sig;
+    } catch (err: unknown) {
+      // Handle wallet rejection
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('User rejected') || message.includes('rejected') || message.includes('User canceled')) {
+        throw new Error('Transaction rejected by user.');
+      }
+      if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
+        throw new Error('Failed to get a valid blockhash. Please try again.');
+      }
+      throw err;
+    }
+  }, [publicKey, signTransaction, connection]);
 
   const getProgramPublicKey = useCallback(() => {
     const network = getCurrentNetwork();
@@ -112,8 +165,15 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     symbol: string,
     decimals: number
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    // Check wallet connected AND signing support
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare. Localnet mock wallets cannot sign transactions.', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -150,7 +210,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -160,15 +220,21 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Mint tokens
   const mintTokens = useCallback(async (
     recipient: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -199,7 +265,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -209,7 +275,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer tokens
   const transferTokens = useCallback(async (
@@ -217,8 +283,14 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     to: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -254,7 +326,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -264,15 +336,21 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Burn tokens
   const burnTokens = useCallback(async (
     from: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -303,7 +381,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -313,14 +391,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Freeze account
   const freezeAccount = useCallback(async (
     account: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -349,7 +433,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -359,14 +443,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Unfreeze account
   const unfreezeAccount = useCallback(async (
     account: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -395,7 +485,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -405,14 +495,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Add agent
   const addAgent = useCallback(async (
     agent: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -441,7 +537,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -451,14 +547,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Remove agent
   const removeAgent = useCallback(async (
     agent: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -487,7 +589,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -497,14 +599,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer owner
   const transferOwner = useCallback(async (
     newOwner: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -533,7 +641,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -543,14 +651,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer freeze authority
   const transferFreezeAuthority = useCallback(async (
     newFreezeAuthority: string
   ): Promise<TransactionResult> => {
-    if (!tokenAccountPubkey || !publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected or token account not provided', success: false };
+    if (!publicKey) {
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
+    }
+    if (!tokenAccountPubkey) {
+      return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
 
     if (!isValidSolanaAddress(tokenAccountPubkey)) {
@@ -579,7 +693,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -589,7 +703,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, connection, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Get supply info (read-only query)
   const getSupplyInfo = useCallback(async (): Promise<SupplyInfo | null> => {
@@ -679,7 +793,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -689,7 +803,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Compliance: Add module
   const addComplianceModule = useCallback(async (
@@ -698,7 +812,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     moduleProgramId: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(aggregatorAccount)) {
@@ -737,7 +854,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -747,7 +864,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Compliance: Remove module
   const removeComplianceModule = useCallback(async (
@@ -756,7 +873,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     moduleProgramId: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(aggregatorAccount)) {
@@ -795,7 +915,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -805,14 +925,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Compliance: Rebalance modules
   const rebalanceModules = useCallback(async (
     aggregatorAccount: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(aggregatorAccount)) {
@@ -841,7 +964,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -851,7 +974,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Compliance: Get state (read-only query)
   const getAggregatorState = useCallback(async (
@@ -948,7 +1071,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -958,7 +1081,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Identity: Register identity
   const registerIdentity = useCallback(async (
@@ -967,7 +1090,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     identity: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(registryAccount)) {
@@ -1007,7 +1133,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -1017,7 +1143,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Identity: Register identity with data
   const registerIdentityWithData = useCallback(async (
@@ -1029,7 +1155,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     metadataUri: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(registryAccount)) {
@@ -1082,7 +1211,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -1092,7 +1221,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Identity: Update identity
   const updateIdentity = useCallback(async (
@@ -1101,7 +1230,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     newIdentity: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(registryAccount)) {
@@ -1140,7 +1272,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -1150,7 +1282,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Identity: Remove identity
   const removeIdentity = useCallback(async (
@@ -1158,7 +1290,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     wallet: string
   ): Promise<TransactionResult> => {
     if (!publicKey) {
-      return { signature: null, loading: false, error: 'Wallet not connected', success: false };
+      return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
+    }
+    if (!signTransaction) {
+      return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
     if (!isValidSolanaAddress(registryAccount)) {
@@ -1192,7 +1327,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const transaction = new Transaction();
       transaction.add(createInstruction(keys, data, programId));
 
-      const sig = await executeLegacyTransaction(connection, transaction, []);
+      const sig = await signAndSend(transaction, programId);
       setSignature(sig);
       return { signature: sig, loading: false, error: null, success: true };
     } catch (err) {
@@ -1202,7 +1337,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, connection, createInstruction]);
+  }, [publicKey, signAndSend, createInstruction]);
 
   // Identity: Get identity (read-only query)
   const getIdentity = useCallback(async (
