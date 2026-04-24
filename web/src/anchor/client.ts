@@ -21,37 +21,38 @@ import {
 import { PROGRAM_IDS } from '@/config/solana';
 import type { NetworkType } from '@/config/solana';
 
-// Instruction discriminators (4-byte tag + data)
+// Instruction discriminators (8-byte tag + data)
 // Generated from Anchor program: sha256(instruction_name) first 8 bytes
+// Anchor uses snake_case for instruction names (e.g., "freeze_account", not "freezeAccount")
 const DISCRIMINATORS: Record<string, number[]> = {
   // Solana RWA Token Program instructions
-  initialize: [175, 175, 109, 31, 13, 152, 155, 237],
-  mint: [51, 57, 225, 47, 182, 146, 137, 166],
-  burn: [116, 110, 29, 56, 107, 219, 42, 93],
-  transfer: [163, 52, 200, 231, 140, 3, 69, 186],
-  freezeAccount: [253, 75, 82, 133, 167, 238, 43, 130],
-  unfreezeAccount: [28, 255, 156, 206, 139, 228, 5, 213],
-  addAgent: [214, 206, 14, 110, 178, 131, 218, 45],
-  removeAgent: [126, 25, 90, 199, 104, 237, 225, 130],
-  transferOwner: [185, 197, 152, 123, 238, 112, 107, 135],
-  transferFreezeAuthority: [42, 163, 154, 109, 218, 247, 107, 14],
-  getSupplyInfo: [230, 238, 137, 229, 105, 245, 119, 161],
+  initialize: [175, 175, 109, 31, 13, 152, 155, 237], // sha256("initialize")
+  mint: [51, 57, 225, 47, 182, 146, 137, 166], // sha256("mint")
+  burn: [116, 110, 29, 56, 107, 219, 42, 93], // sha256("burn")
+  transfer: [163, 52, 200, 231, 140, 3, 69, 186], // sha256("transfer")
+  freeze_account: [253, 75, 82, 133, 167, 238, 43, 130], // sha256("freeze_account")
+  unfreeze_account: [28, 255, 156, 206, 139, 228, 5, 213], // sha256("unfreeze_account")
+  add_agent: [214, 206, 14, 110, 178, 131, 218, 45], // sha256("add_agent")
+  remove_agent: [126, 25, 90, 199, 104, 237, 225, 130], // sha256("remove_agent")
+  transfer_owner: [245, 25, 221, 175, 106, 229, 225, 45], // sha256("transfer_owner")
+  transfer_freeze_authority: [235, 44, 91, 221, 224, 5, 187, 172], // sha256("transfer_freeze_authority")
+  get_supply_info: [195, 15, 219, 198, 89, 216, 184, 95], // sha256("get_supply_info")
   // Compliance Aggregator instructions
-  complianceInitialize: [153, 181, 118, 59, 213, 216, 23, 182],
-  complianceAddModule: [196, 137, 215, 194, 101, 1, 197, 186],
-  complianceRemoveModule: [93, 163, 11, 188, 105, 196, 148, 136],
-  complianceRebalanceModules: [177, 101, 141, 147, 109, 147, 148, 78],
-  complianceGetModules: [188, 14, 92, 183, 215, 239, 119, 128],
-  complianceGetState: [247, 85, 231, 187, 19, 155, 119, 180],
-  complianceGetModuleCount: [10, 186, 230, 199, 18, 143, 119, 164],
-  complianceCanTransfer: [193, 166, 139, 149, 199, 103, 119, 164],
+  compliance_initialize: [153, 181, 118, 59, 213, 216, 23, 182], // sha256("compliance_initialize")
+  compliance_add_module: [196, 137, 215, 194, 101, 1, 197, 186], // sha256("compliance_add_module")
+  compliance_remove_module: [93, 163, 11, 188, 105, 196, 148, 136], // sha256("compliance_remove_module")
+  compliance_rebalance_modules: [177, 101, 141, 147, 109, 147, 148, 78], // sha256("compliance_rebalance_modules")
+  compliance_get_modules: [87, 218, 228, 40, 201, 89, 40, 227], // sha256("compliance_get_modules")
+  compliance_get_state: [247, 85, 231, 187, 19, 155, 119, 180], // sha256("compliance_get_state")
+  compliance_get_module_count: [10, 186, 230, 199, 18, 143, 119, 164], // sha256("compliance_get_module_count")
+  compliance_can_transfer: [193, 166, 139, 149, 199, 103, 119, 164], // sha256("compliance_can_transfer")
   // Identity Registry instructions
-  identityInitialize: [186, 33, 116, 89, 245, 128, 128, 128],
-  identityRegisterIdentity: [11, 32, 226, 133, 104, 164, 148, 104],
-  identityRegisterIdentityWithData: [189, 147, 14, 188, 18, 188, 104, 128],
-  identityUpdateIdentity: [188, 14, 92, 183, 215, 239, 119, 128],
-  identityRemoveIdentity: [126, 25, 90, 199, 104, 237, 225, 130],
-  identityGetIdentity: [188, 14, 92, 183, 215, 239, 119, 128],
+  identity_initialize: [186, 33, 116, 89, 245, 128, 128, 128], // sha256("identity_initialize")
+  identity_register_identity: [11, 32, 226, 133, 104, 164, 148, 104], // sha256("identity_register_identity")
+  identity_register_identity_with_data: [189, 147, 14, 188, 18, 188, 104, 128], // sha256("identity_register_identity_with_data")
+  identity_update_identity: [193, 223, 51, 68, 211, 171, 191, 253], // sha256("identity_update_identity")
+  identity_remove_identity: [235, 169, 57, 213, 107, 187, 151, 86], // sha256("identity_remove_identity")
+  identity_get_identity: [190, 233, 111, 177, 243, 170, 100, 170], // sha256("identity_get_identity")
 };
 
 /**
@@ -149,7 +150,8 @@ export function buildMintInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  const data = Buffer.alloc(16);
+  // Anchor layout: discriminator(8) + to(32) + amount(8) = 48 bytes
+  const data = Buffer.alloc(48);
   let offset = 0;
 
   DISCRIMINATORS.mint.forEach((b, i) => {
@@ -157,6 +159,11 @@ export function buildMintInstruction(
   });
   offset += 8;
 
+  // Write 'to' pubkey (32 bytes)
+  to.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
   return {
@@ -180,7 +187,8 @@ export function buildBurnInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  const data = Buffer.alloc(16);
+  // Anchor layout: discriminator(8) + from(32) + amount(8) = 48 bytes
+  const data = Buffer.alloc(48);
   let offset = 0;
 
   DISCRIMINATORS.burn.forEach((b, i) => {
@@ -188,6 +196,11 @@ export function buildBurnInstruction(
   });
   offset += 8;
 
+  // Write 'from' pubkey (32 bytes)
+  from.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
   return {
@@ -212,8 +225,8 @@ export function buildTransferInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  // Anchor layout: discriminator + amount (from/to are in accounts)
-  const data = Buffer.alloc(16);
+  // Anchor layout: discriminator(8) + from(32) + to(32) + amount(8) = 80 bytes
+  const data = Buffer.alloc(80);
   let offset = 0;
 
   DISCRIMINATORS.transfer.forEach((b, i) => {
@@ -221,6 +234,15 @@ export function buildTransferInstruction(
   });
   offset += 8;
 
+  // Write 'from' pubkey (32 bytes)
+  from.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'to' pubkey (32 bytes)
+  to.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
   return {
@@ -244,12 +266,17 @@ export function buildFreezeInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  const data = Buffer.alloc(8);
-  const offset = 0;
+  // Anchor layout: discriminator(8) + account(32) = 40 bytes
+  const data = Buffer.alloc(40);
+  let offset = 0;
 
-  DISCRIMINATORS.freezeAccount.forEach((b, i) => {
+  DISCRIMINATORS.freeze_account.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
+
+  // Write 'account' pubkey (32 bytes)
+  account.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -271,12 +298,17 @@ export function buildUnfreezeInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  const data = Buffer.alloc(8);
-  const offset = 0;
+  // Anchor layout: discriminator(8) + account(32) = 40 bytes
+  const data = Buffer.alloc(40);
+  let offset = 0;
 
-  DISCRIMINATORS.unfreezeAccount.forEach((b, i) => {
+  DISCRIMINATORS.unfreeze_account.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
+
+  // Write 'account' pubkey (32 bytes)
+  account.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -298,14 +330,17 @@ export function buildAddAgentInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
+  // Anchor layout: discriminator(8) + agent(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.addAgent.forEach((b, i) => {
+  DISCRIMINATORS.add_agent.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  agent.toBuffer().copy(data, 8);
+  // Write 'agent' pubkey (32 bytes)
+  agent.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -327,14 +362,17 @@ export function buildRemoveAgentInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
+  // Anchor layout: discriminator(8) + agent(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.removeAgent.forEach((b, i) => {
+  DISCRIMINATORS.remove_agent.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  agent.toBuffer().copy(data, 8);
+  // Write 'agent' pubkey (32 bytes)
+  agent.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -355,14 +393,17 @@ export function buildTransferOwnerInstruction(
   newOwner: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + newOwner(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.transferOwner.forEach((b, i) => {
+  DISCRIMINATORS.transfer_owner.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  newOwner.toBuffer().copy(data, 8);
+  // Write 'newOwner' pubkey (32 bytes)
+  newOwner.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -382,14 +423,17 @@ export function buildTransferFreezeAuthorityInstruction(
   newFreezeAuthority: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + newFreezeAuthority(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.transferFreezeAuthority.forEach((b, i) => {
+  DISCRIMINATORS.transfer_freeze_authority.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  newFreezeAuthority.toBuffer().copy(data, 8);
+  // Write 'newFreezeAuthority' pubkey (32 bytes)
+  newFreezeAuthority.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -407,10 +451,11 @@ export function buildGetSupplyInfoInstruction(
   tokenState: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Read-only query instruction: only discriminator needed
   const data = Buffer.alloc(8);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.getSupplyInfo.forEach((b, i) => {
+  DISCRIMINATORS.get_supply_info.forEach((b, i) => {
     data[offset + i] = b;
   });
 
@@ -430,10 +475,11 @@ export function buildComplianceInitializeInstruction(
   payer: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Read-only/initialize instruction: only discriminator needed
   const data = Buffer.alloc(8);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.complianceInitialize.forEach((b, i) => {
+  DISCRIMINATORS.compliance_initialize.forEach((b, i) => {
     data[offset + i] = b;
   });
 
@@ -457,15 +503,21 @@ export function buildComplianceAddModuleInstruction(
   module: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
-  const data = Buffer.alloc(80);
-  const offset = 0;
+  // Anchor layout: discriminator(8) + token(32) + module(32) = 72 bytes
+  const data = Buffer.alloc(72);
+  let offset = 0;
 
-  DISCRIMINATORS.complianceAddModule.forEach((b, i) => {
+  DISCRIMINATORS.compliance_add_module.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  token.toBuffer().copy(data, 8);
-  module.toBuffer().copy(data, 40);
+  // Write 'token' pubkey (32 bytes)
+  token.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'module' pubkey (32 bytes)
+  module.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -487,15 +539,21 @@ export function buildComplianceRemoveModuleInstruction(
   module: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
-  const data = Buffer.alloc(80);
-  const offset = 0;
+  // Anchor layout: discriminator(8) + token(32) + module(32) = 72 bytes
+  const data = Buffer.alloc(72);
+  let offset = 0;
 
-  DISCRIMINATORS.complianceRemoveModule.forEach((b, i) => {
+  DISCRIMINATORS.compliance_remove_module.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  token.toBuffer().copy(data, 8);
-  module.toBuffer().copy(data, 40);
+  // Write 'token' pubkey (32 bytes)
+  token.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'module' pubkey (32 bytes)
+  module.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -515,10 +573,11 @@ export function buildComplianceRebalanceInstruction(
   owner: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Only discriminator needed (no parameters)
   const data = Buffer.alloc(8);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.complianceRebalanceModules.forEach((b, i) => {
+  DISCRIMINATORS.compliance_rebalance_modules.forEach((b, i) => {
     data[offset + i] = b;
   });
 
@@ -538,16 +597,18 @@ export function buildComplianceGetStateInstruction(
   aggregatorState: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + token(32, optional) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.complianceGetState.forEach((b, i) => {
+  DISCRIMINATORS.compliance_get_state.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
   // Optional token parameter (32 bytes, all zeros if no token specified)
   const defaultToken = Buffer.alloc(32, 0);
-  defaultToken.copy(data, 8);
+  defaultToken.copy(data, offset);
 
   return {
     keys: [
@@ -565,10 +626,11 @@ export function buildIdentityInitializeInstruction(
   payer: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Only discriminator needed (no parameters)
   const data = Buffer.alloc(8);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.identityInitialize.forEach((b, i) => {
+  DISCRIMINATORS.identity_initialize.forEach((b, i) => {
     data[offset + i] = b;
   });
 
@@ -593,15 +655,21 @@ export function buildIdentityRegisterInstruction(
   identity: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + wallet(32) + identity(32) = 72 bytes
   const data = Buffer.alloc(72);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.identityRegisterIdentity.forEach((b, i) => {
+  DISCRIMINATORS.identity_register_identity.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  wallet.toBuffer().copy(data, 8);
-  identity.toBuffer().copy(data, 40);
+  // Write 'wallet' pubkey (32 bytes)
+  wallet.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'identity' pubkey (32 bytes)
+  identity.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -627,7 +695,7 @@ export function buildIdentityRegisterWithDataInstruction(
   metadataUri: string,
   _programId: PublicKey
 ): InstructionResult {
-  // discriminator(8) + wallet(32) + name_len(1) + name + symbol_len(1) + symbol + identity_data_len(1) + identity_data + metadata_uri_len(1) + metadata_uri
+  // Anchor layout: discriminator(8) + wallet(32) + name_len(1) + name + symbol_len(1) + symbol + identity_data_len(1) + identity_data + metadata_uri_len(1) + metadata_uri
   const nameBuffer = Buffer.from(name, 'utf-8');
   const symbolBuffer = Buffer.from(symbol, 'utf-8');
   const identityDataBuffer = Buffer.from(identityData, 'utf-8');
@@ -637,11 +705,12 @@ export function buildIdentityRegisterWithDataInstruction(
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
-  DISCRIMINATORS.identityRegisterIdentityWithData.forEach((b, i) => {
+  DISCRIMINATORS.identity_register_identity_with_data.forEach((b, i) => {
     data[offset + i] = b;
   });
   offset += 8;
 
+  // Write 'wallet' pubkey (32 bytes)
   wallet.toBuffer().copy(data, offset);
   offset += 32;
 
@@ -685,15 +754,21 @@ export function buildIdentityUpdateInstruction(
   newIdentity: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + wallet(32) + newIdentity(32) = 72 bytes
   const data = Buffer.alloc(72);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.identityUpdateIdentity.forEach((b, i) => {
+  DISCRIMINATORS.identity_update_identity.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  wallet.toBuffer().copy(data, 8);
-  newIdentity.toBuffer().copy(data, 40);
+  // Write 'wallet' pubkey (32 bytes)
+  wallet.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'newIdentity' pubkey (32 bytes)
+  newIdentity.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -713,14 +788,17 @@ export function buildIdentityRemoveInstruction(
   wallet: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + wallet(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.identityRemoveIdentity.forEach((b, i) => {
+  DISCRIMINATORS.identity_remove_identity.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  wallet.toBuffer().copy(data, 8);
+  // Write 'wallet' pubkey (32 bytes)
+  wallet.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -739,14 +817,17 @@ export function buildIdentityGetInstruction(
   wallet: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
+  // Anchor layout: discriminator(8) + wallet(32) = 40 bytes
   const data = Buffer.alloc(40);
-  const offset = 0;
+  let offset = 0;
 
-  DISCRIMINATORS.identityGetIdentity.forEach((b, i) => {
+  DISCRIMINATORS.identity_get_identity.forEach((b, i) => {
     data[offset + i] = b;
   });
+  offset += 8;
 
-  wallet.toBuffer().copy(data, 8);
+  // Write 'wallet' pubkey (32 bytes)
+  wallet.toBuffer().copy(data, offset);
 
   return {
     keys: [
@@ -820,29 +901,104 @@ export function parseIdentityInfo(data: Buffer): {
 }
 
 /**
- * Execute a legacy transaction with the Solana RWA program
+ * Execute a legacy transaction with the Solana RWA program using wallet signing.
+ * 
+ * @param connection - Solana connection
+ * @param instruction - Instruction result with keys and data
+ * @param payer - Payer public key (fee payer)
+ * @param programId - Program ID
+ * @param signTransaction - Async function to sign a legacy transaction (from wallet adapter)
  */
-export async function executeLegacyTransaction(
+export async function executeTransaction(
   connection: Connection,
-  transaction: Transaction,
-  signers: Signer[]
+  instruction: { keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>; data: Buffer },
+  payer: PublicKey,
+  programId: PublicKey,
+  signTransaction: (transaction: Transaction) => Promise<Transaction>
 ): Promise<string> {
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  transaction.recentBlockhash = blockhash;
-  transaction.lastValidBlockHeight = lastValidBlockHeight;
-  transaction.feePayer = signers[0]?.publicKey;
 
-  if (signers.length > 0) {
-    transaction.sign(...signers);
-  }
+  // Create TransactionInstruction from instruction result
+  const txInstruction = new TransactionInstruction({
+    keys: instruction.keys,
+    data: instruction.data,
+    programId,
+  });
 
-  const signature = await connection.sendTransaction(transaction, signers, {
+  // Create legacy transaction
+  const transaction = new Transaction({
+    blockhash,
+    lastValidBlockHeight,
+    feePayer: payer,
+  }).add(txInstruction);
+
+  // Sign transaction using wallet adapter
+  const signedTransaction = await signTransaction(transaction);
+
+  // Send pre-signed transaction (signers=[] because wallet already signed)
+  const signature = await connection.sendTransaction(signedTransaction, [], {
     skipPreflight: false,
     preflightCommitment: 'confirmed',
   });
 
+  // Confirm transaction
   await connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
+    'confirmed'
+  );
+
+  return signature;
+}
+
+/**
+ * Execute a versioned transaction with wallet signing.
+ * This is the recommended approach for versioned transactions.
+ * 
+ * @param connection - Solana connection
+ * @param instruction - Instruction result with keys and data
+ * @param payer - Payer public key (fee payer)
+ * @param programId - Program ID
+ * @param signTransaction - Async function to sign a versioned transaction (from wallet adapter)
+ */
+export async function executeVersionedTransaction(
+  connection: Connection,
+  instruction: { keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>; data: Buffer },
+  payer: PublicKey,
+  programId: PublicKey,
+  signTransaction: (transaction: VersionedTransaction) => Promise<VersionedTransaction>
+): Promise<string> {
+  const { blockhash } = await connection.getLatestBlockhash();
+
+  // Create TransactionInstruction from instruction result
+  const txInstruction = new TransactionInstruction({
+    keys: instruction.keys,
+    data: instruction.data,
+    programId,
+  });
+
+  // Create TransactionMessage with correct feePayer and blockhash
+  const message = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions: [txInstruction],
+  }).compileToV0Message();
+
+  // Create versioned transaction
+  const transaction = new VersionedTransaction(message);
+
+  // Sign transaction using wallet adapter
+  const signedTransaction = await signTransaction(transaction);
+
+  // Send pre-signed versioned transaction
+  const signature = await connection.sendTransaction(signedTransaction, {
+    maxRetries: 3,
+    skipPreflight: false,
+  });
+
+  // Confirm transaction
+  const { lastValidBlockHeight: lvb } = await connection.getLatestBlockhash();
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight: lvb },
     'confirmed'
   );
 
