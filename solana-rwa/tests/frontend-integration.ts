@@ -24,7 +24,7 @@ describe('Frontend-Backend Integration Tests', () => {
   // Program IDs from Anchor.toml
   const SOLANA_RWA_ID = new PublicKey('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L');
   const IDENTITY_REGISTRY_ID = new PublicKey('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5');
-  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT');
+  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3');
 
   let owner: Keypair;
   let agent: Keypair;

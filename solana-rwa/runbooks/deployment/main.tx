@@ -1,10 +1,17 @@
 ################################################################
-# Solana RWA - Complete Deployment & Initialization Runbook
-# Deploys and initializes all three programs:
+# Solana RWA - Program Deployment Runbook
+# Deploys all three programs to the target network:
 #   1. compliance_aggregator (no dependencies)
 #   2. identity_registry (depends on compliance_aggregator)
 #   3. solana_rwa (depends on both)
-################################################################
+#
+# NOTE: Post-deployment initialization (token creation, identity registry setup,
+# compliance aggregator setup) requires separate runbooks that use svm::process_instructions.
+# See runbooks/token-operations/token-operations.tx for token initialization examples.
+#
+# Uses svm::deploy_program with svm::get_program_from_anchor_project() to deploy
+# programs from the Anchor project's target/deploy directory.
+# =============================================================================
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
@@ -12,140 +19,63 @@ addon "svm" {
 }
 
 # =============================================================================
+# Signers - Inline definition for localnet
+# =============================================================================
+
+signer "payer" "svm::secret_key" {
+    description = "Pays fees for program deployments and operations"
+    keypair_json = "~/.config/solana/id.json"
+}
+
+signer "authority" "svm::secret_key" {
+    description = "Can upgrade programs and manage critical ops"
+    keypair_json = "~/.config/solana/id.json"
+}
+
+# =============================================================================
+# Program IDs from Anchor.toml
+# =============================================================================
+
+variable "compliance_aggregator_program_id" {
+    value = "3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3"
+}
+
+variable "identity_registry_program_id" {
+    value = "3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5"
+}
+
+variable "solana_rwa_program_id" {
+    value = "7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L"
+}
+
+# =============================================================================
 # PHASE 1: Deploy Programs
+# =============================================================================
+# Each program is deployed in a separate action. Programs are ordered by dependency:
+#   1. compliance_aggregator (no dependencies)
+#   2. identity_registry (depends on compliance_aggregator)
+#   3. solana_rwa (depends on both compliance_aggregator and identity_registry)
 # =============================================================================
 
 action "deploy_compliance_aggregator" "svm::deploy_program" {
-    description = "Deploy compliance_aggregator program"
+    description = "Deploy compliance_aggregator program (no dependencies)"
     program = svm::get_program_from_anchor_project("compliance_aggregator")
     authority = signer.authority
     payer = signer.payer
-    // For localnet, use instant deployment (cheatcode)
-    // This writes program data directly to account instead of transactions
-    instant_surfnet_deployment = true
 }
 
 action "deploy_identity_registry" "svm::deploy_program" {
-    description = "Deploy identity_registry program"
+    description = "Deploy identity_registry program (depends on compliance_aggregator)"
     program = svm::get_program_from_anchor_project("identity_registry")
     authority = signer.authority
     payer = signer.payer
-    instant_surfnet_deployment = true
 }
 
 action "deploy_solana_rwa" "svm::deploy_program" {
-    description = "Deploy solana_rwa (token) program"
+    description = "Deploy solana_rwa program (depends on compliance_aggregator and identity_registry)"
     program = svm::get_program_from_anchor_project("solana_rwa")
     authority = signer.authority
     payer = signer.payer
-    instant_surfnet_deployment = true
-}
-
-# =============================================================================
-# PHASE 2: Initialize Programs
-# =============================================================================
-
-# Store program IDs as variables for later use
-variable "compliance_aggregator_id" {
-    description = "Program ID of deployed compliance_aggregator"
-    value = action.deploy_compliance_aggregator.program_id
-}
-
-variable "identity_registry_id" {
-    description = "Program ID of deployed identity_registry"
-    value = action.deploy_identity_registry.program_id
-}
-
-variable "solana_rwa_id" {
-    description = "Program ID of deployed solana_rwa"
-    value = action.deploy_solana_rwa.program_id
-}
-
-# Initialize Compliance Aggregator
-action "init_compliance_aggregator" "svm::process_instructions" {
-    description = "Initialize compliance_aggregator program state"
-    instruction {
-        program_idl = action.deploy_compliance_aggregator.program_idl
-        instruction_name = "initialize"
-        
-        payer {
-            public_key = signer.payer.public_key
-        }
-        
-        authority {
-            public_key = signer.authority.public_key
-        }
-        
-        system_program = svm::system_program_id()
-    }
-    signers = [signer.payer, signer.authority]
-}
-
-# Initialize Identity Registry
-action "init_identity_registry" "svm::process_instructions" {
-    description = "Initialize identity_registry program state"
-    instruction {
-        program_idl = action.deploy_identity_registry.program_idl
-        instruction_name = "initialize"
-        
-        payer {
-            public_key = signer.payer.public_key
-        }
-        
-        authority {
-            public_key = signer.authority.public_key
-        }
-        
-        system_program = svm::system_program_id()
-    }
-    signers = [signer.payer, signer.authority]
-}
-
-# Initialize Solana RWA Token
-action "init_solana_rwa" "svm::process_instructions" {
-    description = "Initialize solana_rwa token with name, symbol, and decimals"
-    instruction {
-        program_idl = action.deploy_solana_rwa.program_idl
-        instruction_name = "initialize"
-        instruction_args = [
-            input.token_name,
-            input.token_symbol,
-            input.token_decimals
-        ]
-        
-        payer {
-            public_key = signer.payer.public_key
-        }
-        
-        authority {
-            public_key = signer.authority.public_key
-        }
-        
-        system_program = svm::system_program_id()
-    }
-    signers = [signer.payer, signer.authority]
-}
-
-# =============================================================================
-# PHASE 3: Setup Agents (Optional)
-# =============================================================================
-
-action "add_agent_to_solana_rwa" "svm::process_instructions" {
-    description = "Add an agent to solana_rwa program (optional)"
-    instruction {
-        program_idl = action.deploy_solana_rwa.program_idl
-        instruction_name = "add_agent"
-        instruction_args = [input.agent_pubkey]
-        
-        payer {
-            public_key = signer.payer.public_key
-        }
-        
-        authority {
-            public_key = signer.authority.public_key
-        }
-    }
-    signers = [signer.payer, signer.authority]
 }
 
 # =============================================================================
@@ -154,35 +84,20 @@ action "add_agent_to_solana_rwa" "svm::process_instructions" {
 
 output "deployment_summary" {
     description = "Summary of all deployed programs"
-    value = "compliance_aggregator: ${action.deploy_compliance_aggregator.program_id}\nidentity_registry: ${action.deploy_identity_registry.program_id}\nsolana_rwa: ${action.deploy_solana_rwa.program_id}"
+    value = "compliance_aggregator: ${variable.compliance_aggregator_program_id}\nidentity_registry: ${variable.identity_registry_program_id}\nsolana_rwa: ${variable.solana_rwa_program_id}"
 }
 
 output "compliance_aggregator_program_id" {
     description = "Program ID of compliance_aggregator"
-    value = action.deploy_compliance_aggregator.program_id
+    value = variable.compliance_aggregator_program_id
 }
 
 output "identity_registry_program_id" {
     description = "Program ID of identity_registry"
-    value = action.deploy_identity_registry.program_id
+    value = variable.identity_registry_program_id
 }
 
 output "solana_rwa_program_id" {
     description = "Program ID of solana_rwa"
-    value = action.deploy_solana_rwa.program_id
-}
-
-output "compliance_aggregator_init_signature" {
-    description = "Transaction signature of compliance_aggregator initialization"
-    value = action.init_compliance_aggregator.signature
-}
-
-output "identity_registry_init_signature" {
-    description = "Transaction signature of identity_registry initialization"
-    value = action.init_identity_registry.signature
-}
-
-output "solana_rwa_init_signature" {
-    description = "Transaction signature of solana_rwa initialization"
-    value = action.init_solana_rwa.signature
+    value = variable.solana_rwa_program_id
 }

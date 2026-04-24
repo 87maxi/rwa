@@ -32,7 +32,7 @@
 use anchor_lang::prelude::*;  // Import Anchor essentials
 
 // declare_id!() = the program's on-chain address
-declare_id!("EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT");
+declare_id!("3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3");
 
 // #[program] marks this module as containing all instruction handlers
 #[program]

@@ -98,26 +98,51 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     sleep 1
 done
 
-# Step 3: Deploy programs
-INFO "Step 3: Deploying programs via txtx runbook..."
+# Step 3: Deploy programs using solana program deploy
+INFO "Step 3: Deploying programs via solana program deploy..."
 
-if [ -f "txtx.yml" ]; then
-    surfpool run deployment \
-        --env localnet \
-        -u \
-        --manifest-file-path ./txtx.yml \
-        2>&1 | tee -a "$LOG_FILE"
+WALLET_PATH="${HOME}/.config/solana/id.json"
+SOLANA_URL="http://127.0.0.1:$SURFPOL_PORT"
+
+# Configure solana CLI to use Surfpool
+solana config set --url "$SOLANA_URL" 2>/dev/null || true
+solana config set --keypair "$WALLET_PATH" 2>/dev/null || true
+
+if command -v solana &> /dev/null; then
+    # Deploy all three programs in dependency order
+    INFO "Deploying compliance_aggregator..."
+    solana program deploy \
+        -v \
+        -k "$WALLET_PATH" \
+        --url "$SOLANA_URL" \
+        ./target/deploy/compliance_aggregator.so 2>&1 | tee -a "$LOG_FILE"
+    
+    INFO "Deploying identity_registry..."
+    solana program deploy \
+        -v \
+        -k "$WALLET_PATH" \
+        --url "$SOLANA_URL" \
+        ./target/deploy/identity_registry.so 2>&1 | tee -a "$LOG_FILE"
+    
+    INFO "Deploying solana_rwa..."
+    solana program deploy \
+        -v \
+        -k "$WALLET_PATH" \
+        --url "$SOLANA_URL" \
+        ./target/deploy/solana_rwa.so 2>&1 | tee -a "$LOG_FILE"
+    
     SUCCESS "Deployment complete"
 else
-    WARN "txtx.yml not found. Skipping txtx deployment."
-    WARN "You may need to deploy manually with: anchor deploy"
+    ERROR "Solana CLI not found. Cannot deploy programs."
+    exit 1
 fi
 
 # Step 4: Run Anchor tests
 INFO "Step 4: Running Anchor tests..."
 
 if command -v anchor &> /dev/null; then
-    anchor test --provider.url http://127.0.0.1:$SURFPOL_PORT 2>&1 | tee -a "$LOG_FILE"
+    # Use --skip-deploy and --skip-local-validator since we already deployed and Surfpool is running
+    anchor test --provider.cluster localnet --skip-deploy --skip-local-validator 2>&1 | tee -a "$LOG_FILE"
     TEST_STATUS=$?
     
     if [ $TEST_STATUS -eq 0 ]; then

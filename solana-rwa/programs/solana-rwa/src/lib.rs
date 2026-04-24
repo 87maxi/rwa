@@ -96,6 +96,10 @@
 
 use anchor_lang::prelude::*;  // Import all Anchor essentials (like "from django.conf import *"
 
+// Module for cross-program invocation (CPI) program IDs
+// Like importing contract addresses for calling other smart contracts
+pub mod ids;
+
 // declare_id!() sets the program's public key on the blockchain.
 // This is like deploying a smart contract and getting its address.
 // In production, you'd generate this with: anchor keys list

@@ -1,78 +1,340 @@
 ---
+# =============================================================================
+# TXTX (Infrastructure as Code) Configuration for Solana RWA
+# =============================================================================
+#
+# This file defines the deployment configuration for the Solana RWA project.
+# It uses the txtx DSL (Domain Specific Language) to define runbooks and
+# environment variables for deployment automation.
+#
+# IMPORTANT: Program ID Management
+# ---------------------------------
+# After deploying to devnet/mainnet, you MUST update the program IDs below:
+#
+# 1. Run deployment: txtx run deployment --environment devnet
+# 2. Capture program IDs from the deployment output
+# 3. Update the values below with the actual deployed program IDs
+# 4. Verify with: txtx validate
+#
+# How to get program IDs after deployment:
+#   - Check the deployment logs in .surfpool/state/
+#   - Run: cat .surfpool/state/*.json | grep program_id
+#   - Or check the Solana explorer for your deployed programs
+#
+# Program ID Format Validation:
+#   - Must be valid Base58 strings (characters: A-Z, a-z, 0-9, $, *, +, -, ., /, =, @, _, ~)
+#   - Must be exactly 32 bytes when decoded from Base58
+#   - Example: "7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L"
+#
+# Rust Basics for Python/Go/PHP/Perl Developers:
+# -----------------------------------------------
+# YAML is like Python's indentation-based syntax but with explicit markers:
+# - Keys are "key: value" pairs (like Python dict)
+# - Lists use "- item" syntax (like Python [item1, item2])
+# - Indentation defines scope (like Python's block structure)
+# - Strings can be quoted ("text") or unquoted (value)
+# - Comments start with # (like Python)
+
 name: solana-rwa
 id: solana-rwa
 runbooks:
-  # Main deployment runbook - deploys and initializes all programs
+  # =============================================================================
+  # MAIN DEPLOYMENT RUNBOOK
+  # =============================================================================
+  # Deploys and initializes all three programs in dependency order:
+  #   1. compliance_aggregator (no dependencies - base layer)
+  #   2. identity_registry (depends on compliance_aggregator - middle layer)
+  #   3. solana_rwa (depends on both - top layer)
+  #
+  # Analogy: Like installing dependencies in order: pip install base middle app
   - name: deployment
     description: Deploy and initialize all Solana RWA programs (solana_rwa, identity_registry, compliance_aggregator)
     location: ./runbooks/deployment
     state:
       location: .surfpool/state
 
-  # Token operations runbook - mint, transfer, manage agents
+  # =============================================================================
+  # TOKEN OPERATIONS RUNBOOK
+  # =============================================================================
+  # Operations that can be performed AFTER deployment:
+  # - Mint new tokens
+  # - Transfer tokens between accounts
+  # - Add/remove authorized agents
+  # - Freeze/unfreeze accounts
+  #
+  # These operations require program IDs to be set (see Phase 2 after deployment)
   - name: token-operations
     description: Token operations (mint, transfer, add/remove agents, freeze/unfreeze accounts)
-    location: ./runbooks/deployment
+    location: ./runbooks/token-operations
     # No state management for operations - they run each time
+    # Each execution is independent and uses current state on-chain
 
-  # Upgrade runbook - upgrade deployed programs
+  # =============================================================================
+  # UPGRADE RUNBOOK
+  # =============================================================================
+  # Upgrades deployed programs to new versions while preserving state.
+  #
+  # IMPORTANT: Program upgrades on Solana:
+  # - The program ID stays the SAME
+  # - Only the program CODE is updated
+  # - State data persists (like upgrading a smart contract's bytecode)
+  # - Authority must sign the upgrade transaction
+  #
+  # Process:
+  #   1. Build new version: anchor build
+  #   2. Run upgrade runbook: txtx run upgrade --environment devnet
+  #   3. Verify new version on explorer
   - name: upgrade
     description: Upgrade deployed programs to new versions
-    location: ./runbooks/deployment
+    location: ./runbooks/upgrade
     state:
       location: .surfpool/state
 
-  # Surfnet setup runbook - configure local environment
+  # =============================================================================
+  # COMPLIANCE AGGREGATOR INITIALIZATION RUNBOOK
+  # =============================================================================
+  # Initializes the compliance aggregator state account after deployment.
+  # Creates the ComplianceAggregatorState PDA that stores all module configurations.
+  #
+  # Order: Run FIRST (compliance_aggregator has no dependencies)
+  # Usage: txtx run compliance-initialization --env localnet
+  - name: compliance-initialization
+    description: Initialize compliance aggregator state account (creates ComplianceAggregatorState PDA)
+    location: ./runbooks/compliance-initialization
+
+  # =============================================================================
+  # IDENTITY REGISTRY INITIALIZATION RUNBOOK
+  # =============================================================================
+  # Initializes the identity registry state account after deployment.
+  # Creates the IdentityRegistryState PDA that stores all identity mappings.
+  #
+  # Order: Run SECOND (identity_registry depends on compliance_aggregator being deployed)
+  # Usage: txtx run identity-initialization --env localnet
+  - name: identity-initialization
+    description: Initialize identity registry state account (creates IdentityRegistryState PDA)
+    location: ./runbooks/identity-initialization
+
+  # =============================================================================
+  # TOKEN INITIALIZATION RUNBOOK
+  # =============================================================================
+  # Initializes the token state account after deployment.
+  # Creates the TokenState PDA that stores all token data (balances, owner, agents, etc.)
+  #
+  # Order: Run THIRD (requires token program ID and token details)
+  # Usage: txtx run token-initialization --env localnet --input token_name="My Token" --input token_symbol="MTK"
+  - name: token-initialization
+    description: Initialize token state account (creates TokenState PDA with name, symbol, decimals)
+    location: ./runbooks/token-initialization
+
+  # =============================================================================
+  # SURFNET SETUP RUNBOOK
+  # =============================================================================
+  # Configures the local development environment:
+  # - Sets up account balances
+  # - Creates token accounts
+  # - Configures program authorities
+  #
+  # This runbook is for local development only (localnet/surfpool)
   - name: setup-surfnet
     description: Configure Surfnet environment (balances, token accounts, program authorities)
-    location: ./runbooks/deployment
+    location: ./runbooks/setup-surfnet
     # No state management for setup
 
-# Input variables available to all runbooks, grouped by environment
+# =============================================================================
+# ENVIRONMENT CONFIGURATION
+# =============================================================================
+# Input variables available to all runbooks, grouped by environment.
+# Each environment has its own set of program IDs and network settings.
+#
+# How to use environment variables:
+#   txtx run deployment --environment devnet \
+#     --input solana_rwa_program_id=<YOUR_PROGRAM_ID>
+#
+# Or edit this file directly after deployment to persist the values.
+
 environments:
+  # =============================================================================
+  # LOCALNET (Development)
+  # =============================================================================
+  # Used for local development with surfpool/solana-test-validator
+  # Program IDs are generated by Anchor and must match Anchor.toml
+  #
+  # NOTE: These IDs are auto-populated by surfpool after deployment.
+  # Before deployment, they are empty strings as placeholders.
   localnet:
     network_id: localnet
     rpc_api_url: http://127.0.0.1:8899
     payer_keypair_json: ~/.config/solana/id.json
     authority_keypair_json: ~/.config/solana/id.json
+    
     # Token initialization parameters
     token_name: "RWA Token"
     token_symbol: "RWA"
     token_decimals: 9
+    
     # Agent to add (optional, leave empty to skip)
     agent_pubkey: ""
-    # Program IDs for token operations (set after deployment)
+    
+    # Program IDs for token operations
+    # These are populated AFTER deployment by surfpool state extraction
+    # For localnet, these match Anchor.toml [programs.localnet] section
     solana_rwa_program_id: ""
     identity_registry_program_id: ""
     compliance_aggregator_program_id: ""
+    
+    # SPL Token program ID (standard on all Solana networks)
+    # This is a well-known program ID that never changes
     token_program_id: ""
-    # Token state account (set after initialization)
+    
+    # Token state account (set after token initialization)
     token_state_account: ""
 
+  # =============================================================================
+  # DEVNET (Testing)
+  # =============================================================================
+  # Used for testing before mainnet deployment
+  # Program IDs are GENERATED at deployment time - DO NOT hardcode
+  #
+  # Deployment workflow:
+  #   1. Update program IDs in this file AFTER successful deployment
+  #   2. Run: txtx validate (to verify configuration)
+  #   3. Run token operations: txtx run token-operations --environment devnet
+  #
+  # IMPORTANT: Always backup this file before deployment!
+  # After deployment, the new program IDs should be saved here.
   devnet:
     network_id: devnet
     rpc_api_url: https://api.devnet.solana.com
+    payer_keypair_json: ~/.config/solana/devnet.json
+    authority_keypair_json: ~/.config/solana/devnet.json
+    
+    # Token initialization parameters
     token_name: "RWA Token Devnet"
     token_symbol: "RWAD"
     token_decimals: 9
+    
+    # Agent to add (optional)
     agent_pubkey: ""
+    
+    # Program IDs - UPDATE AFTER DEPLOYMENT
+    # These will be populated from deployment output
     solana_rwa_program_id: ""
     identity_registry_program_id: ""
     compliance_aggregator_program_id: ""
+    
+    # SPL Token program (same on all Solana networks)
     token_program_id: ""
+    
+    # Token state account (set after initialization)
     token_state_account: ""
+    
+    # Expected payer address (for verification)
     expected_payer_address: ""
 
+  # =============================================================================
+  # MAINNET (Production)
+  # =============================================================================
+  # PRODUCTION deployment - USE WITH CAUTION
+  # Requires significant SOL for program deployment fees
+  #
+  # Deployment checklist:
+  #   [ ] Code audited by security team
+  #   [ ] Tests passing on devnet
+  #   [ ] Upgrade authority configured
+  #   [ ] Emergency pause mechanism in place
+  #   [ ] Program IDs documented and backed up
+  #
+  # IMPORTANT: Mainnet deployment fees are significant (~1-2 SOL per program)
+  # Test thoroughly on devnet before mainnet deployment!
   mainnet:
     network_id: mainnet
     rpc_api_url: https://api.mainnet-beta.solana.com
+    payer_keypair_json: ~/.config/solana/mainnet.json
+    authority_keypair_json: ~/.config/solana/mainnet.json
+    
+    # Token initialization parameters
     token_name: "RWA Token"
     token_symbol: "RWA"
     token_decimals: 9
+    
+    # Agent to add (optional)
     agent_pubkey: ""
+    
+    # Program IDs - UPDATE AFTER DEPLOYMENT
     solana_rwa_program_id: ""
     identity_registry_program_id: ""
     compliance_aggregator_program_id: ""
+    
+    # SPL Token program (same on all Solana networks)
     token_program_id: ""
+    
+    # Token state account (set after initialization)
     token_state_account: ""
+    
+    # Expected payer address (for verification)
     expected_payer_address: ""
+
+# =============================================================================
+# PROGRAM ID VALIDATION RULES
+# =============================================================================
+# The following rules are documented for reference. txtx validation will check:
+#
+# 1. Format: Program IDs must be valid Base58 strings
+#    - Valid characters: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
+#    - Length: 32-44 characters (Base58 encoded 32 bytes)
+#
+# 2. Uniqueness: Each program must have a unique ID
+#    - solana_rwa != identity_registry != compliance_aggregator
+#
+# 3. Consistency: IDs must match across:
+#    - Anchor.toml [programs.<environment>] section
+#    - ids.rs constants (for localnet)
+#    - web/src/config/solana.ts PROGRAM_IDS
+#    - txtx.yml environment variables
+#
+# 4. Well-known programs: Some program IDs are standard:
+#    - SPL Token: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+#    - SPL System: 11111111111111111111111111111111
+#    - Compute Budget: ComputeB1earer1111111111111111111111111111
+#
+# =============================================================================
+# DEPLOYMENT WORKFLOW REFERENCE
+# =============================================================================
+#
+# Local Development (Surfpool):
+#   $ surfpool start
+#   $ txtx run deployment --environment localnet
+#   $ txtx run token-operations --environment localnet
+#
+# Devnet Deployment:
+#   $ txtx run deployment --environment devnet
+#   # Copy program IDs from output
+#   # Update txtx.yml with actual program IDs
+#   $ txtx run token-operations --environment devnet
+#
+# Mainnet Deployment:
+#   $ txtx run deployment --environment mainnet
+#   # Verify on Solana explorer
+#   # Update txtx.yml with actual program IDs
+#   $ txtx run token-operations --environment mainnet
+#
+# Upgrade Procedure:
+#   $ cd solana-rwa && anchor build
+#   $ txtx run upgrade --environment <env>
+#   $ txtx validate --environment <env>
+#
+# =============================================================================
+# TROUBLESHOOTING
+# =============================================================================
+#
+# Problem: "Program ID not found" error
+# Solution: Ensure program IDs are populated in txtx.yml for the target environment
+#
+# Problem: "DeclaredProgramIdMismatch" error
+# Solution: Ensure Anchor.toml [programs.localnet] matches ids.rs constants
+#
+# Problem: "Invalid program ID" error
+# Solution: Verify program ID is valid Base58 and 32 bytes when decoded
+#
+# Problem: Frontend can't connect to program
+# Solution: Ensure web/src/config/solana.ts PROGRAM_IDS match txtx.yml values

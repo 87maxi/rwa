@@ -167,6 +167,38 @@ function loadIDL(programName: string): IDL {
   return JSON.parse(content) as IDL;
 }
 
+// =============================================================================
+// Module-level IDL loading - executed before any describe blocks
+// =============================================================================
+
+const SOLANA_RWA_IDL_PATH = path.join(__dirname, '..', 'target', 'idl', 'solana_rwa.json');
+const IDENTITY_REGISTRY_IDL_PATH = path.join(__dirname, '..', 'target', 'idl', 'identity_registry.json');
+const COMPLIANCE_AGGREGATOR_IDL_PATH = path.join(__dirname, '..', 'target', 'idl', 'compliance_aggregator.json');
+
+let solanaRwaIdl: IDL;
+let identityRegistryIdl: IDL;
+let complianceAggregatorIdl: IDL;
+
+// Synchronous loading - runs at module load time (before Mocha parses describe blocks)
+try {
+  solanaRwaIdl = loadIDL('solana_rwa');
+} catch {
+  console.log('solana_rwa IDL not found - running structural tests only');
+  solanaRwaIdl = { name: 'solana_rwa', version: '0.0.0', instructions: [] } as IDL;
+}
+
+try {
+  identityRegistryIdl = loadIDL('identity_registry');
+} catch {
+  identityRegistryIdl = { name: 'identity_registry', version: '0.0.0', instructions: [] } as IDL;
+}
+
+try {
+  complianceAggregatorIdl = loadIDL('compliance_aggregator');
+} catch {
+  complianceAggregatorIdl = { name: 'compliance_aggregator', version: '0.0.0', instructions: [] } as IDL;
+}
+
 /**
  * Converts Rust snake_case to TypeScript camelCase.
  */
@@ -281,33 +313,6 @@ describe('IDL Consistency Tests', () => {
   const SOLANA_RWA_SRC = path.join(__dirname, '..', 'programs', 'solana-rwa', 'src', 'lib.rs');
   const IDENTITY_REGISTRY_SRC = path.join(__dirname, '..', 'programs', 'identity-registry', 'src', 'lib.rs');
   const COMPLIANCE_AGGREGATOR_SRC = path.join(__dirname, '..', 'programs', 'compliance-aggregator', 'src', 'lib.rs');
-
-  // Load IDLs
-  let solanaRwaIdl: IDL;
-  let identityRegistryIdl: IDL;
-  let complianceAggregatorIdl: IDL;
-
-  before(async () => {
-    try {
-      solanaRwaIdl = loadIDL('solana_rwa');
-    } catch (error) {
-      // IDL might not exist yet - tests will be skipped
-      console.log('IDL not found - running structural tests only');
-      solanaRwaIdl = { name: 'solana_rwa', version: '0.0.0', instructions: [] } as IDL;
-    }
-
-    try {
-      identityRegistryIdl = loadIDL('identity_registry');
-    } catch {
-      identityRegistryIdl = { name: 'identity_registry', version: '0.0.0', instructions: [] } as IDL;
-    }
-
-    try {
-      complianceAggregatorIdl = loadIDL('compliance_aggregator');
-    } catch {
-      complianceAggregatorIdl = { name: 'compliance_aggregator', version: '0.0.0', instructions: [] } as IDL;
-    }
-  });
 
   // =================================================================
   // Section 1: Instruction Consistency
