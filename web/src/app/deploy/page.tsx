@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { TOKEN_CONFIG } from '@/config/solana';
+import { TOKEN_CONFIG, PROGRAM_IDS, getCurrentNetwork } from '@/config/solana';
 import { useTokenActions } from '@/hooks/useTokenActions';
+import { PublicKey, Connection } from '@solana/web3.js';
 
 interface TokenConfig {
   name: string;
@@ -31,10 +32,30 @@ export default function DeployPage() {
     freezeAuthority: '',
   });
 
-  // Use the connected wallet's public key as the token account pubkey for initialization
-  // After initialization, this will be the PDA for the token state
-  const tokenAccountPubkey = publicKey?.toString() ?? null;
-  const tokenActions = useTokenActions(tokenAccountPubkey);
+  // Derive PDA for the token state account from the owner wallet
+  // The token state is a PDA seeded with: [owner_wallet_bytes]
+  const tokenStatePda = useMemo(() => {
+    if (!publicKey) return null;
+    
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.solanaRwa;
+      if (!programIdStr) return null;
+      
+      const programId = new PublicKey(programIdStr);
+      // Derive PDA from owner wallet and program ID
+      const [derivedPda] = PublicKey.findProgramAddressSync(
+        [publicKey.toBuffer()],
+        programId
+      );
+      
+      return derivedPda.toString();
+    } catch {
+      return null;
+    }
+  }, [publicKey]);
+  
+  const tokenActions = useTokenActions(tokenStatePda);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
