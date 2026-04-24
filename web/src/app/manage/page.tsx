@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
@@ -9,6 +9,8 @@ import { useSolanaConnection, useWalletBalance } from '@/hooks';
 import { ClientOnly } from '@/components/ClientOnly';
 import { useTokenActions, type SupplyInfo, type AggregatorState, type IdentityInfo } from '@/hooks/useTokenActions';
 import { useSolanaNotification } from '@/hooks';
+import { PublicKey } from '@solana/web3.js';
+import { PROGRAM_IDS, getCurrentNetwork } from '@/config/solana';
 
 export default function ManagePage() {
   const { connected, publicKey } = useWallet();
@@ -42,10 +44,30 @@ export default function ManagePage() {
   const [aggregatorState, setAggregatorState] = useState<AggregatorState | null>(null);
   const [identityInfo, setIdentityInfo] = useState<IdentityInfo | null>(null);
 
-  // Use the connected wallet's public key as the token account pubkey
-  // In production, this would be the PDA of the deployed token state
-  const tokenAccountPubkey = publicKey?.toString() ?? null;
-  const tokenActions = useTokenActions(tokenAccountPubkey);
+  // Derive PDA for the token state account from the owner wallet
+  // The token state is a PDA seeded with: [owner_wallet_bytes]
+  const tokenStatePda = useMemo(() => {
+    if (!publicKey) return null;
+    
+    try {
+      const network = getCurrentNetwork();
+      const programIdStr = PROGRAM_IDS[network]?.solanaRwa;
+      if (!programIdStr) return null;
+      
+      const programId = new PublicKey(programIdStr);
+      // Derive PDA from owner wallet and program ID
+      const [derivedPda] = PublicKey.findProgramAddressSync(
+        [publicKey.toBuffer()],
+        programId
+      );
+      
+      return derivedPda.toString();
+    } catch {
+      return null;
+    }
+  }, [publicKey]);
+  
+  const tokenActions = useTokenActions(tokenStatePda);
   
   // Notification system
   const { success, error: showError } = useSolanaNotification();
