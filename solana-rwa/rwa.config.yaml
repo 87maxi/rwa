@@ -1,0 +1,96 @@
+project:
+  name: solana-rwa
+  version: 1.0.0
+  description: Real World Assets tokenization platform on Solana
+networks:
+  localnet:
+    rpc_url: http://127.0.0.1:8899
+    websocket_url: ws://127.0.0.1:8900
+    keypair: ~/.config/solana/id.json
+    surfpool:
+      enabled: true
+      auto_start: true
+      auto_restart: true
+      instant_deployment: true
+      dashboard_port: 5173
+      log_level: info
+      test_ledger_reset: true
+      reset_leadger_sleep: 1000
+    txtx:
+      enabled: true
+      state_location: .surfpool/state
+      signer_strategy: secret_key
+  devnet:
+    rpc_url: https://api.devnet.solana.com
+    websocket_url: wss://api.devnet.solana.com
+    keypair: ~/.config/solana/devnet.json
+    surfpool:
+      enabled: false
+      auto_start: false
+      instant_deployment: false
+    txtx:
+      enabled: true
+      state_location: .surfpool/state
+      signer_strategy: web_wallet
+  mainnet:
+    rpc_url: https://api.mainnet-beta.solana.com
+    websocket_url: wss://api.mainnet-beta.solana.com
+    keypair: ~/.config/solana/mainnet.json
+    surfpool:
+      enabled: false
+      auto_start: false
+      instant_deployment: false
+    txtx:
+      enabled: true
+      state_location: .surfpool/state
+      signer_strategy: squads
+programs:
+  localnet:
+    compliance_aggregator: tP5foGHT8LVSF7L4NNqW9b1SsATunKcCfPbjNVv2ZwF
+    identity_registry: HTDMcmLinvhDRGWKPUoshVxtT6nkMNCKzaCn9hhW8nSU
+    solana_rwa: x6uwJC9QEQRjNDJ1nY6BmxiHh33yhgBJr3G5FGWE9R8U
+  devnet:
+    compliance_aggregator: ''
+    identity_registry: ''
+    solana_rwa: ''
+  mainnet:
+    compliance_aggregator: ''
+    identity_registry: ''
+    solana_rwa: ''
+deployment:
+  order:
+  - compliance_aggregator
+  - identity_registry
+  - solana_rwa
+build:
+  tool: anchor
+  workspace: solana-rwa
+  programs:
+  - compliance-aggregator
+  - identity-registry
+  - solana-rwa
+  output:
+    idl: idl
+    types: types
+    binaries: target/deploy
+test:
+  framework: mocha + yarn
+  pattern: tests/**/*.ts
+  timeout: 1000000
+  suites:
+  - name: unit
+    path: tests/**/*.ts
+  - name: security
+    path: tests/security/**/*.ts
+  - name: integration
+    path: tests/frontend-integration.ts
+  - name: consistency
+    path: tests/*-consistency.ts
+anchor:
+  toolchain:
+    package_manager: yarn
+  features:
+    resolution: true
+    skip_lint: false
+  registry:
+    url: https://api.apr.dev

@@ -1,0 +1,42 @@
+# =============================================================================
+# Default Configuration Overrides
+# Base settings applied to all environments
+# =============================================================================
+
+# Default provider settings
+provider:
+  cluster: localnet
+  wallet: ~/.config/solana/id.json
+
+# Default deployment settings
+deployment:
+  timeout: 120000
+  confirm_iterations: 100
+  skip_if_deployed: false
+  order:
+    - compliance_aggregator
+    - identity_registry
+    - solana_rwa
+
+# Default build settings
+build:
+  verbose: false
+  wasm: true
+  so: false
+  verifiable: false
+
+# Default test settings
+test:
+  timeout: 1000000
+  parallel: false
+
+# Default IDL settings
+idl:
+  out_dir: idl
+  types_dir: types
+
+# Default program addresses (empty - must be populated per environment)
+programs:
+  compliance_aggregator: ""
+  identity_registry: ""
+  solana_rwa: ""
