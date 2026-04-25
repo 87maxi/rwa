@@ -2,11 +2,28 @@
 # Solana RWA - Upgrade Programs Runbook
 # Upgrades deployed programs to new versions
 # IMPORTANT: Programs must be deployed with upgrade authority set
+#
+# Usage:
+#   surfpool run upgrade --env localnet -u
 ################################################################
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
     network_id = input.network_id
+}
+
+# =============================================================================
+# Signers
+# =============================================================================
+
+signer "payer" "svm::secret_key" {
+    description = "Pays fees for program deployments and operations"
+    keypair_json = "~/.config/solana/id.json"
+}
+
+signer "authority" "svm::secret_key" {
+    description = "Can upgrade programs and manage critical ops"
+    keypair_json = "~/.config/solana/id.json"
 }
 
 # =============================================================================
@@ -18,8 +35,6 @@ action "upgrade_compliance_aggregator" "svm::deploy_program" {
     program = svm::get_program_from_anchor_project("compliance_aggregator")
     authority = signer.authority
     payer = signer.payer
-    // For upgrades, we don't use instant_surfnet_deployment
-    // instant_surfnet_deployment = false
 }
 
 # =============================================================================
@@ -31,7 +46,6 @@ action "upgrade_identity_registry" "svm::deploy_program" {
     program = svm::get_program_from_anchor_project("identity_registry")
     authority = signer.authority
     payer = signer.payer
-    // instant_surfnet_deployment = false
 }
 
 # =============================================================================
@@ -43,7 +57,6 @@ action "upgrade_solana_rwa" "svm::deploy_program" {
     program = svm::get_program_from_anchor_project("solana_rwa")
     authority = signer.authority
     payer = signer.payer
-    // instant_surfnet_deployment = false
 }
 
 # =============================================================================

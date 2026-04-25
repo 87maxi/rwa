@@ -2,11 +2,28 @@
 # Solana RWA - Setup Surfnet Runbook
 # Configures the local Surfnet environment for testing
 # Sets up accounts, token accounts, and program authorities
+#
+# Usage:
+#   surfpool run setup-surfnet --env localnet -u
 ################################################################
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
     network_id = input.network_id
+}
+
+# =============================================================================
+# Signers
+# =============================================================================
+
+signer "payer" "svm::secret_key" {
+    description = "Pays fees for program deployments and operations"
+    keypair_json = "~/.config/solana/id.json"
+}
+
+signer "authority" "svm::secret_key" {
+    description = "Can upgrade programs and manage critical ops"
+    keypair_json = "~/.config/solana/id.json"
 }
 
 # =============================================================================
@@ -36,7 +53,7 @@ action "setup_usdc_token_account" "svm::setup_surfnet" {
 }
 
 # =============================================================================
-# Setup Program Authority (for localnet testing)
+# Setup Program Authorities (for localnet testing)
 # =============================================================================
 
 action "set_program_authorities" "svm::setup_surfnet" {
