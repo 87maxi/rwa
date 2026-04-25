@@ -1,0 +1,102 @@
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature HTW2pSyErTj4BV6KBM9NZ9VBUJVxt7sacNWcf76wtzb3
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature depVvnQ2UysGrhwdiwU42tCadZL8GcBb1i2GYhMopQv
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature TestFeature11111111111111111111111111111111
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature TestFeature21111111111111111111111111111111
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature zkdoVwnSFnSLtGJG7irJPEYUpmb4i7sGMGcnN6T9rnC
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature 2oMRZEDWT2tqtYMofhmmfQ8SsjqUFzT6sYXppQDavxwz
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature 2aQJYqER2aKyb3cZw22v4SL2xMX7vwXBRWfvS4pTrtED
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature JE86WkYvTrzW8HgNmrHY7dFYpCmSptUpKupbo2AdQ9cG
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature DeS7sR48ZcFTUmt5FFEVDr1v1bh73aAbZiZq3SYr8Eh8
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature 9ypxGLzkMxi89eDerRKXWDXe44UY2z4hBig4mDhNq5Dp
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature 7bTK6Jis8Xpfrs8ZoUfiMDPazTcdPcTWheZFJTA5Z6X4
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature 9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature FXs1zh47QbNnhXcnB6YiAQoJ4sGB91tKF3UFHLcKT7PM
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature GDH5TVdbTPUpRnXaRyQqiKUa7uZAbZ28Q2N9bhbKoMLm
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature CJzY83ggJHqPGDq8VisV3U91jDJLuEaALZooBrXtnnLU
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature rent6iVy6PDoViPBeJ6k5EJQrkj62h7DPyLbWGHwjrC
+[2026-04-24--18-46-42 DEBUG surfpool_core::surfnet::svm] Deactivating feature ptokFjwyJtrwCa9Kgo9xoDS59V4QccBGEaRFnRPnSdP
+[2026-04-24--18-46-42 INFO actix_server::builder] starting 5 workers
+[2026-04-24--18-46-42 INFO actix_server::server] Tokio runtime found; starting in existing Tokio runtime
+[2026-04-24--18-46-42 INFO actix_server::server] starting service: "actix-web-service-127.0.0.1:18488", workers: 5, listening on: 127.0.0.1:18488
+[2026-04-24--18-46-42 DEBUG reqwest::connect] starting new connection: https://api.devnet.solana.com/
+[2026-04-24--18-46-42 DEBUG hyper_util::client::legacy::connect::http] connecting to 208.115.212.49:443
+[2026-04-24--18-46-43 DEBUG hyper_util::client::legacy::connect::http] connected to 208.115.212.49:443
+[2026-04-24--18-46-43 DEBUG hyper_util::client::legacy::pool] pooling idle connection for ("https", api.devnet.solana.com)
+[2026-04-24--18-46-43 DEBUG hyper_util::client::legacy::pool] reuse idle connection for ("https", api.devnet.solana.com)
+[2026-04-24--18-46-43 DEBUG hyper_util::client::legacy::pool] pooling idle connection for ("https", api.devnet.solana.com)
+[2026-04-24--18-46-43 DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [1]
+[2026-04-24--18-46-43 DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2026-04-24--18-46-43 INFO parity_ws] Listening for new connections on 127.0.0.1:8900.
+[2026-04-24--18-46-43 DEBUG jsonrpc_ws_server::server] Bound to local address: 127.0.0.1:8900
+[2026-04-24--18-46-43 DEBUG reqwest::connect] starting new connection: https://cloud.txtx.run/
+[2026-04-24--18-46-43 DEBUG hyper::client::connect::dns] resolving host="cloud.txtx.run"
+[2026-04-24--18-46-43 DEBUG hyper::client::connect::http] connecting to 66.33.60.129:443
+[2026-04-24--18-46-43 DEBUG hyper::client::connect::http] connected to 66.33.60.129:443
+[2026-04-24--18-46-43 DEBUG rustls::client::hs] No cached session for DnsName("cloud.txtx.run")
+[2026-04-24--18-46-43 DEBUG rustls::client::hs] Not resuming any session
+[2026-04-24--18-46-43 DEBUG rustls::client::hs] Using ciphersuite TLS13_AES_128_GCM_SHA256
+[2026-04-24--18-46-43 DEBUG rustls::client::tls13] Not resuming
+[2026-04-24--18-46-43 DEBUG rustls::client::tls13] TLS1.3 encrypted extensions: [Protocols([ProtocolName(6832)]), ServerNameAck]
+[2026-04-24--18-46-43 DEBUG rustls::client::hs] ALPN protocol is Some(b"h2")
+[2026-04-24--18-46-43 DEBUG h2::client] binding client connection
+[2026-04-24--18-46-43 DEBUG h2::client] client connection bound
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_write] send frame=Settings { flags: (0x0), enable_push: 0, initial_window_size: 2097152, max_frame_size: 16384 }
+[2026-04-24--18-46-43 DEBUG h2::proto::connection] Connection; peer=Client
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_write] send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 5177345 }
+[2026-04-24--18-46-43 DEBUG hyper::client::pool] pooling idle connection for ("https", cloud.txtx.run)
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_write] send frame=Headers { stream_id: StreamId(1), flags: (0x5: END_HEADERS | END_STREAM) }
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_read] received frame=Settings { flags: (0x0), header_table_size: 4096, max_concurrent_streams: 250, initial_window_size: 1048576, max_frame_size: 1048576, max_header_list_size: 2097472 }
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_write] send frame=Settings { flags: (0x1: ACK) }
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_read] received frame=WindowUpdate { stream_id: StreamId(0), size_increment: 983041 }
+[2026-04-24--18-46-43 DEBUG h2::codec::framed_read] received frame=Settings { flags: (0x1: ACK) }
+[2026-04-24--18-46-43 DEBUG h2::proto::settings] received settings ACK; applying Settings { flags: (0x0), enable_push: 0, initial_window_size: 2097152, max_frame_size: 16384 }
+[2026-04-24--18-46-44 DEBUG h2::codec::framed_read] received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+[2026-04-24--18-46-44 DEBUG h2::codec::framed_read] received frame=Data { stream_id: StreamId(1) }
+[2026-04-24--18-46-44 DEBUG h2::codec::framed_read] received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+[2026-04-24--18-46-44 DEBUG h2::codec::framed_write] send frame=GoAway { error_code: NO_ERROR, last_stream_id: StreamId(0) }
+[2026-04-24--18-46-44 DEBUG h2::proto::connection] Connection::poll; connection error error=GoAway(b"", NO_ERROR, Library)
+[2026-04-24--18-46-44 DEBUG rustls::common_state] Sending warning alert CloseNotify
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Datasource connection successful. Epoch 1059 / Slot index 349551 / Slot 457837551.
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Account 9u42Zdjkjt56FEoqBdv8GPGnWuBG5TEAXWS6k9kEqZQW updated.
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Genesis airdrop successful 9u42Zdjkjt56FEoqBdv8GPGnWuBG5TEAXWS6k9kEqZQW: 10000000000000
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Transaction processed 2AQdZWAsuvfcpmz53jMihfus5qim3jfgaZrRNoEkSYkTcVEWCZT3ikNJobzfmocH1FQvNh7RWxF5B5bpPSyHfxPd
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Program 11111111111111111111111111111111 invoke [1]
+[2026-04-24--18-46-44 INFO surfpool::cli::simnet] Program 11111111111111111111111111111111 success
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::io] parsed 5 headers
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::conn] incoming body is content-length (133 bytes)
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::conn] incoming body completed
+[2026-04-24--18-48-04 DEBUG surfpool_core::rpc] Processing request 'getAccountInfo'
+[2026-04-24--18-48-04 DEBUG reqwest::connect] starting new connection: https://api.devnet.solana.com/
+[2026-04-24--18-48-04 DEBUG hyper_util::client::legacy::connect::http] connecting to 208.115.212.49:443
+[2026-04-24--18-48-04 DEBUG hyper_util::client::legacy::connect::http] connected to 208.115.212.49:443
+[2026-04-24--18-48-04 DEBUG rpc] Response: {"jsonrpc":"2.0","result":{"context":{"slot":457837754,"apiVersion":"3.1.10"},"value":null},"id":1}.
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::io] flushed 224 bytes
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::conn] read eof
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::io] parsed 5 headers
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::conn] incoming body is content-length (134 bytes)
+[2026-04-24--18-48-04 DEBUG hyper::proto::h1::conn] incoming body completed
+[2026-04-24--18-48-04 DEBUG surfpool_core::rpc] Processing request 'getAccountInfo'
+[2026-04-24--18-48-04 DEBUG reqwest::connect] starting new connection: https://api.devnet.solana.com/
+[2026-04-24--18-48-04 DEBUG hyper_util::client::legacy::connect::http] connecting to 208.115.212.49:443
+[2026-04-24--18-48-05 DEBUG hyper_util::client::legacy::connect::http] connected to 208.115.212.49:443
+[2026-04-24--18-48-05 DEBUG rpc] Response: {"jsonrpc":"2.0","result":{"context":{"slot":457837756,"apiVersion":"3.1.10"},"value":null},"id":1}.
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::io] flushed 224 bytes
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::conn] read eof
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::io] parsed 5 headers
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::conn] incoming body is content-length (134 bytes)
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::conn] incoming body completed
+[2026-04-24--18-48-05 DEBUG surfpool_core::rpc] Processing request 'getAccountInfo'
+[2026-04-24--18-48-05 DEBUG surfpool_core::rpc] RPC error for method 'getAccountInfo': code=InvalidParams, message=Invalid pubkey 'x6uwJC9QEQRjNDJ1nY6BmxiHh33yhgBJr3G5FGWE9R8U'
+[2026-04-24--18-48-05 DEBUG rpc] Response: {"jsonrpc":"2.0","error":{"code":-32602,"message":"Invalid pubkey 'x6uwJC9QEQRjNDJ1nY6BmxiHh33yhgBJr3G5FGWE9R8U'","data":"String is the wrong size"},"id":1}.
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::io] flushed 281 bytes
+[2026-04-24--18-48-05 DEBUG hyper::proto::h1::conn] read eof
+[2026-04-24--18-53-51 DEBUG parity_ws::io] Received shutdown signal. WebSocket is attempting to shut down.
+[2026-04-24--18-53-51 DEBUG parity_ws::factory] Factory received WebSocket shutdown request.
+[2026-04-24--18-53-51 DEBUG parity_ws::io] Shutting down websocket server.
+[2026-04-24--18-53-51 INFO actix_server::worker] shutting down idle worker
+[2026-04-24--18-53-51 INFO actix_server::worker] shutting down idle worker
+[2026-04-24--18-53-51 INFO actix_server::worker] shutting down idle worker
+[2026-04-24--18-53-51 DEBUG actix_server::accept] paused accepting connections on 127.0.0.1:18488
+[2026-04-24--18-53-51 INFO actix_server::accept] accept thread stopped
+[2026-04-24--18-53-51 INFO actix_server::worker] shutting down idle worker
+[2026-04-24--18-53-51 INFO actix_server::worker] shutting down idle worker
