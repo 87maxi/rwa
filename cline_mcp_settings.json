@@ -1,0 +1,9 @@
+{
+  "servers": [
+    {
+      "name": "github.com/upstash/context7-mcp",
+      "uri": "https://mcp.context7.com/mcp",
+      "apiKey": "ACTUAL_API_KEY"
+    }
+  ]
+}
