@@ -22,37 +22,38 @@ import { PROGRAM_IDS } from '@/config/solana';
 import type { NetworkType } from '@/config/solana';
 
 // Instruction discriminators (8-byte tag + data)
-// Generated from Anchor program: sha256(instruction_name) first 8 bytes
+// Generated from Anchor IDL: sha256(instruction_name) first 8 bytes
 // Anchor uses snake_case for instruction names (e.g., "freeze_account", not "freezeAccount")
 const DISCRIMINATORS: Record<string, number[]> = {
   // Solana RWA Token Program instructions
-  initialize: [175, 175, 109, 31, 13, 152, 155, 237], // sha256("initialize")
-  mint: [51, 57, 225, 47, 182, 146, 137, 166], // sha256("mint")
-  burn: [116, 110, 29, 56, 107, 219, 42, 93], // sha256("burn")
-  transfer: [163, 52, 200, 231, 140, 3, 69, 186], // sha256("transfer")
-  freeze_account: [253, 75, 82, 133, 167, 238, 43, 130], // sha256("freeze_account")
-  unfreeze_account: [28, 255, 156, 206, 139, 228, 5, 213], // sha256("unfreeze_account")
-  add_agent: [214, 206, 14, 110, 178, 131, 218, 45], // sha256("add_agent")
-  remove_agent: [126, 25, 90, 199, 104, 237, 225, 130], // sha256("remove_agent")
-  transfer_owner: [245, 25, 221, 175, 106, 229, 225, 45], // sha256("transfer_owner")
-  transfer_freeze_authority: [235, 44, 91, 221, 224, 5, 187, 172], // sha256("transfer_freeze_authority")
-  get_supply_info: [195, 15, 219, 198, 89, 216, 184, 95], // sha256("get_supply_info")
-  // Compliance Aggregator instructions
-  compliance_initialize: [153, 181, 118, 59, 213, 216, 23, 182], // sha256("compliance_initialize")
-  compliance_add_module: [196, 137, 215, 194, 101, 1, 197, 186], // sha256("compliance_add_module")
-  compliance_remove_module: [93, 163, 11, 188, 105, 196, 148, 136], // sha256("compliance_remove_module")
-  compliance_rebalance_modules: [177, 101, 141, 147, 109, 147, 148, 78], // sha256("compliance_rebalance_modules")
-  compliance_get_modules: [87, 218, 228, 40, 201, 89, 40, 227], // sha256("compliance_get_modules")
-  compliance_get_state: [247, 85, 231, 187, 19, 155, 119, 180], // sha256("compliance_get_state")
-  compliance_get_module_count: [10, 186, 230, 199, 18, 143, 119, 164], // sha256("compliance_get_module_count")
-  compliance_can_transfer: [193, 166, 139, 149, 199, 103, 119, 164], // sha256("compliance_can_transfer")
-  // Identity Registry instructions
-  identity_initialize: [186, 33, 116, 89, 245, 128, 128, 128], // sha256("identity_initialize")
-  identity_register_identity: [11, 32, 226, 133, 104, 164, 148, 104], // sha256("identity_register_identity")
-  identity_register_identity_with_data: [189, 147, 14, 188, 18, 188, 104, 128], // sha256("identity_register_identity_with_data")
-  identity_update_identity: [193, 223, 51, 68, 211, 171, 191, 253], // sha256("identity_update_identity")
-  identity_remove_identity: [235, 169, 57, 213, 107, 187, 151, 86], // sha256("identity_remove_identity")
-  identity_get_identity: [190, 233, 111, 177, 243, 170, 100, 170], // sha256("identity_get_identity")
+  initialize: [175, 175, 109, 31, 13, 152, 155, 237],
+  mint: [51, 57, 225, 47, 182, 146, 137, 166],
+  burn: [116, 110, 29, 56, 107, 219, 42, 93],
+  transfer: [163, 52, 200, 231, 140, 3, 69, 186],
+  freeze_account: [253, 75, 82, 133, 167, 238, 43, 130],
+  unfreeze_account: [28, 255, 156, 206, 139, 228, 5, 213],
+  add_agent: [214, 206, 14, 110, 178, 131, 218, 45],
+  remove_agent: [126, 25, 90, 199, 104, 237, 225, 130],
+  transfer_owner: [245, 25, 221, 175, 106, 229, 225, 45],
+  transfer_freeze_authority: [235, 44, 91, 221, 224, 5, 187, 172],
+  get_supply_info: [195, 15, 219, 198, 89, 216, 184, 95],
+  // Compliance Aggregator instructions - from target/idl/compliance_aggregator.json
+  compliance_initialize: [175, 175, 109, 31, 13, 152, 155, 237],
+  compliance_add_module: [81, 183, 101, 212, 17, 241, 122, 204],
+  compliance_add_module_to_existing: [203, 126, 130, 90, 26, 18, 76, 11],
+  compliance_remove_module: [115, 146, 208, 15, 125, 73, 88, 161],
+  compliance_rebalance_modules: [56, 55, 46, 23, 128, 216, 111, 201],
+  compliance_get_modules: [134, 121, 45, 135, 3, 24, 47, 199],
+  compliance_get_state: [45, 27, 40, 94, 135, 141, 130, 172],
+  compliance_get_module_count: [208, 166, 2, 246, 185, 112, 23, 15],
+  compliance_can_transfer: [233, 153, 157, 96, 140, 58, 200, 137],
+  // Identity Registry instructions - from target/idl/identity_registry.json
+  identity_initialize: [175, 175, 109, 31, 13, 152, 155, 237],
+  identity_register_identity: [164, 118, 227, 177, 47, 176, 187, 248],
+  identity_register_identity_with_data: [108, 188, 121, 153, 200, 193, 22, 7],
+  identity_update_identity: [130, 54, 88, 104, 222, 124, 238, 252],
+  identity_remove_identity: [146, 93, 160, 7, 61, 138, 181, 113],
+  identity_get_identity: [239, 148, 144, 13, 242, 216, 55, 213],
 };
 
 /**
@@ -129,10 +130,11 @@ export function buildInitializeInstruction(
   // Write decimals
   data[offset] = decimals;
 
+  // Account order must match Anchor struct: payer, token, system_program
   return {
     keys: [
-      { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: true },
+      { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -145,13 +147,13 @@ export function buildInitializeInstruction(
 export function buildMintInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
-  to: PublicKey,
+  balanceAccount: PublicKey,
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  // Anchor layout: discriminator(8) + to(32) + amount(8) = 48 bytes
-  const data = Buffer.alloc(48);
+  // Anchor layout: discriminator(8) + amount(8) = 16 bytes
+  const data = Buffer.alloc(16);
   let offset = 0;
 
   DISCRIMINATORS.mint.forEach((b, i) => {
@@ -159,18 +161,16 @@ export function buildMintInstruction(
   });
   offset += 8;
 
-  // Write 'to' pubkey (32 bytes)
-  to.toBuffer().copy(data, offset);
-  offset += 32;
-
   // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
+  // Account order: token, agent, balance_account, system_program
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: agent, isSigner: true, isWritable: false },
-      { pubkey: to, isSigner: false, isWritable: true },
+      { pubkey: balanceAccount, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
@@ -183,6 +183,7 @@ export function buildBurnInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   from: PublicKey,
+  balanceAccount: PublicKey,
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
@@ -203,30 +204,34 @@ export function buildBurnInstruction(
   // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
+  // Account order: token, agent, sender, balance_account, system_program
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: agent, isSigner: true, isWritable: false },
-      { pubkey: from, isSigner: false, isWritable: true },
+      { pubkey: from, isSigner: true, isWritable: true },
+      { pubkey: balanceAccount, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
 }
 
 /**
- * Build transfer instruction
- */
-export function buildTransferInstruction(
+   * Build transfer instruction
+   */
+  export function buildTransferInstruction(
   tokenState: PublicKey,
-  agent: PublicKey,
   from: PublicKey,
-  to: PublicKey,
+  fromBalance: PublicKey,
+  toBalance: PublicKey,
   amount: bigint,
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  // Anchor layout: discriminator(8) + from(32) + to(32) + amount(8) = 80 bytes
-  const data = Buffer.alloc(80);
+  // Anchor layout: discriminator(8) + amount(8) = 16 bytes
+  // The from/to addresses are derived from from_balance/to_balance PDAs
+  const data = Buffer.alloc(16);
   let offset = 0;
 
   DISCRIMINATORS.transfer.forEach((b, i) => {
@@ -234,23 +239,17 @@ export function buildTransferInstruction(
   });
   offset += 8;
 
-  // Write 'from' pubkey (32 bytes)
-  from.toBuffer().copy(data, offset);
-  offset += 32;
-
-  // Write 'to' pubkey (32 bytes)
-  to.toBuffer().copy(data, offset);
-  offset += 32;
-
   // Write 'amount' (8 bytes)
   data.writeBigUInt64LE(amount, offset);
 
+  // Account order: token, from, from_balance, to_balance, system_program
   return {
     keys: [
-      { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: agent, isSigner: true, isWritable: false },
-      { pubkey: from, isSigner: false, isWritable: true },
-      { pubkey: to, isSigner: false, isWritable: true },
+      { pubkey: tokenState, isSigner: false, isWritable: false },
+      { pubkey: from, isSigner: true, isWritable: false },
+      { pubkey: fromBalance, isSigner: false, isWritable: true },
+      { pubkey: toBalance, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
@@ -278,11 +277,13 @@ export function buildFreezeInstruction(
   // Write 'account' pubkey (32 bytes)
   account.toBuffer().copy(data, offset);
 
+  // Account order: token, authority, frozen_account, system_program
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: agent, isSigner: true, isWritable: false },
       { pubkey: account, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
@@ -310,6 +311,7 @@ export function buildUnfreezeInstruction(
   // Write 'account' pubkey (32 bytes)
   account.toBuffer().copy(data, offset);
 
+  // Account order: token, authority, frozen_account
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
@@ -346,6 +348,7 @@ export function buildAddAgentInstruction(
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: agent, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -378,7 +381,7 @@ export function buildRemoveAgentInstruction(
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: agent, isSigner: false, isWritable: true },
     ],
     data,
   };
@@ -485,8 +488,8 @@ export function buildComplianceInitializeInstruction(
 
   return {
     keys: [
-      { pubkey: aggregatorState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: aggregatorState, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -494,13 +497,14 @@ export function buildComplianceInitializeInstruction(
 }
 
 /**
- * Build compliance add module instruction
- */
-export function buildComplianceAddModuleInstruction(
+   * Build compliance add module instruction
+   */
+  export function buildComplianceAddModuleInstruction(
   aggregatorState: PublicKey,
   owner: PublicKey,
   token: PublicKey,
   module: PublicKey,
+  tokenCompliance: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
   // Anchor layout: discriminator(8) + token(32) + module(32) = 72 bytes
@@ -519,47 +523,42 @@ export function buildComplianceAddModuleInstruction(
   // Write 'module' pubkey (32 bytes)
   module.toBuffer().copy(data, offset);
 
+  // Account order from AddModule struct: aggregator, owner, token, token_compliance, system_program
   return {
     keys: [
       { pubkey: aggregatorState, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: tokenCompliance, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
 }
 
 /**
- * Build compliance remove module instruction
- */
-export function buildComplianceRemoveModuleInstruction(
+   * Build compliance remove module instruction
+   */
+  export function buildComplianceRemoveModuleInstruction(
   aggregatorState: PublicKey,
   owner: PublicKey,
-  token: PublicKey,
-  module: PublicKey,
+  tokenCompliance: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
-  // Anchor layout: discriminator(8) + token(32) + module(32) = 72 bytes
-  const data = Buffer.alloc(72);
+  // No arguments - just discriminator
+  const data = Buffer.alloc(8);
   let offset = 0;
 
   DISCRIMINATORS.compliance_remove_module.forEach((b, i) => {
     data[offset + i] = b;
   });
-  offset += 8;
 
-  // Write 'token' pubkey (32 bytes)
-  token.toBuffer().copy(data, offset);
-  offset += 32;
-
-  // Write 'module' pubkey (32 bytes)
-  module.toBuffer().copy(data, offset);
-
+  // Account order from RemoveModule struct: aggregator, owner, token_compliance
   return {
     keys: [
-      { pubkey: aggregatorState, isSigner: false, isWritable: true },
+      { pubkey: aggregatorState, isSigner: false, isWritable: false },
       { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: tokenCompliance, isSigner: false, isWritable: true },
     ],
     data,
   };
@@ -636,8 +635,8 @@ export function buildIdentityInitializeInstruction(
 
   return {
     keys: [
-      { pubkey: registryState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: registryState, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -645,9 +644,9 @@ export function buildIdentityInitializeInstruction(
 }
 
 /**
- * Build identity register identity instruction
- */
-export function buildIdentityRegisterInstruction(
+   * Build identity register identity instruction
+   */
+  export function buildIdentityRegisterInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   payer: PublicKey,
@@ -671,11 +670,14 @@ export function buildIdentityRegisterInstruction(
   // Write 'identity' pubkey (32 bytes)
   identity.toBuffer().copy(data, offset);
 
+  // Account order from RegisterIdentity struct: payer, registry, owner, identity_account, system_program
   return {
     keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: registryState, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
@@ -736,18 +738,20 @@ export function buildIdentityRegisterWithDataInstruction(
 
   return {
     keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: registryState, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
 }
 
 /**
- * Build identity update identity instruction
- */
-export function buildIdentityUpdateInstruction(
+   * Build identity update identity instruction
+   */
+  export function buildIdentityUpdateInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   wallet: PublicKey,
@@ -755,6 +759,7 @@ export function buildIdentityUpdateInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // Anchor layout: discriminator(8) + wallet(32) + newIdentity(32) = 72 bytes
+  // wallet is used for PDA derivation: [b"identity", registry.key(), wallet.key()]
   const data = Buffer.alloc(72);
   let offset = 0;
 
@@ -763,16 +768,18 @@ export function buildIdentityUpdateInstruction(
   });
   offset += 8;
 
-  // Write 'wallet' pubkey (32 bytes)
+  // Write 'wallet' pubkey (32 bytes) - used for PDA derivation
   wallet.toBuffer().copy(data, offset);
   offset += 32;
 
   // Write 'newIdentity' pubkey (32 bytes)
   newIdentity.toBuffer().copy(data, offset);
 
+  // Account order from UpdateIdentity struct: registry (read-only), identity_account (writable), owner
   return {
     keys: [
-      { pubkey: registryState, isSigner: false, isWritable: true },
+      { pubkey: registryState, isSigner: false, isWritable: false },
+      { pubkey: wallet, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
     ],
     data,
@@ -803,6 +810,7 @@ export function buildIdentityRemoveInstruction(
   return {
     keys: [
       { pubkey: registryState, isSigner: false, isWritable: true },
+      { pubkey: wallet, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
     ],
     data,

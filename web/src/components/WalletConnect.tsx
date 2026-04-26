@@ -1,154 +1,141 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useSolanaConnection } from '@/hooks';
+import type { Wallet } from '@solana/wallet-adapter-react';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
+interface WalletOption {
+  name: string;
+  icon: string;
+}
+
+const WALLET_OPTIONS: WalletOption[] = [
+  { name: 'Phantom', icon: '🟣' },
+  { name: 'Solflare', icon: '🔴' },
+  { name: 'Ledger', icon: '⚫' },
+  { name: 'Trezor', icon: '🟡' },
+  { name: 'Coinbase', icon: '🔵' },
+];
+
+function isWalletReady(wallet: Wallet): boolean {
+  return wallet.readyState === 'Installed' || wallet.readyState === 'Loadable';
+}
+
 export function WalletConnect() {
-  const { connected, publicKey } = useWallet();
-  const { networkType, networkColor, networkLabel, disconnect } = useSolanaConnection();
+  const { connected, publicKey, disconnect, connect, wallets, select } = useWallet();
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Format address for display
   const address = publicKey?.toString() || '';
-  const shortAddress = address.length > 10 
+  const shortAddress = address.length > 10
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : address;
 
-  // Custom styling for the wallet button
-  const customStyles = `
-    .solana-wallet-btn {
-      background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%) !important;
-      border: none !important;
-      border-radius: 12px !important;
-      padding: 12px 24px !important;
-      font-weight: 600 !important;
-      font-size: 15px !important;
-      color: white !important;
-      min-height: 48px !important;
-      box-shadow: 0 0 25px rgba(139, 92, 246, 0.35) !important;
-      transition: all 0.3s ease !important;
-      font-family: 'DM Sans', system-ui, sans-serif !important;
-      letter-spacing: 0.01em !important;
+  // Filter wallets that are available
+  const availableWallets = useMemo(() => {
+    return wallets.filter(isWalletReady);
+  }, [wallets]);
+
+  const handleConnect = async (walletName: string) => {
+    const wallet = wallets.find(w => w.adapter.name === walletName);
+    if (!wallet) {
+      console.error('Wallet not found:', walletName);
+      setShowDropdown(false);
+      return;
     }
     
-    .solana-wallet-btn:hover {
-      transform: translateY(-2px) !important;
-      box-shadow: 0 0 35px rgba(139, 92, 246, 0.5) !important;
+    try {
+      // select() must be called before connect() and may need to be awaited
+      select(wallet.adapter.name);
+      // Wait a tick for the wallet state to update
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await connect();
+    } catch (err) {
+      console.error('Connection error:', err);
+      // Check if it's a user rejection or NotSelected error
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      if (errorMsg.includes('UserRejectedRequest') || errorMsg.includes('user rejected')) {
+        console.log('Wallet connection rejected by user');
+      } else if (errorMsg.includes('NotSelected')) {
+        console.error('WalletNotSelectedError: select() may not have completed. Try again.');
+      }
+    } finally {
+      setShowDropdown(false);
     }
-    
-    .solana-wallet-button {
-      font-family: 'DM Sans', system-ui, sans-serif !important;
-    }
-    
-    .solana-wallet-dropdown {
-      background: rgba(10, 10, 46, 0.95) !important;
-      backdrop-filter: blur(20px) !important;
-      border: 1px solid rgba(100, 120, 200, 0.2) !important;
-      border-radius: 16px !important;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
-      min-width: 280px !important;
-    }
-    
-    .solana-wallet-dropdown-list button {
-      padding: 14px 18px !important;
-      font-size: 15px !important;
-      color: #e2e8f0 !important;
-      border: none !important;
-      transition: all 0.2s ease !important;
-      min-height: 52px !important;
-    }
-    
-    .solana-wallet-dropdown-list button:hover {
-      background: rgba(139, 92, 246, 0.15) !important;
-      color: #a78bfa !important;
-    }
-    
-    .solana-wallet-dropdown-divider {
-      border-color: rgba(100, 120, 200, 0.15) !important;
-    }
-    
-    .solana-wallet-dropdown-disconnect {
-      color: #ef4444 !important;
-    }
-    
-    .solana-wallet-modal-button {
-      font-size: 14px !important;
-      padding: 10px 16px !important;
-    }
-  `;
+  };
 
   if (!connected) {
     return (
       <div className="relative">
-        <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-        <WalletMultiButton className="solana-wallet-btn" />
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m10-6a4 4 0 00-4-4H8a4 4 0 00-4 4v2a4 4 0 004 4h8a4 4 0 004-4V9z" />
+          </svg>
+          Connect Wallet
+        </button>
+
+        {showDropdown && (
+          <div className="absolute right-0 mt-2 w-64 rounded-xl bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 shadow-2xl z-50 overflow-hidden">
+            <div className="p-2">
+              <p className="text-xs text-gray-400 px-3 py-2 uppercase tracking-wider">Select wallet</p>
+              {availableWallets.length > 0 ? (
+                availableWallets.map((wallet) => (
+                  <button
+                    key={wallet.adapter.name}
+                    onClick={() => handleConnect(wallet.adapter.name)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left"
+                  >
+                    <span className="text-xl">{WALLET_OPTIONS.find(w => w.name === wallet.adapter.name)?.icon || '💼'}</span>
+                    <span className="text-white font-medium">{wallet.adapter.name}</span>
+                    {wallet.adapter.icon && (
+                      <img src={wallet.adapter.icon} alt={wallet.adapter.name} className="w-5 h-5 ml-auto" />
+                    )}
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-4 text-center text-gray-400 text-sm">
+                  No wallet extensions detected
+                  <div className="mt-2 text-xs text-gray-500">
+                    Install Phantom or Solflare
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-3 py-2 border-t border-gray-700/50">
+              <a
+                href="https://phantom.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                Don't have a wallet? →
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      <div className="flex items-center gap-3">
-        {/* Network indicator badge */}
-        <div 
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border"
-          style={{ 
-            background: 'rgba(10, 10, 46, 0.6)',
-            borderColor: 'rgba(100, 120, 200, 0.18)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}
-        >
-          {/* Pulsing dot */}
-          <div className="relative">
-            <div 
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ 
-                backgroundColor: networkColor,
-                boxShadow: `0 0 8px ${networkColor}60`
-              }}
-            />
-            <div 
-              className="absolute inset-0 w-2.5 h-2.5 rounded-full animate-ping opacity-60" 
-              style={{ backgroundColor: networkColor }}
-            />
-          </div>
-          <span 
-            className="text-sm font-semibold tabular-nums"
-            style={{ color: networkColor }}
-          >
-            {networkLabel}
-          </span>
-        </div>
-        
-        {/* Wallet address with disconnect hover */}
-        <div 
-          className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-300 group cursor-pointer"
-          style={{ 
-            background: 'rgba(10, 10, 46, 0.6)',
-            borderColor: 'rgba(100, 120, 200, 0.18)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}
-          onClick={disconnect}
-        >
-          <span className="text-sm font-mono text-foreground-secondary group-hover:text-foreground transition-colors tabular-nums">
-            {shortAddress}
-          </span>
-          
-          {/* Disconnect icon - visible on hover */}
-          <div 
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-opacity"
-            style={{ background: 'rgba(239, 68, 68, 0.1)' }}
-          >
-            <svg className="w-3.5 h-3.5 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-        </div>
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50">
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <span className="text-sm font-mono text-gray-300">{shortAddress}</span>
       </div>
+      <button
+        onClick={() => {
+          disconnect();
+          setShowDropdown(false);
+        }}
+        className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm"
+      >
+        Disconnect
+      </button>
     </div>
   );
 }

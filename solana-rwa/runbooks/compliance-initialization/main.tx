@@ -1,83 +1,50 @@
 ################################################################
-# Solana RWA - Compliance Aggregator Initialization Runbook
-# Initializes the compliance aggregator account after program deployment.
-#
-# For LOCALNET (surfpool): Uses svm::setup_surfnet to create account directly
-# For DEVNET/MAINNET: Uses svm::process_instructions with initialize instruction
-#
-# IMPORTANT: Choose the correct approach based on your environment.
-#
-# Deployment Workflow:
-#   1. Deploy programs: txtx run deployment --env <environment>
-#   2. Capture compliance_aggregator program ID from output
-#   3. Run initialization: txtx run compliance-initialization --env <environment>
-#   4. The account public_key is: signer.authority.public_key
-#   5. Add compliance modules using token-operations or custom runbooks
-#
-# Usage:
-#   Localnet: surfpool run compliance-initialization --env localnet -u
-#   Devnet:   txtx run compliance-initialization --env devnet -u
-################################################################
+# Compliance Aggregator Initialization Runbook
+# Initializes the compliance aggregator after deployment.
+# Creates the ComplianceAggregatorState PDA derived from seed "aggregator".
+# =============================================================================
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
     network_id = input.network_id
 }
 
-# =============================================================================
-# Signers
-# =============================================================================
-
 signer "payer" "svm::secret_key" {
     description = "Pays fees for compliance aggregator initialization"
-    keypair_json = "~/.config/solana/id.json"
+    keypair_json = input.payer_keypair_json
 }
 
 signer "authority" "svm::secret_key" {
-    description = "Program authority (owner of compliance aggregator)"
-    keypair_json = "~/.config/solana/id.json"
+    description = "Authority for compliance aggregator operations"
+    keypair_json = input.authority_keypair_json
 }
 
-# =============================================================================
-# Variables - Program IDs (must be provided from deployment)
-# =============================================================================
-
-variable "compliance_aggregator_id" {
-    description = "Program ID of compliance_aggregator (set after deployment)"
+variable "compliance_aggregator_program_id" {
     value = input.compliance_aggregator_program_id
-    editable = true
 }
 
-# =============================================================================
-# Compliance Aggregator Initialization
-# =============================================================================
+# Derive PDA for ComplianceAggregatorState: PDA("aggregator", compliance_aggregator_program_id)
+variable "aggregator_pda" {
+    description = "PDA derived from seed 'aggregator' and the compliance aggregator program ID"
+    value = "derive_pda([b\"aggregator\"], compliance_aggregator_program_id)"
+}
 
-# For devnet/mainnet: Use process_instructions with the initialize instruction
-# The Anchor program's initialize instruction handles account creation via #[account(init)]
 action "initialize_compliance_aggregator" "svm::process_instructions" {
-    description = "Initialize compliance aggregator account (creates ComplianceAggregatorState via program instruction)"
+    description = "Initialize compliance aggregator state (creates ComplianceAggregatorState PDA)"
+    
     instruction {
-        program_id = variable.compliance_aggregator_id
-        instruction_name = "initialize"
-        instruction_args = []
-
-        # Payer: Who pays for rent (must be mutable and signer)
-        payer {
-            public_key = signer.payer.public_key
-        }
-
-        # Aggregator: The new ComplianceAggregatorState account
-        # This account will be created by the program's initialize instruction
-        aggregator {
-            public_key = signer.authority.public_key
-            signer = true
-            writable = true
-        }
-
-        # System program: Required for account creation by Anchor's init
-        system_program {
-            public_key = "11111111111111111111111111111111"
-        }
+        program_id = variable.compliance_aggregator_program_id
+        signers = [signer.payer]
+        accounts = [
+            { pubkey = signer.payer, is_signer = true, is_writable = true },
+            { pubkey = variable.aggregator_pda, is_signer = false, is_writable = true },
+            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
+        ]
+        data = "initialize"
     }
-    signers = [signer.payer, signer.authority]
+}
+
+output "initialization_summary" {
+    description = "Compliance aggregator initialization result"
+    value = "Compliance aggregator initialized. Program ID: ${variable.compliance_aggregator_program_id}, Aggregator PDA: ${variable.aggregator_pda}"
 }

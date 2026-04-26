@@ -30,8 +30,12 @@ node_modules/
 # =============================================================================
 test-ledger/
 **/test-ledger/
-.surfpool/
-**/.surfpool/
+
+# Surfpool: Ignore logs and temporary files, but keep state files
+.surfpool/logs/
+.surfpool/*.lock
+# Keep state files for deployment tracking:
+# .surfpool/state/deployment.*.tx-state.json
 
 # =============================================================================
 # IDE & Editor
@@ -67,6 +71,13 @@ deploy_output.log
 *.json.bak
 *.key
 *.secret
+
+# =============================================================================
+# Keys - NEVER commit keypairs
+# =============================================================================
+keys/
+**/keys/*.json
+!keys/.gitignore
 
 # =============================================================================
 # Backup Files

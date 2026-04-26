@@ -1,89 +1,76 @@
 ################################################################
 # Solana RWA - Program Deployment Runbook
-# Deploys all three programs to the target network:
-#   1. compliance_aggregator (no dependencies)
-#   2. identity_registry (depends on compliance_aggregator)
-#   3. solana_rwa (depends on both)
+# =============================================================================
 #
-# NOTE: Post-deployment initialization (token creation, identity registry setup,
-# compliance aggregator setup) requires separate runbooks that use svm::process_instructions.
-# See runbooks/token-operations/token-operations.tx for token initialization examples.
+# IMPORTANT: This runbook no longer performs program deployment.
 #
-# Uses svm::deploy_program with svm::get_program_from_anchor_project() to deploy
-# programs from the Anchor project's target/deploy directory.
+# Program deployment is now handled by `anchor deploy` which correctly manages
+# the keypair/IDL consistency via declare_id!() macros.
+#
+# DEPLOYMENT WORKFLOW:
+# ====================
+#
+# 1. Deploy programs using Anchor (handles keypair/IDL consistency):
+#    cd solana-rwa
+#    ./deploy.sh                    # Deploy to localnet
+#    ./deploy.sh devnet             # Deploy to devnet
+#    ./deploy.sh --reset            # Reset validator and deploy
+#
+#    Or manually:
+#    anchor build
+#    anchor deploy --program-name compliance_aggregator
+#    anchor deploy --program-name identity_registry
+#    anchor deploy --program-name solana_rwa
+#
+# 2. Initialize programs using txtx runbooks:
+#    ./init.sh                      # Initialize on localnet
+#    ./init.sh devnet               # Initialize on devnet
+#
+#    Or manually:
+#    txtx run compliance-initialization --env localnet
+#    txtx run identity-initialization --env localnet
+#    txtx run token-initialization --env localnet
+#
+# WHY NOT svm::deploy_program?
+# =============================
+# The txtx svm::deploy_program command generates a random keypair for each
+# deployment, which doesn't match the fixed program IDs defined in declare_id!()
+# macros. This causes a "program keypair does not match program pubkey found
+# in IDL" error.
+#
+# Anchor's deploy command correctly uses the program IDs from declare_id!(),
+# ensuring consistency between the deployed program and its IDL.
+#
+# PROGRAM IDS (from declare_id!() macros)
+# ========================================
+# compliance_aggregator: AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK
+# identity_registry:     48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9
+# solana_rwa:            EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt
+#
 # =============================================================================
 
-addon "svm" {
-    rpc_api_url = input.rpc_api_url
-    network_id = input.network_id
-}
-
 # =============================================================================
-# Signers - Inline definition for localnet
-# =============================================================================
-
-signer "payer" "svm::secret_key" {
-    description = "Pays fees for program deployments and operations"
-    keypair_json = "~/.config/solana/id.json"
-}
-
-signer "authority" "svm::secret_key" {
-    description = "Can upgrade programs and manage critical ops"
-    keypair_json = "~/.config/solana/id.json"
-}
-
-# =============================================================================
-# Program IDs from Anchor.toml
+# Program IDs from Anchor.toml / declare_id!()
 # =============================================================================
 
 variable "compliance_aggregator_program_id" {
-    value = "3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3"
+    value = "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK"
 }
 
 variable "identity_registry_program_id" {
-    value = "3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5"
+    value = "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9"
 }
 
 variable "solana_rwa_program_id" {
-    value = "7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L"
+    value = "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt"
 }
 
 # =============================================================================
-# PHASE 1: Deploy Programs
-# =============================================================================
-# Each program is deployed in a separate action. Programs are ordered by dependency:
-#   1. compliance_aggregator (no dependencies)
-#   2. identity_registry (depends on compliance_aggregator)
-#   3. solana_rwa (depends on both compliance_aggregator and identity_registry)
-# =============================================================================
-
-action "deploy_compliance_aggregator" "svm::deploy_program" {
-    description = "Deploy compliance_aggregator program (no dependencies)"
-    program = svm::get_program_from_anchor_project("compliance_aggregator")
-    authority = signer.authority
-    payer = signer.payer
-}
-
-action "deploy_identity_registry" "svm::deploy_program" {
-    description = "Deploy identity_registry program (depends on compliance_aggregator)"
-    program = svm::get_program_from_anchor_project("identity_registry")
-    authority = signer.authority
-    payer = signer.payer
-}
-
-action "deploy_solana_rwa" "svm::deploy_program" {
-    description = "Deploy solana_rwa program (depends on compliance_aggregator and identity_registry)"
-    program = svm::get_program_from_anchor_project("solana_rwa")
-    authority = signer.authority
-    payer = signer.payer
-}
-
-# =============================================================================
-# Outputs - Display deployment results
+# Outputs - Display program IDs for reference
 # =============================================================================
 
 output "deployment_summary" {
-    description = "Summary of all deployed programs"
+    description = "Program IDs for reference (programs must be deployed with anchor deploy first)"
     value = "compliance_aggregator: ${variable.compliance_aggregator_program_id}\nidentity_registry: ${variable.identity_registry_program_id}\nsolana_rwa: ${variable.solana_rwa_program_id}"
 }
 
@@ -100,4 +87,9 @@ output "identity_registry_program_id" {
 output "solana_rwa_program_id" {
     description = "Program ID of solana_rwa"
     value = variable.solana_rwa_program_id
+}
+
+output "deployment_instructions" {
+    description = "Instructions for deploying programs"
+    value = "Programs must be deployed using anchor deploy BEFORE running initialization:\n\n  1. ./deploy.sh                    # Deploy to localnet\n  2. ./init.sh                      # Initialize programs\n\nOr manually:\n  1. anchor build && anchor deploy --program-name <program>\n  2. txtx run <init-runbook> --env localnet"
 }

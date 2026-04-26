@@ -11,9 +11,8 @@ import {
   TrezorWalletAdapter,
   CoinbaseWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
-import { clusterApiUrl } from '@solana/web3.js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type NetworkType } from '@/config/solana';
+import { type NetworkType, getConnectionUrl } from '@/config/solana';
 import { useSolanaNotification, useWalletErrorHandling } from '@/hooks/useSolanaNotification';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
@@ -66,24 +65,15 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
     return WalletAdapterNetwork.Devnet;
   }, [network, endpoint]);
 
-  // Final RPC endpoint
+  // Final RPC endpoint - use centralized config
   const finalEndpoint = useMemo(() => {
-    // Always use the custom endpoint if provided or configured
+    // Always use the custom endpoint if provided and points to localhost
     if (endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'))) {
       return endpoint;
     }
-    // urls is defined for potential future use
-    const urls: Record<NetworkType, string> = {
-      localnet: 'http://localhost:8899',
-      devnet: 'https://api.devnet.solana.com',
-      mainnet: 'https://api.mainnet-beta.solana.com',
-    };
-    if (endpoint) {
-      return endpoint;
-    }
-    // For public networks, use cluster API URL
-    return clusterApiUrl(solanaNetwork);
-  }, [endpoint, solanaNetwork]);
+    // Use centralized config for network URLs
+    return getConnectionUrl(network);
+  }, [endpoint, network]);
 
   // Available wallets - agnostic support for multiple Solana wallets
   const wallets = useMemo(
@@ -101,7 +91,7 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
   return (
     <QueryClientProvider client={queryClient}>
       <ConnectionProvider endpoint={finalEndpoint}>
-        <WalletProvider wallets={wallets} autoConnect onError={handleError}>
+        <WalletProvider wallets={wallets} autoConnect={network !== "localnet" && !endpoint?.includes("localhost")} onError={handleError}>
           <WalletModalProvider>{children}</WalletModalProvider>
         </WalletProvider>
       </ConnectionProvider>

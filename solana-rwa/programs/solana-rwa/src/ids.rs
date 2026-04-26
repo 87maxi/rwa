@@ -70,14 +70,19 @@ use std::str::FromStr;  // Required for Pubkey::from_str()
 // IMPORTANT: These IDs are ONLY for local development
 // Production (devnet/mainnet) uses different IDs per deployment
 
+/// Solana RWA Token Program ID (localnet development)
+/// This is the address of the solana_rwa program on localnet
+/// Like a deployed smart contract's address, but for local testing
+pub const SOLANA_RWA_PROGRAM_ID: &str = "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt";
+
 /// Identity Registry Program ID (localnet development)
 /// This is the address of the identity_registry program on localnet
 /// Like a deployed smart contract's address, but for local testing
-pub const IDENTITY_REGISTRY_PROGRAM_ID: &str = "3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5";
+pub const IDENTITY_REGISTRY_PROGRAM_ID: &str = "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9";
 
 /// Compliance Aggregator Program ID (localnet development)
 /// This is the address of the compliance_aggregator program on localnet
-pub const COMPLIANCE_AGGREGATOR_PROGRAM_ID: &str = "3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3";
+pub const COMPLIANCE_AGGREGATOR_PROGRAM_ID: &str = "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK";
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -85,26 +90,17 @@ pub const COMPLIANCE_AGGREGATOR_PROGRAM_ID: &str = "3nf1C8FuDP5SreRF6WZAiiRDpNS4
 // These functions convert string IDs to Pubkey objects
 // Used when the program needs to call another program
 
+/// Get the Solana RWA program ID as a Pubkey
+pub fn get_solana_rwa_program_id_local() -> Pubkey {
+    Pubkey::from_str(SOLANA_RWA_PROGRAM_ID).unwrap()
+}
+
 /// Get the Identity Registry program ID as a Pubkey
-///
-/// Rust explanation:
-/// - &str in parameters = input string (borrowed, like Python's str parameter)
-/// - -> Pubkey = return type (32-byte Solana address)
-/// - The function parses the string constant and returns a Pubkey
-///
-/// Python analogy:
-///   def get_identity_registry_program_id() -> PublicKey:
-///       return PublicKey.from_string(IDENTITY_REGISTRY_PROGRAM_ID)
 pub fn get_identity_registry_program_id() -> Pubkey {
-    // Pubkey::from_str() converts Base58 string to 32-byte Pubkey
-    // .unwrap() extracts the Pubkey or panics if string is invalid
-    // SAFE: We use hardcoded valid Base58 strings above
     Pubkey::from_str(IDENTITY_REGISTRY_PROGRAM_ID).unwrap()
 }
 
 /// Get the Compliance Aggregator program ID as a Pubkey
-///
-/// Similar to get_identity_registry_program_id() but for compliance_aggregator
 pub fn get_compliance_aggregator_program_id() -> Pubkey {
     Pubkey::from_str(COMPLIANCE_AGGREGATOR_PROGRAM_ID).unwrap()
 }
@@ -187,28 +183,30 @@ mod tests {
     /// Test that helper functions return valid Pubkeys
     #[test]
     fn test_helper_functions_return_valid_pubkeys() {
+        let rwa_id = get_solana_rwa_program_id_local();
         let identity_id = get_identity_registry_program_id();
         let compliance_id = get_compliance_aggregator_program_id();
-        let rwa_id = get_solana_rwa_program_id();
 
         // All Pubkeys should be different (not zero addresses)
+        assert_ne!(rwa_id, Pubkey::default());
         assert_ne!(identity_id, Pubkey::default());
         assert_ne!(compliance_id, Pubkey::default());
-        assert_ne!(rwa_id, Pubkey::default());
 
         // All Pubkeys should be different from each other
+        assert_ne!(rwa_id, identity_id);
+        assert_ne!(rwa_id, compliance_id);
         assert_ne!(identity_id, compliance_id);
-        assert_ne!(identity_id, rwa_id);
-        assert_ne!(compliance_id, rwa_id);
     }
 
     /// Test that program IDs are correct length (32 bytes when decoded)
     #[test]
     fn test_program_ids_correct_length() {
+        let rwa_pubkey = get_solana_rwa_program_id_local();
         let identity_pubkey = get_identity_registry_program_id();
         let compliance_pubkey = get_compliance_aggregator_program_id();
 
         // Pubkeys are always 32 bytes (like Ethereum addresses are 20 bytes)
+        assert_eq!(rwa_pubkey.to_bytes().len(), 32);
         assert_eq!(identity_pubkey.to_bytes().len(), 32);
         assert_eq!(compliance_pubkey.to_bytes().len(), 32);
     }

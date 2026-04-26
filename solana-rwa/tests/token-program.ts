@@ -2,38 +2,69 @@ import * as anchor from '@coral-xyz/anchor';
 import { Program, AnchorProvider } from '@coral-xyz/anchor';
 import { SolanaRwa } from '../target/types/solana_rwa';
 import { expect } from 'chai';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 
 describe('Solana RWA Token Program', () => {
   const provider = AnchorProvider.env();
   const connection = provider.connection;
   const program = anchor.workspace.SolanaRwa as Program<SolanaRwa>;
 
-  // Keypairs
-  const owner = anchor.web3.Keypair.generate();
-  const agent = anchor.web3.Keypair.generate();
-  const recipient = anchor.web3.Keypair.generate();
+  const owner = Keypair.generate();
+  const agent = Keypair.generate();
+  const recipient = Keypair.generate();
 
-  // Token state account
-  let tokenState: anchor.web3.Keypair;
+  let tokenState: PublicKey;
 
   before(async () => {
-    // Airdrop to owner and agent (100 SOL each for rent exemption)
-    const ownerSig = await connection.requestAirdrop(owner.publicKey, 100 * LAMPORTS_PER_SOL);
-    const agentSig = await connection.requestAirdrop(agent.publicKey, 100 * LAMPORTS_PER_SOL);
-    const recipientSig = await connection.requestAirdrop(recipient.publicKey, 100 * LAMPORTS_PER_SOL);
-    await connection.confirmTransaction(ownerSig);
-    await connection.confirmTransaction(agentSig);
-    await connection.confirmTransaction(recipientSig);
+    const sigs = await Promise.all([
+      connection.requestAirdrop(owner.publicKey, 100 * LAMPORTS_PER_SOL),
+      connection.requestAirdrop(agent.publicKey, 100 * LAMPORTS_PER_SOL),
+      connection.requestAirdrop(recipient.publicKey, 100 * LAMPORTS_PER_SOL),
+    ]);
+    await Promise.all(sigs.map(sig => connection.confirmTransaction(sig)));
   });
 
   beforeEach(async () => {
-    // Create new token state account before each test
-    tokenState = anchor.web3.Keypair.generate();
-    // Airdrop to tokenState account itself for rent
-    const sig = await connection.requestAirdrop(tokenState.publicKey, LAMPORTS_PER_SOL);
-    await connection.confirmTransaction(sig);
+    const [pda, _bump] = await PublicKey.findProgramAddress(
+      [Buffer.from("token"), owner.publicKey.toBuffer()],
+      program.programId
+    );
+    tokenState = pda;
   });
+
+  async function getBalancePda(wallet: PublicKey): Promise<PublicKey> {
+    const { publicKey } = await PublicKey.findProgramAddress(
+      [Buffer.from("balance"), tokenState.toBuffer(), wallet.toBuffer()],
+      program.programId
+    );
+    return publicKey;
+  }
+
+  async function getAgentPda(agentPubkey: PublicKey): Promise<PublicKey> {
+    const { publicKey } = await PublicKey.findProgramAddress(
+      [Buffer.from("agent"), tokenState.toBuffer(), agentPubkey.toBuffer()],
+      program.programId
+    );
+    return publicKey;
+  }
+
+  async function getFrozenPda(wallet: PublicKey): Promise<PublicKey> {
+    const { publicKey } = await PublicKey.findProgramAddress(
+      [Buffer.from("frozen"), tokenState.toBuffer(), wallet.toBuffer()],
+      program.programId
+    );
+    return publicKey;
+  }
+
+  async function fetchBalance(wallet: PublicKey): Promise<number | null> {
+    const balancePda = await getBalancePda(wallet);
+    try {
+      const balanceAccount = await program.account.balanceAccount.fetch(balancePda);
+      return Number(balanceAccount.balance);
+    } catch {
+      return null;
+    }
+  }
 
   describe('Initialization', () => {
     it('Should initialize token state', async () => {
@@ -41,385 +72,451 @@ describe('Solana RWA Token Program', () => {
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
-        .signers([owner, tokenState])
+        .signers([owner])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      
+      const account = await program.account.tokenState.fetch(tokenState);
       expect(account.owner.toString()).to.equal(owner.publicKey.toString());
       expect(account.name).to.equal('Test Token');
       expect(account.symbol).to.equal('TST');
       expect(account.decimals).to.equal(9);
-      expect(account.totalSupply.toNumber()).to.equal(0);
-      expect(account.nextIndex.toNumber()).to.equal(0);
-      expect(account.balances.length).to.equal(0);
-      expect(account.frozenAccounts.length).to.equal(0);
-      expect(account.agents.length).to.equal(0);
-      expect(account.complianceModules.length).to.equal(0);
+      expect(Number(account.totalSupply)).to.equal(0);
+    });
+
+    it('Should reject duplicate initialization', async () => {
+      await program.methods
+        .initialize('Test Token', 'TST', 9)
+        .accounts({
+          payer: owner.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+
+      try {
+        await program.methods
+          .initialize('Another', 'AT', 6)
+          .accounts({
+            payer: owner.publicKey,
+            token: tokenState,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([owner])
+          .rpc();
+        expect.fail('Expected duplicate init to fail');
+      } catch (e: any) {
+        expect(e.message).to.include('account already in use');
+      }
     });
   });
 
   describe('Agent Management', () => {
-    it('Should add agent', async () => {
+    beforeEach(async () => {
       await program.methods
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
-        .signers([owner, tokenState])
+        .signers([owner])
         .rpc();
+    });
 
+    it('Should add agent', async () => {
+      const agentPda = await getAgentPda(agent.publicKey);
       await program.methods
         .addAgent(agent.publicKey)
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      expect(account.agents.map(a => a.toString())).to.include(agent.publicKey.toString());
+      const agentAccount = await program.account.agentAccount.fetch(agentPda);
+      expect(agentAccount.agent.toString()).to.equal(agent.publicKey.toString());
     });
 
     it('Should remove agent', async () => {
-      await program.methods
-        .initialize('Test Token', 'TST', 9)
-        .accounts({
-          payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
-      // Add agent
+      const agentPda = await getAgentPda(agent.publicKey);
       await program.methods
         .addAgent(agent.publicKey)
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
-      // Remove agent
       await program.methods
-        .removeAgent(agent.publicKey)
+        .removeAgent()
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           payer: owner.publicKey,
+          agentAccount: agentPda,
         })
         .signers([owner])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      expect(account.agents).to.not.include(agent.publicKey.toString());
+      try {
+        await program.account.agentAccount.fetch(agentPda);
+        expect.fail('Agent should be removed');
+      } catch {
+        expect(true).to.be.true;
+      }
     });
 
     it('Should reject non-owner adding agent', async () => {
+      const agentPda = await getAgentPda(agent.publicKey);
+      try {
+        await program.methods
+          .addAgent(agent.publicKey)
+          .accounts({
+            token: tokenState,
+            payer: agent.publicKey,
+            newAgent: agent.publicKey,
+            agentAccount: agentPda,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([agent])
+          .rpc();
+        expect.fail('Expected rejection');
+      } catch (e: any) {
+        expect(e.message.toLowerCase()).to.include('unauthorized');
+      }
+    });
+
+    it('Should prevent duplicate agents', async () => {
+      const agentPda = await getAgentPda(agent.publicKey);
       await program.methods
-        .initialize('Test Token', 'TST', 9)
+        .addAgent(agent.publicKey)
         .accounts({
+          token: tokenState,
           payer: owner.publicKey,
-          token: tokenState.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
         })
-        .signers([owner, tokenState])
+        .signers([owner])
         .rpc();
 
       try {
         await program.methods
           .addAgent(agent.publicKey)
           .accounts({
-            token: tokenState.publicKey,
-            payer: agent.publicKey,
+            token: tokenState,
+            payer: owner.publicKey,
+            newAgent: agent.publicKey,
+            agentAccount: agentPda,
+            systemProgram: SystemProgram.programId,
           })
-          .signers([agent])
+          .signers([owner])
           .rpc();
-        expect.fail('Expected transaction to fail');
+        expect.fail('Expected duplicate rejection');
       } catch (e: any) {
-        expect(e.message).to.include('Unauthorized');
+        expect(e.message.toLowerCase()).to.include('duplicate');
       }
     });
   });
 
   describe('Minting', () => {
-    it('Should mint tokens to address', async () => {
+    beforeEach(async () => {
       await program.methods
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
-      // Add agent
-      await program.methods
-        .addAgent(agent.publicKey)
-        .accounts({
-          token: tokenState.publicKey,
-          payer: owner.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
-      // Mint tokens
+      const agentPda = await getAgentPda(agent.publicKey);
+      await program.methods
+        .addAgent(agent.publicKey)
+        .accounts({
+          token: tokenState,
+          payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+    });
+
+    it('Should mint tokens', async () => {
       const mintAmount = new anchor.BN(1000);
+      const balancePda = await getBalancePda(recipient.publicKey);
+
       await program.methods
         .mint(recipient.publicKey, mintAmount)
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           agent: agent.publicKey,
+          balanceAccount: balancePda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      expect(account.totalSupply.toNumber()).to.equal(mintAmount.toNumber());
-      expect(account.balances.length).to.equal(1);
-      expect(account.balances[0].key.toString()).to.equal(recipient.publicKey.toString());
-      expect(account.balances[0].value.toNumber()).to.equal(mintAmount.toNumber());
+      const account = await program.account.tokenState.fetch(tokenState);
+      expect(Number(account.totalSupply)).to.equal(mintAmount.toNumber());
+      expect(await fetchBalance(recipient.publicKey)).to.equal(1000);
     });
 
     it('Should reject non-agent minting', async () => {
-      await program.methods
-        .initialize('Test Token', 'TST', 9)
-        .accounts({
-          payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
       try {
         await program.methods
           .mint(recipient.publicKey, new anchor.BN(100))
           .accounts({
-            token: tokenState.publicKey,
+            token: tokenState,
             agent: recipient.publicKey,
           })
           .signers([recipient])
           .rpc();
-        expect.fail('Expected transaction to fail');
+        expect.fail('Expected rejection');
       } catch (e: any) {
-        expect(e.message).to.include('Unauthorized');
+        expect(e.message.toLowerCase()).to.include('unauthorized');
       }
     });
   });
 
   describe('Transfers', () => {
     beforeEach(async () => {
-      // Initialize and mint tokens for transfer tests
       await program.methods
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
-      await program.methods
-        .addAgent(agent.publicKey)
-        .accounts({
-          token: tokenState.publicKey,
-          payer: owner.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
+      const agentPda = await getAgentPda(agent.publicKey);
+      await program.methods
+        .addAgent(agent.publicKey)
+        .accounts({
+          token: tokenState,
+          payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+
+      const balancePda = await getBalancePda(owner.publicKey);
       await program.methods
         .mint(owner.publicKey, new anchor.BN(1000))
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           agent: agent.publicKey,
+          balanceAccount: balancePda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
     });
 
     it('Should transfer tokens', async () => {
-      const transferAmount = new anchor.BN(100);
-      
       await program.methods
-        .transfer(owner.publicKey, recipient.publicKey, transferAmount)
+        .transfer(owner.publicKey, recipient.publicKey, new anchor.BN(100))
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           from: owner.publicKey,
           to: recipient.publicKey,
         })
         .signers([owner])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      
-      const ownerBalance = account.balances.find(b => b.key.toString() === owner.publicKey.toString());
-      const recipientBalance = account.balances.find(b => b.key.toString() === recipient.publicKey.toString());
-
-      expect(ownerBalance?.value.toNumber()).to.equal(900);
-      expect(recipientBalance?.value.toNumber()).to.equal(transferAmount.toNumber());
+      expect(await fetchBalance(owner.publicKey)).to.equal(900);
+      expect(await fetchBalance(recipient.publicKey)).to.equal(100);
     });
 
-    it('Should reject transfer with insufficient balance', async () => {
+    it('Should reject insufficient balance transfer', async () => {
       try {
         await program.methods
           .transfer(owner.publicKey, recipient.publicKey, new anchor.BN(2000))
           .accounts({
-            token: tokenState.publicKey,
+            token: tokenState,
             from: owner.publicKey,
             to: recipient.publicKey,
           })
           .signers([owner])
           .rpc();
-        expect.fail('Expected transaction to fail');
+        expect.fail('Expected rejection');
       } catch (e: any) {
-        expect(e.message).to.include('Insufficient balance');
+        expect(e.message.toLowerCase()).to.include('insufficient');
       }
     });
   });
 
   describe('Freeze/Unfreeze', () => {
     beforeEach(async () => {
-      // Initialize and mint tokens for freeze tests
       await program.methods
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
-      await program.methods
-        .addAgent(agent.publicKey)
-        .accounts({
-          token: tokenState.publicKey,
-          payer: owner.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
+      const agentPda = await getAgentPda(agent.publicKey);
+      await program.methods
+        .addAgent(agent.publicKey)
+        .accounts({
+          token: tokenState,
+          payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+
+      const balancePda = await getBalancePda(recipient.publicKey);
       await program.methods
         .mint(recipient.publicKey, new anchor.BN(1000))
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           agent: agent.publicKey,
+          balanceAccount: balancePda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
     });
 
     it('Should freeze account', async () => {
+      const frozenPda = await getFrozenPda(recipient.publicKey);
       await program.methods
         .freezeAccount(recipient.publicKey)
         .accounts({
-          token: tokenState.publicKey,
-          from: agent.publicKey,
-          to: recipient.publicKey,
+          token: tokenState,
+          authority: agent.publicKey,
+          frozenAccount: frozenPda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      const frozenEntry = account.frozenAccounts.find(f => f.key.toString() === recipient.publicKey.toString());
-      expect(frozenEntry?.frozen).to.equal(true);
+      const frozenAccount = await program.account.frozenAccount.fetch(frozenPda);
+      expect(frozenAccount.frozen).to.equal(true);
     });
 
     it('Should unfreeze account', async () => {
-      // First freeze
+      const frozenPda = await getFrozenPda(recipient.publicKey);
       await program.methods
         .freezeAccount(recipient.publicKey)
         .accounts({
-          token: tokenState.publicKey,
-          from: agent.publicKey,
-          to: recipient.publicKey,
+          token: tokenState,
+          authority: agent.publicKey,
+          frozenAccount: frozenPda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
 
-      // Then unfreeze
       await program.methods
         .unfreezeAccount(recipient.publicKey)
         .accounts({
-          token: tokenState.publicKey,
-          from: agent.publicKey,
-          to: recipient.publicKey,
+          token: tokenState,
+          authority: agent.publicKey,
+          frozenAccount: frozenPda,
         })
         .signers([agent])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      const frozenEntry = account.frozenAccounts.find(f => f.key.toString() === recipient.publicKey.toString());
-      expect(frozenEntry?.frozen).to.equal(false);
+      const frozenAccount = await program.account.frozenAccount.fetch(frozenPda);
+      expect(frozenAccount.frozen).to.equal(false);
     });
   });
 
   describe('Burning', () => {
     beforeEach(async () => {
-      // Initialize and mint tokens for burn tests
       await program.methods
         .initialize('Test Token', 'TST', 9)
         .accounts({
           payer: owner.publicKey,
-          token: tokenState.publicKey,
-        })
-        .signers([owner, tokenState])
-        .rpc();
-
-      await program.methods
-        .addAgent(agent.publicKey)
-        .accounts({
-          token: tokenState.publicKey,
-          payer: owner.publicKey,
+          token: tokenState,
+          systemProgram: SystemProgram.programId,
         })
         .signers([owner])
         .rpc();
 
+      const agentPda = await getAgentPda(agent.publicKey);
+      await program.methods
+        .addAgent(agent.publicKey)
+        .accounts({
+          token: tokenState,
+          payer: owner.publicKey,
+          newAgent: agent.publicKey,
+          agentAccount: agentPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([owner])
+        .rpc();
+
+      const balancePda = await getBalancePda(owner.publicKey);
       await program.methods
         .mint(owner.publicKey, new anchor.BN(1000))
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           agent: agent.publicKey,
+          balanceAccount: balancePda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
     });
 
     it('Should burn tokens', async () => {
-      const burnAmount = new anchor.BN(200);
-      
+      const balancePda = await getBalancePda(owner.publicKey);
       await program.methods
-        .burn(owner.publicKey, burnAmount)
+        .burn(owner.publicKey, new anchor.BN(200))
         .accounts({
-          token: tokenState.publicKey,
+          token: tokenState,
           agent: agent.publicKey,
+          sender: owner.publicKey,
+          balanceAccount: balancePda,
+          systemProgram: SystemProgram.programId,
         })
         .signers([agent])
         .rpc();
 
-      const account = await program.account.tokenState.fetch(tokenState.publicKey);
-      expect(account.totalSupply.toNumber()).to.equal(800);
-      
-      const ownerBalance = account.balances.find(b => b.key.toString() === owner.publicKey.toString());
-      expect(ownerBalance?.value.toNumber()).to.equal(800);
+      const account = await program.account.tokenState.fetch(tokenState);
+      expect(Number(account.totalSupply)).to.equal(800);
+      expect(await fetchBalance(owner.publicKey)).to.equal(800);
     });
 
-    it('Should reject burning with insufficient balance', async () => {
+    it('Should reject insufficient burn', async () => {
       try {
         await program.methods
           .burn(owner.publicKey, new anchor.BN(2000))
           .accounts({
-            token: tokenState.publicKey,
+            token: tokenState,
             agent: agent.publicKey,
           })
           .signers([agent])
           .rpc();
-        expect.fail('Expected transaction to fail');
+        expect.fail('Expected rejection');
       } catch (e: any) {
-        expect(e.message).to.include('Insufficient balance');
+        expect(e.message.toLowerCase()).to.include('insufficient');
       }
     });
   });

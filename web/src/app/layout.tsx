@@ -32,7 +32,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SolanaProvider network="localnet">
+        <SolanaProvider network={(process.env.NEXT_PUBLIC_SOLANA_NETWORK as 'localnet' | 'devnet' | 'mainnet') || 'localnet'}>
           <ClientOnly fallback={children}>
             {children}
           </ClientOnly>

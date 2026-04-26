@@ -1,8 +1,8 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program, AnchorProvider } from '@coral-xyz/anchor';
-import { SolanaRwa } from '../target/types/solana_rwa';
-import { IdentityRegistry } from '../target/types/identity_registry';
-import { ComplianceAggregator } from '../target/types/compliance_aggregator';
+import { SolanaRwa } from '../target/types/7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L';
+import { IdentityRegistry } from '../target/types/3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5';
+import { ComplianceAggregator } from '../target/types/EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 
@@ -24,7 +24,7 @@ describe('Frontend-Backend Integration Tests', () => {
   // Program IDs from Anchor.toml
   const SOLANA_RWA_ID = new PublicKey('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L');
   const IDENTITY_REGISTRY_ID = new PublicKey('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5');
-  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('3nf1C8FuDP5SreRF6WZAiiRDpNS4LLbemZPefde5Mre3');
+  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('ALgh7qDAL68XSxrqU1zDTeu2mXrEErHmQLAQnkPHvtpg');
 
   let owner: Keypair;
   let agent: Keypair;

@@ -1,106 +1,62 @@
 ################################################################
-# Solana RWA - Token Initialization Runbook
-# Initializes the token state account after program deployment.
-#
-# For LOCALNET (surfpool): Uses svm::setup_surfnet to create account directly
-# For DEVNET/MAINNET: Uses svm::process_instructions with initialize instruction
-#
-# IMPORTANT: Choose the correct approach based on your environment.
-#
-# Deployment Workflow:
-#   1. Deploy programs: txtx run deployment --env <environment>
-#   2. Capture solana_rwa program ID from output
-#   3. Run initialization: txtx run token-initialization --env <environment>
-#   4. The account public_key is: signer.authority.public_key
-#   5. Use token-operations runbook with the token state key
-#
-# Usage:
-#   Localnet: surfpool run token-initialization --env localnet -u
-#   Devnet:   txtx run token-initialization --env devnet -u \
-#               --input token_name="My Token" --input token_symbol="MTK" --input token_decimals=9
-################################################################
+# Token Initialization Runbook
+# Initializes the RWA token after deployment.
+# Creates the TokenState PDA derived from seeds ["token", payer].
+# =============================================================================
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
     network_id = input.network_id
 }
 
-# =============================================================================
-# Signers
-# =============================================================================
-
 signer "payer" "svm::secret_key" {
     description = "Pays fees for token initialization"
-    keypair_json = "~/.config/solana/id.json"
+    keypair_json = input.payer_keypair_json
 }
 
-signer "authority" "svm::secret_key" {
-    description = "Program authority (owner and freeze authority)"
-    keypair_json = "~/.config/solana/id.json"
-}
-
-# =============================================================================
-# Variables - Program IDs (must be provided from deployment)
-# =============================================================================
-
-variable "solana_rwa_id" {
-    description = "Program ID of solana_rwa (set after deployment)"
+variable "solana_rwa_program_id" {
     value = input.solana_rwa_program_id
-    editable = true
 }
-
-# =============================================================================
-# Input Variables - Token Details (editable at runtime)
-# =============================================================================
 
 variable "token_name" {
-    description = "Token name (e.g., \"Real World Asset Token\")"
-    value = ""
-    editable = true
+    value = input.token_name
 }
 
 variable "token_symbol" {
-    description = "Token symbol (e.g., \"RWAT\")"
-    value = ""
-    editable = true
+    value = input.token_symbol
 }
 
 variable "token_decimals" {
-    description = "Number of decimal places (e.g., 9)"
-    value = "0"
-    editable = true
+    value = input.token_decimals
 }
 
-# =============================================================================
-# Token Initialization
-# =============================================================================
+# Derive PDA for TokenState: PDA(["token", payer], solana_rwa_program_id)
+variable "token_pda" {
+    description = "PDA derived from seeds ['token', payer] and the solana-rwa program ID"
+    value = "derive_pda([b\"token\", payer.public_key], solana_rwa_program_id)"
+}
 
-# For devnet/mainnet: Use process_instructions with the initialize instruction
-# The Anchor program's initialize instruction handles account creation via #[account(init)]
 action "initialize_token" "svm::process_instructions" {
-    description = "Initialize token state account (creates TokenState via program instruction)"
+    description = "Initialize RWA token (creates TokenState PDA with metadata)"
+    
     instruction {
-        program_id = variable.solana_rwa_id
-        instruction_name = "initialize"
-        instruction_args = [variable.token_name, variable.token_symbol, variable.token_decimals]
-
-        # Payer: Who pays for rent (must be mutable and signer)
-        payer {
-            public_key = signer.payer.public_key
-        }
-
-        # Token: The new TokenState account
-        # This account will be created by the program's initialize instruction
-        token {
-            public_key = signer.authority.public_key
-            signer = true
-            writable = true
-        }
-
-        # System program: Required for account creation by Anchor's init
-        system_program {
-            public_key = "11111111111111111111111111111111"
+        program_id = variable.solana_rwa_program_id
+        signers = [signer.payer]
+        accounts = [
+            { pubkey = signer.payer, is_signer = true, is_writable = true },
+            { pubkey = variable.token_pda, is_signer = false, is_writable = true },
+            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
+        ]
+        data = {
+            discriminator = "initialize"
+            name = variable.token_name
+            symbol = variable.token_symbol
+            decimals = variable.token_decimals
         }
     }
-    signers = [signer.payer, signer.authority]
+}
+
+output "initialization_summary" {
+    description = "Token initialization result"
+    value = "Token initialized: ${variable.token_name} (${variable.token_symbol}) with ${variable.token_decimals} decimals. Program ID: ${variable.solana_rwa_program_id}, Token PDA: ${variable.token_pda}"
 }

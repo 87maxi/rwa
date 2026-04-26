@@ -45,7 +45,7 @@ export default function DeployPage() {
       const programId = new PublicKey(programIdStr);
       // Derive PDA from owner wallet and program ID
       const [derivedPda] = PublicKey.findProgramAddressSync(
-        [publicKey.toBuffer()],
+        [Buffer.from("token"), publicKey.toBuffer()],
         programId
       );
       

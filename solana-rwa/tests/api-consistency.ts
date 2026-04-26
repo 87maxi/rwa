@@ -1,8 +1,8 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program, AnchorProvider } from '@coral-xyz/anchor';
-import { SolanaRwa } from '../target/types/solana_rwa';
-import { IdentityRegistry } from '../target/types/identity_registry';
-import { ComplianceAggregator } from '../target/types/compliance_aggregator';
+import { SolanaRwa } from '../target/types/7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L';
+import { IdentityRegistry } from '../target/types/3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5';
+import { ComplianceAggregator } from '../target/types/EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT';
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -163,9 +163,9 @@ describe('TypeScript-Rust API Consistency Tests', () => {
   const complianceAggregatorIdl = complianceAggregatorProgram.idl;
 
   // Extract TypeScript methods
-  const solanaRwaTsMethods = extractTypeScriptMethods('solana_rwa');
-  const identityRegistryTsMethods = extractTypeScriptMethods('identity_registry');
-  const complianceAggregatorTsMethods = extractTypeScriptMethods('compliance_aggregator');
+  const solanaRwaTsMethods = extractTypeScriptMethods('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L');
+  const identityRegistryTsMethods = extractTypeScriptMethods('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5');
+  const complianceAggregatorTsMethods = extractTypeScriptMethods('EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT');
 
   // =================================================================
   // Section 1: Instruction Function Availability
@@ -723,24 +723,24 @@ describe('TypeScript-Rust API Consistency Tests', () => {
   describe('Program ID Consistency', () => {
     it('solana-rwa program ID should match Anchor.toml', () => {
       const anchorToml = fs.readFileSync(path.join(__dirname, '..', 'Anchor.toml'), 'utf-8');
-      expect(anchorToml).to.include('solana_rwa = "7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L"');
+      expect(anchorToml).to.include('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L = "7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L"');
     });
 
     it('identity-registry program ID should match Anchor.toml', () => {
       const anchorToml = fs.readFileSync(path.join(__dirname, '..', 'Anchor.toml'), 'utf-8');
-      expect(anchorToml).to.include('identity_registry = "3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5"');
+      expect(anchorToml).to.include('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5 = "3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5"');
     });
 
     it('compliance-aggregator program ID should match Anchor.toml', () => {
       const anchorToml = fs.readFileSync(path.join(__dirname, '..', 'Anchor.toml'), 'utf-8');
-      expect(anchorToml).to.include('compliance_aggregator = "EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT"');
+      expect(anchorToml).to.include('EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT = "ALgh7qDAL68XSxrqU1zDTeu2mXrEErHmQLAQnkPHvtpg"');
     });
 
     it('program IDs should be unique', () => {
       const ids = [
         '7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L',
         '3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5',
-        'EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT',
+        'ALgh7qDAL68XSxrqU1zDTeu2mXrEErHmQLAQnkPHvtpg',
       ];
 
       const uniqueIds = new Set(ids);

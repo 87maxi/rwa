@@ -1,8 +1,8 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import { SolanaRWA } from '../target/idl/solana-rwa.json';
-import { IdentityRegistry } from '../target/idl/identity-registry.json';
-import { ComplianceAggregator } from '../target/idl/compliance-aggregator.json';
+import { SolanaRWA } from '../target/idl/7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L.json';
+import { IdentityRegistry } from '../target/idl/3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5.json';
+import { ComplianceAggregator } from '../target/idl/EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT.json';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 
@@ -31,7 +31,7 @@ describe('Cross-Program Consistency Tests', () => {
   // Program IDs from Anchor.toml
   const SOLANA_RWA_ID = new PublicKey('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L');
   const IDENTITY_REGISTRY_ID = new PublicKey('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5');
-  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT');
+  const COMPLIANCE_AGGREGATOR_ID = new PublicKey('ALgh7qDAL68XSxrqU1zDTeu2mXrEErHmQLAQnkPHvtpg');
 
   let owner: Keypair;
   let agent: Keypair;
@@ -675,7 +675,7 @@ describe('Cross-Program Consistency Tests', () => {
 
       expect(solanaRWAIdl.address).to.equal('7URg5r88otZuAXX5a9ju8pauWUHLFSALdAvnjMRmcd3L');
       expect(identityRegistryIdl.address).to.equal('3QreJufDNn5MgdhDtWuYBW2WmQnbDzwf9zLTxXkub8X5');
-      expect(complianceAggregatorIdl.address).to.equal('EPjdwvyJ8XQfXZvoLufER1trT78Kx7ujYWEKbgvKunzT');
+      expect(complianceAggregatorIdl.address).to.equal('ALgh7qDAL68XSxrqU1zDTeu2mXrEErHmQLAQnkPHvtpg');
     });
 
     it('CP-030: Should have all programs with version information', () => {

@@ -18,9 +18,9 @@ export type NetworkType = 'localnet' | 'devnet' | 'mainnet';
 function getProgramIds(network: NetworkType) {
   const defaults = {
     localnet: {
-      solanaRwa: "6vRjMaaEvFW2q9EjyVE3UPrBgg1KMjbXV2orVuXFKiya",
-      identityRegistry: "vAoitJwFDr25fYuFJPkoqwBZYBMaKH9iWFwitJbLkUZT",
-      complianceAggregator: "HY4TWkEY3AkxJrie7kFzRfgX8HAp33Bp6rbJTGBoQDbq",
+      solanaRwa: "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt",
+      identityRegistry: "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9",
+      complianceAggregator: "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK",
     },
     devnet: {
       solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || '',
@@ -39,9 +39,9 @@ function getProgramIds(network: NetworkType) {
 
 export const PROGRAM_IDS = {
   localnet: {
-    solanaRwa: "6vRjMaaEvFW2q9EjyVE3UPrBgg1KMjbXV2orVuXFKiya",
-    identityRegistry: "vAoitJwFDr25fYuFJPkoqwBZYBMaKH9iWFwitJbLkUZT",
-    complianceAggregator: "HY4TWkEY3AkxJrie7kFzRfgX8HAp33Bp6rbJTGBoQDbq",
+    solanaRwa: "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt",
+    identityRegistry: "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9",
+    complianceAggregator: "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK",
   },
   devnet: {
     solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || '',

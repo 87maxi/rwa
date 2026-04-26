@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 
 export function NetworkStatus() {
@@ -21,9 +22,20 @@ export function NetworkStatus() {
     connectionRef.current = connection;
   }, [connection]);
 
+  const { publicKey } = useWallet();
+  const publicKeyRef = useRef(publicKey);
+
+  // Track public key changes
+  useEffect(() => {
+    publicKeyRef.current = publicKey;
+  }, [publicKey]);
+
   const fetchSlot = useCallback(async () => {
     const currentConnection = connectionRef.current;
     if (!currentConnection) return;
+    
+    // Only poll if wallet is connected
+    if (!publicKeyRef.current) return;
     
     const startTime = Date.now();
     try {
@@ -40,14 +52,17 @@ export function NetworkStatus() {
   useEffect(() => {
     if (!mounted) return;
     
+    // Only start polling if wallet is connected
+    if (!publicKey) return;
+    
     // Initial fetch
     fetchSlot();
     
-    // Update every 5 seconds
+    // Update every 5 seconds (only when connected)
     const interval = setInterval(fetchSlot, 5000);
     
     return () => clearInterval(interval);
-  }, [fetchSlot, mounted]);
+  }, [fetchSlot, mounted, publicKey]);
 
   const getNetworkColor = (network: string): string => {
     const colors: Record<string, string> = {

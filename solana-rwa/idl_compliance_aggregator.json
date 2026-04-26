@@ -1,0 +1,961 @@
+{
+  "address": "7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb",
+  "metadata": {
+    "name": "compliance_aggregator",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Compliance aggregator program for RWA token platform"
+  },
+  "instructions": [
+    {
+      "name": "add_module",
+      "docs": [
+        "Add a compliance module for a token (creates new TokenComplianceAccount)"
+      ],
+      "discriminator": [
+        81,
+        183,
+        101,
+        212,
+        17,
+        241,
+        122,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (must be signed via seeds for authorization)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Owner of the aggregator (must sign)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "New TokenComplianceAccount PDA (will be created)",
+            "Seeds: [b\"compliance\", aggregator.key(), token.key()]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token",
+          "type": "pubkey"
+        },
+        {
+          "name": "module",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "add_module_to_existing",
+      "docs": [
+        "Add a module to an existing TokenComplianceAccount"
+      ],
+      "discriminator": [
+        203,
+        126,
+        130,
+        90,
+        26,
+        18,
+        76,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (for authorization)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Owner of the aggregator (must sign)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "TokenComplianceAccount PDA (will be updated)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token_compliance.token",
+                "account": "TokenComplianceAccount"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "module",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "can_transfer",
+      "docs": [
+        "Check if a transfer is allowed (compliance check)"
+      ],
+      "discriminator": [
+        233,
+        153,
+        157,
+        96,
+        140,
+        58,
+        200,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (for PDA derivation)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "TokenComplianceAccount PDA (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "token",
+          "type": "pubkey"
+        },
+        {
+          "name": "from",
+          "type": "pubkey"
+        },
+        {
+          "name": "to",
+          "type": "pubkey"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "sender_kyc",
+          "type": "pubkey"
+        },
+        {
+          "name": "recipient_kyc",
+          "type": "pubkey"
+        },
+        {
+          "name": "sender_balance",
+          "type": "u64"
+        },
+        {
+          "name": "recipient_balance",
+          "type": "u64"
+        },
+        {
+          "name": "total_holders",
+          "type": "u64"
+        }
+      ],
+      "returns": "bool"
+    },
+    {
+      "name": "get_module_count",
+      "docs": [
+        "Get module count for a token"
+      ],
+      "discriminator": [
+        208,
+        166,
+        2,
+        246,
+        185,
+        112,
+        23,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (for PDA derivation)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "TokenComplianceAccount PDA (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": "u64"
+    },
+    {
+      "name": "get_modules",
+      "docs": [
+        "Get all compliance modules for a token"
+      ],
+      "discriminator": [
+        134,
+        121,
+        45,
+        135,
+        3,
+        24,
+        47,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (for PDA derivation)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token"
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "TokenComplianceAccount PDA (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": {
+        "vec": "pubkey"
+      }
+    },
+    {
+      "name": "get_state",
+      "docs": [
+        "Get the current state of the aggregator"
+      ],
+      "discriminator": [
+        45,
+        27,
+        40,
+        94,
+        135,
+        141,
+        130,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "AggregatorState"
+        }
+      }
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize a new compliance aggregator"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Who pays for the aggregator account creation"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "aggregator",
+          "docs": [
+            "The new aggregator PDA account (stores owner info only)",
+            "Seeds: [b\"aggregator\"]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "Solana's system program (required for account creation)"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "remove_module",
+      "docs": [
+        "Remove a compliance module for a token"
+      ],
+      "discriminator": [
+        115,
+        146,
+        208,
+        15,
+        125,
+        73,
+        88,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "aggregator",
+          "docs": [
+            "Aggregator PDA (for authorization)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  103,
+                  114,
+                  101,
+                  103,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Owner of the aggregator (must sign)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "token_compliance",
+          "docs": [
+            "TokenComplianceAccount PDA (will be updated or closed)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  108,
+                  105,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "aggregator"
+              },
+              {
+                "kind": "account",
+                "path": "token_compliance.token",
+                "account": "TokenComplianceAccount"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "module",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ComplianceAggregatorState",
+      "discriminator": [
+        150,
+        198,
+        94,
+        35,
+        222,
+        80,
+        225,
+        150
+      ]
+    },
+    {
+      "name": "TokenComplianceAccount",
+      "discriminator": [
+        47,
+        104,
+        232,
+        130,
+        84,
+        184,
+        101,
+        97
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ModuleAddedEvent",
+      "discriminator": [
+        100,
+        138,
+        120,
+        134,
+        96,
+        112,
+        18,
+        42
+      ]
+    },
+    {
+      "name": "ModuleRemovedEvent",
+      "discriminator": [
+        9,
+        101,
+        240,
+        162,
+        112,
+        246,
+        29,
+        184
+      ]
+    },
+    {
+      "name": "TransferCheckEvent",
+      "discriminator": [
+        84,
+        7,
+        140,
+        204,
+        69,
+        208,
+        100,
+        13
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "TokenNotRegistered",
+      "msg": "Token not registered"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6002,
+      "name": "DuplicateModule",
+      "msg": "Module already exists for this token"
+    },
+    {
+      "code": 6003,
+      "name": "WalletNotKYCVerified",
+      "msg": "Wallet not KYC verified"
+    },
+    {
+      "code": 6004,
+      "name": "BalanceLimitExceeded",
+      "msg": "Balance limit exceeded"
+    },
+    {
+      "code": 6005,
+      "name": "MaxHoldersExceeded",
+      "msg": "Max holders exceeded"
+    },
+    {
+      "code": 6006,
+      "name": "TransferLocked",
+      "msg": "Transfer is locked"
+    },
+    {
+      "code": 6007,
+      "name": "ZeroAmountNotAllowed",
+      "msg": "Zero amount transfer not allowed"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidAddress",
+      "msg": "Invalid address in transfer"
+    },
+    {
+      "code": 6009,
+      "name": "TransferAmountExceeded",
+      "msg": "Transfer amount exceeded"
+    }
+  ],
+  "types": [
+    {
+      "name": "AggregatorState",
+      "docs": [
+        "AggregatorState - returned by get_state query"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "aggregator_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComplianceAggregatorState",
+      "docs": [
+        "ComplianceAggregatorState is the control account for the compliance aggregator.",
+        "It is stored as a PDA with seeds [b\"aggregator\"]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "aggregator_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ModuleAddedEvent",
+      "docs": [
+        "Event emitted when a new compliance module is added"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "module",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ModuleRemovedEvent",
+      "docs": [
+        "Event emitted when a compliance module is removed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "module",
+            "type": "pubkey"
+          },
+          {
+            "name": "removed_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenComplianceAccount",
+      "docs": [
+        "TokenComplianceAccount stores compliance modules for a specific token.",
+        "It is stored as a PDA with seeds: [b\"compliance\", aggregator_pubkey, token_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "modules",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferCheckEvent",
+      "docs": [
+        "Event emitted when a transfer compliance check is performed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "allowed",
+            "type": "bool"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

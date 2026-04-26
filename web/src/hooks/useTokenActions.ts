@@ -71,7 +71,7 @@ export interface TransactionResult {
  */
 export function useTokenActions(tokenAccountPubkey: string | null) {
   const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, wallets, wallet } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -108,13 +108,15 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     transaction.feePayer = publicKey;
 
     try {
-      // Sign with wallet
+      // Sign with wallet - this stores signatures internally in the adapter
       const signedTransaction = await signTransaction(transaction);
 
-      // Send pre-signed transaction (signers=[] because wallet already signed)
-      const sig = await connection.sendTransaction(signedTransaction, [], {
+      // Send using wallet adapter's sendTransaction which properly handles signatures
+      // The wallet adapter stores signatures internally and sends them with the transaction
+      const sig = await sendTransaction(signedTransaction, connection, {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
+        maxRetries: 3,
       });
 
       // Confirm
@@ -133,9 +135,12 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
         throw new Error('Failed to get a valid blockhash. Please try again.');
       }
+      if (message.includes('No signers') || message.includes('no signers')) {
+        throw new Error('Transaction signing failed. The wallet did not sign the transaction. Please ensure your wallet is connected and try again.');
+      }
       throw err;
     }
-  }, [publicKey, signTransaction, connection]);
+  }, [publicKey, signTransaction, sendTransaction, connection]);
 
   const getProgramPublicKey = useCallback(() => {
     const network = getCurrentNetwork();

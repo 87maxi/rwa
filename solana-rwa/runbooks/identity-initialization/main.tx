@@ -1,83 +1,50 @@
 ################################################################
-# Solana RWA - Identity Registry Initialization Runbook
-# Initializes the identity registry account after program deployment.
-#
-# For LOCALNET (surfpool): Uses svm::setup_surfnet to create account directly
-# For DEVNET/MAINNET: Uses svm::process_instructions with initialize instruction
-#
-# IMPORTANT: Choose the correct approach based on your environment.
-#
-# Deployment Workflow:
-#   1. Deploy programs: txtx run deployment --env <environment>
-#   2. Capture identity_registry program ID from output
-#   3. Run initialization: txtx run identity-initialization --env <environment>
-#   4. The account public_key is: signer.authority.public_key
-#   5. Use identity operations with the registry key
-#
-# Usage:
-#   Localnet: surfpool run identity-initialization --env localnet -u
-#   Devnet:   txtx run identity-initialization --env devnet -u
-################################################################
+# Identity Registry Initialization Runbook
+# Initializes the identity registry after deployment.
+# Creates the IdentityRegistryState PDA derived from seed "registry".
+# =============================================================================
 
 addon "svm" {
     rpc_api_url = input.rpc_api_url
     network_id = input.network_id
 }
 
-# =============================================================================
-# Signers
-# =============================================================================
-
 signer "payer" "svm::secret_key" {
     description = "Pays fees for identity registry initialization"
-    keypair_json = "~/.config/solana/id.json"
+    keypair_json = input.payer_keypair_json
 }
 
 signer "authority" "svm::secret_key" {
-    description = "Program authority (owner of identity registry)"
-    keypair_json = "~/.config/solana/id.json"
+    description = "Authority for identity registry operations"
+    keypair_json = input.authority_keypair_json
 }
 
-# =============================================================================
-# Variables - Program IDs (must be provided from deployment)
-# =============================================================================
-
-variable "identity_registry_id" {
-    description = "Program ID of identity_registry (set after deployment)"
+variable "identity_registry_program_id" {
     value = input.identity_registry_program_id
-    editable = true
 }
 
-# =============================================================================
-# Identity Registry Initialization
-# =============================================================================
+# Derive PDA for IdentityRegistryState: PDA("registry", identity_registry_program_id)
+variable "registry_pda" {
+    description = "PDA derived from seed 'registry' and the identity registry program ID"
+    value = "derive_pda([b\"registry\"], identity_registry_program_id)"
+}
 
-# For devnet/mainnet: Use process_instructions with the initialize instruction
-# The Anchor program's initialize instruction handles account creation via #[account(init)]
 action "initialize_identity_registry" "svm::process_instructions" {
-    description = "Initialize identity registry account (creates IdentityRegistryState via program instruction)"
+    description = "Initialize identity registry state (creates IdentityRegistryState PDA)"
+    
     instruction {
-        program_id = variable.identity_registry_id
-        instruction_name = "initialize"
-        instruction_args = []
-
-        # Payer: Who pays for rent (must be mutable and signer)
-        payer {
-            public_key = signer.payer.public_key
-        }
-
-        # Registry: The new IdentityRegistryState account
-        # This account will be created by the program's initialize instruction
-        registry {
-            public_key = signer.authority.public_key
-            signer = true
-            writable = true
-        }
-
-        # System program: Required for account creation by Anchor's init
-        system_program {
-            public_key = "11111111111111111111111111111111"
-        }
+        program_id = variable.identity_registry_program_id
+        signers = [signer.payer]
+        accounts = [
+            { pubkey = signer.payer, is_signer = true, is_writable = true },
+            { pubkey = variable.registry_pda, is_signer = false, is_writable = true },
+            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
+        ]
+        data = "initialize"
     }
-    signers = [signer.payer, signer.authority]
+}
+
+output "initialization_summary" {
+    description = "Identity registry initialization result"
+    value = "Identity registry initialized. Program ID: ${variable.identity_registry_program_id}, Registry PDA: ${variable.registry_pda}"
 }
