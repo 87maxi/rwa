@@ -43,9 +43,9 @@
 #
 # PROGRAM IDS (from declare_id!() macros)
 # ========================================
-# compliance_aggregator: AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK
-# identity_registry:     48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9
-# solana_rwa:            EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt
+# compliance_aggregator: 9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7
+# identity_registry:     6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc
+# solana_rwa:            6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe
 #
 # =============================================================================
 
@@ -54,15 +54,15 @@
 # =============================================================================
 
 variable "compliance_aggregator_program_id" {
-    value = "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK"
+    value = "9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7"
 }
 
 variable "identity_registry_program_id" {
-    value = "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9"
+    value = "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc"
 }
 
 variable "solana_rwa_program_id" {
-    value = "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt"
+    value = "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe"
 }
 
 # =============================================================================

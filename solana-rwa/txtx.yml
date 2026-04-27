@@ -178,9 +178,9 @@ environments:
     # Program IDs for token operations
     # These are populated AFTER deployment by surfpool state extraction
     # For localnet, these match Anchor.toml [programs.localnet] section
-    solana_rwa_program_id: ""
-    identity_registry_program_id: ""
-    compliance_aggregator_program_id: ""
+    solana_rwa_program_id: "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe"
+    identity_registry_program_id: "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc"
+    compliance_aggregator_program_id: "9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7"
     
     # SPL Token program ID (standard on all Solana networks)
     # This is a well-known program ID that never changes
