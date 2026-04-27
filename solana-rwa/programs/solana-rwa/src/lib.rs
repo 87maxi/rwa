@@ -29,22 +29,54 @@
 // - No account size limits (each balance is independent)
 // - Efficient updates/removals (no vector manipulation)
 // - Better parallelization (different balances don't conflict)
+//
+// MODULE STRUCTURE:
+// -----------------
+// - constants: Global constants (MAX_SUPPLY, etc.)
+// - states: On-chain data structures (TokenState, BalanceAccount, etc.)
+// - events: Event definitions (OwnerTransferred, TokensMinted, etc.)
+// - errors: Error codes (ErrorCode enum)
+// - pdas: PDA derivation helper functions
+// - tests: Comprehensive test suite
+// =============================================================================
 
 use anchor_lang::prelude::*;
 
 // Module for cross-program invocation (CPI) program IDs
 pub mod ids;
 
+// Module for global constants
+pub mod constants;
+
+// Module for on-chain data structures
+pub mod states;
+
+// Module for event definitions
+pub mod events;
+
+// Module for error codes
+pub mod errors;
+
+// Module for PDA derivation helpers
+pub mod pdas;
+
+// Module for comprehensive tests
+pub mod tests;
+
 // declare_id!() = the program's on-chain address
 declare_id!("2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX");
+
+// Re-export all public items for easy access
+pub use constants::MAX_SUPPLY;
+pub use states::{TokenState, BalanceAccount, FrozenAccount, AgentAccount, SupplyInfo};
+pub use events::{OwnerTransferredEvent, TokensMintedEvent, AccountFrozenEvent, AccountUnfrozenEvent, FreezeAuthorityTransferredEvent};
+pub use errors::ErrorCode;
+pub use pdas::{derive_balance_pda, derive_frozen_pda, derive_agent_pda};
 
 // #[program] marks this module as containing all instruction handlers
 #[program]
 pub mod solana_rwa {
     use super::*;
-
-    /// Maximum supply cap for the token (1 billion tokens with 9 decimals)
-    pub const MAX_SUPPLY: u64 = 1_000_000_000_000_000_000u64;
 
     // =================================================================
     // ACCOUNT VALIDATION STRUCTURES
@@ -525,502 +557,5 @@ pub mod solana_rwa {
 
         msg!("Agent removed: {}", agent_key);
         Ok(())
-    }
-}
-
-// =================================================================
-// DATA STRUCTURES (On-Chain Storage)
-// =================================================================
-
-/// TokenState is the main control account for the token program.
-/// It is stored as a PDA with seeds [b"token"].
-#[account]
-pub struct TokenState {
-    pub owner: Pubkey,              // Who created this token
-    pub freeze_authority: Pubkey,   // Freeze authority
-    pub name: String,               // Token name
-    pub symbol: String,             // Token symbol
-    pub decimals: u8,               // Decimal places
-    pub total_supply: u64,          // Total tokens minted
-    pub next_index: u64,            // Counter for future use
-    pub bump: u8,                   // PDA bump for token
-}
-
-/// BalanceAccount stores a single wallet's token balance.
-/// Seeds: [b"balance", token_pubkey, wallet_pubkey]
-#[account]
-pub struct BalanceAccount {
-    pub wallet: Pubkey,   // Wallet address
-    pub balance: u64,     // Balance in smallest units
-    pub bump: u8,         // PDA bump
-}
-
-/// FrozenAccount stores the frozen status of a wallet account.
-/// Seeds: [b"frozen", token_pubkey, wallet_pubkey]
-#[account]
-pub struct FrozenAccount {
-    pub wallet: Pubkey,   // Wallet address
-    pub frozen: bool,     // true = frozen, false = active
-    pub bump: u8,         // PDA bump
-}
-
-/// AgentAccount stores an authorized agent.
-/// Seeds: [b"agent", token_pubkey, agent_pubkey]
-#[account]
-pub struct AgentAccount {
-    pub agent: Pubkey,    // Agent wallet address
-    pub bump: u8,         // PDA bump
-}
-
-// =================================================================
-// QUERY RETURN TYPES
-// =================================================================
-
-/// SupplyInfo - returned by get_supply_info query
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct SupplyInfo {
-    pub current_supply: u64,
-    pub max_supply: u64,
-    pub remaining_supply: u64,
-}
-
-// =================================================================
-// HELPER FUNCTIONS (PDA derivation utilities)
-// =================================================================
-
-/// Derive the PDA for a BalanceAccount
-pub fn derive_balance_pda(token: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"balance", token.as_ref(), wallet.as_ref()];
-    Pubkey::find_program_address(seeds, &id())
-}
-
-/// Derive the PDA for a FrozenAccount
-pub fn derive_frozen_pda(token: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"frozen", token.as_ref(), wallet.as_ref()];
-    Pubkey::find_program_address(seeds, &id())
-}
-
-/// Derive the PDA for an AgentAccount
-pub fn derive_agent_pda(token: &Pubkey, agent: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"agent", token.as_ref(), agent.as_ref()];
-    Pubkey::find_program_address(seeds, &id())
-}
-
-// =================================================================
-// ERROR CODES
-// =================================================================
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Unauthorized")]
-    Unauthorized,
-
-    #[msg("Insufficient balance")]
-    InsufficientBalance,
-
-    #[msg("Account frozen")]
-    AccountFrozen,
-
-    #[msg("Agent already exists")]
-    DuplicateAgent,
-
-    #[msg("Invalid amount: amount must be greater than zero")]
-    InvalidAmount,
-
-    #[msg("Supply exceeded maximum cap")]
-    SupplyExceeded,
-
-    #[msg("Supply overflow")]
-    SupplyOverflow,
-
-    #[msg("New owner cannot be the same as current owner")]
-    SameOwner,
-
-    #[msg("Caller is not the freeze authority")]
-    NotFreezeAuthority,
-
-    #[msg("New freeze authority cannot be the same as current")]
-    SameFreezeAuthority,
-
-    #[msg("Invalid string length")]
-    InvalidString,
-}
-
-// =================================================================
-// EVENTS
-// =================================================================
-
-#[event]
-pub struct OwnerTransferredEvent {
-    pub old_owner: Pubkey,
-    pub new_owner: Pubkey,
-    pub transferred_by: Pubkey,
-}
-
-#[event]
-pub struct TokensMintedEvent {
-    pub to: Pubkey,
-    pub amount: u64,
-    pub total_supply: u64,
-    pub minted_by: Pubkey,
-}
-
-#[event]
-pub struct AccountFrozenEvent {
-    pub account: Pubkey,
-    pub frozen_by: Pubkey,
-}
-
-#[event]
-pub struct AccountUnfrozenEvent {
-    pub account: Pubkey,
-    pub unfrozen_by: Pubkey,
-}
-
-#[event]
-pub struct FreezeAuthorityTransferredEvent {
-    pub old_freeze_authority: Pubkey,
-    pub new_freeze_authority: Pubkey,
-    pub transferred_by: Pubkey,
-}
-
-// =================================================================
-// COMPREHENSIVE TESTS
-// =================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use anchor_lang::prelude::Pubkey;
-
-    // =================================================================
-    // TokenState Tests
-    // =================================================================
-
-    #[test]
-    fn test_token_state_default_creation() {
-        let dummy_pubkey = Pubkey::default();
-        let state = TokenState {
-            owner: dummy_pubkey,
-            freeze_authority: dummy_pubkey,
-            name: "Test Token".to_string(),
-            symbol: "TT".to_string(),
-            decimals: 9,
-            total_supply: 0,
-            next_index: 0,
-            bump: 255,
-        };
-
-        assert_eq!(state.name, "Test Token");
-        assert_eq!(state.symbol, "TT");
-        assert_eq!(state.decimals, 9);
-        assert_eq!(state.total_supply, 0);
-        assert_eq!(state.bump, 255);
-    }
-
-    // =================================================================
-    // BalanceAccount Tests
-    // =================================================================
-
-    #[test]
-    fn test_balance_account_structure() {
-        let wallet = Pubkey::new_unique();
-        let balance_account = BalanceAccount {
-            wallet,
-            balance: 1000,
-            bump: 1,
-        };
-
-        assert_eq!(balance_account.wallet, wallet);
-        assert_eq!(balance_account.balance, 1000);
-        assert_eq!(balance_account.bump, 1);
-    }
-
-    #[test]
-    fn test_balance_account_zero_balance() {
-        let wallet = Pubkey::new_unique();
-        let balance_account = BalanceAccount {
-            wallet,
-            balance: 0,
-            bump: 0,
-        };
-
-        assert_eq!(balance_account.balance, 0);
-    }
-
-    // =================================================================
-    // FrozenAccount Tests
-    // =================================================================
-
-    #[test]
-    fn test_frozen_account_frozen_status() {
-        let wallet = Pubkey::new_unique();
-        let frozen_account = FrozenAccount {
-            wallet,
-            frozen: true,
-            bump: 2,
-        };
-
-        assert!(frozen_account.frozen);
-    }
-
-    #[test]
-    fn test_frozen_account_active_status() {
-        let wallet = Pubkey::new_unique();
-        let frozen_account = FrozenAccount {
-            wallet,
-            frozen: false,
-            bump: 3,
-        };
-
-        assert!(!frozen_account.frozen);
-    }
-
-    // =================================================================
-    // AgentAccount Tests
-    // =================================================================
-
-    #[test]
-    fn test_agent_account_structure() {
-        let agent = Pubkey::new_unique();
-        let agent_account = AgentAccount {
-            agent,
-            bump: 4,
-        };
-
-        assert_eq!(agent_account.agent, agent);
-        assert_eq!(agent_account.bump, 4);
-    }
-
-    // =================================================================
-    // SupplyInfo Tests
-    // =================================================================
-
-    #[test]
-    fn test_supply_info_calculation() {
-        let max_supply = MAX_SUPPLY;
-        let current_supply = 1_000_000_000_000_000u64;
-
-        let supply_info = SupplyInfo {
-            current_supply,
-            max_supply,
-            remaining_supply: max_supply - current_supply,
-        };
-
-        assert_eq!(supply_info.current_supply, current_supply);
-        assert_eq!(supply_info.max_supply, max_supply);
-        assert_eq!(supply_info.remaining_supply, max_supply - current_supply);
-    }
-
-    #[test]
-    fn test_supply_info_zero_supply() {
-        let max_supply = MAX_SUPPLY;
-
-        let supply_info = SupplyInfo {
-            current_supply: 0,
-            max_supply,
-            remaining_supply: max_supply,
-        };
-
-        assert_eq!(supply_info.current_supply, 0);
-        assert_eq!(supply_info.remaining_supply, max_supply);
-    }
-
-    #[test]
-    fn test_supply_info_max_supply_value() {
-        assert_eq!(MAX_SUPPLY, 1_000_000_000_000_000_000u64);
-    }
-
-    // =================================================================
-    // PDA Derivation Tests
-    // =================================================================
-
-    #[test]
-    fn test_pda_balance_derivation() {
-        let token = Pubkey::new_unique();
-        let wallet = Pubkey::new_unique();
-        let seeds = &[b"balance", token.as_ref(), wallet.as_ref()];
-        let (pda, _bump) = Pubkey::find_program_address(seeds, &id());
-
-        assert_ne!(pda, Pubkey::default());
-    }
-
-    #[test]
-    fn test_pda_frozen_derivation() {
-        let token = Pubkey::new_unique();
-        let wallet = Pubkey::new_unique();
-        let seeds = &[b"frozen", token.as_ref(), wallet.as_ref()];
-        let (pda, _bump) = Pubkey::find_program_address(seeds, &id());
-
-        assert_ne!(pda, Pubkey::default());
-    }
-
-    #[test]
-    fn test_pda_agent_derivation() {
-        let token = Pubkey::new_unique();
-        let agent = Pubkey::new_unique();
-        let seeds = &[b"agent", token.as_ref(), agent.as_ref()];
-        let (pda, _bump) = Pubkey::find_program_address(seeds, &id());
-
-        assert_ne!(pda, Pubkey::default());
-    }
-
-    #[test]
-    fn test_pda_unique_for_different_wallets() {
-        let token = Pubkey::new_unique();
-        let wallet1 = Pubkey::new_unique();
-        let wallet2 = Pubkey::new_unique();
-
-        let seeds1 = &[b"balance", token.as_ref(), wallet1.as_ref()];
-        let seeds2 = &[b"balance", token.as_ref(), wallet2.as_ref()];
-
-        let (pda1, _) = Pubkey::find_program_address(seeds1, &id());
-        let (pda2, _) = Pubkey::find_program_address(seeds2, &id());
-
-        assert_ne!(pda1, pda2);
-    }
-
-    #[test]
-    fn test_pda_deterministic() {
-        let token = Pubkey::new_unique();
-        let wallet = Pubkey::new_unique();
-
-        let seeds = &[b"balance", token.as_ref(), wallet.as_ref()];
-        let (pda1, _bump1) = Pubkey::find_program_address(seeds, &id());
-        let (pda2, _bump2) = Pubkey::find_program_address(seeds, &id());
-
-        assert_eq!(pda1, pda2);
-    }
-
-    // =================================================================
-    // Error Code Tests
-    // =================================================================
-
-    #[test]
-    fn test_error_codes_all_defined() {
-        let _unauthorized = ErrorCode::Unauthorized;
-        let _insufficient_balance = ErrorCode::InsufficientBalance;
-        let _account_frozen = ErrorCode::AccountFrozen;
-        let _duplicate_agent = ErrorCode::DuplicateAgent;
-        let _invalid_amount = ErrorCode::InvalidAmount;
-        let _supply_exceeded = ErrorCode::SupplyExceeded;
-        let _supply_overflow = ErrorCode::SupplyOverflow;
-        let _same_owner = ErrorCode::SameOwner;
-        let _not_freeze_authority = ErrorCode::NotFreezeAuthority;
-        let _same_freeze_authority = ErrorCode::SameFreezeAuthority;
-    }
-
-    // =================================================================
-    // Event Structure Tests
-    // =================================================================
-
-    #[test]
-    fn test_owner_transferred_event() {
-        let old_owner = Pubkey::new_unique();
-        let new_owner = Pubkey::new_unique();
-        let transferred_by = Pubkey::new_unique();
-
-        let event = OwnerTransferredEvent {
-            old_owner,
-            new_owner,
-            transferred_by,
-        };
-
-        assert_eq!(event.old_owner, old_owner);
-        assert_eq!(event.new_owner, new_owner);
-        assert_eq!(event.transferred_by, transferred_by);
-    }
-
-    #[test]
-    fn test_tokens_minted_event() {
-        let to = Pubkey::new_unique();
-        let amount = 1_000_000u64;
-        let total_supply = 2_000_000u64;
-        let minted_by = Pubkey::new_unique();
-
-        let event = TokensMintedEvent {
-            to,
-            amount,
-            total_supply,
-            minted_by,
-        };
-
-        assert_eq!(event.to, to);
-        assert_eq!(event.amount, amount);
-        assert_eq!(event.total_supply, total_supply);
-        assert_eq!(event.minted_by, minted_by);
-    }
-
-    #[test]
-    fn test_account_frozen_event() {
-        let account = Pubkey::new_unique();
-        let frozen_by = Pubkey::new_unique();
-
-        let event = AccountFrozenEvent {
-            account,
-            frozen_by,
-        };
-
-        assert_eq!(event.account, account);
-        assert_eq!(event.frozen_by, frozen_by);
-    }
-
-    #[test]
-    fn test_account_unfrozen_event() {
-        let account = Pubkey::new_unique();
-        let unfrozen_by = Pubkey::new_unique();
-
-        let event = AccountUnfrozenEvent {
-            account,
-            unfrozen_by,
-        };
-
-        assert_eq!(event.account, account);
-        assert_eq!(event.unfrozen_by, unfrozen_by);
-    }
-
-    #[test]
-    fn test_freeze_authority_transferred_event() {
-        let old_freeze_authority = Pubkey::new_unique();
-        let new_freeze_authority = Pubkey::new_unique();
-        let transferred_by = Pubkey::new_unique();
-
-        let event = FreezeAuthorityTransferredEvent {
-            old_freeze_authority,
-            new_freeze_authority,
-            transferred_by,
-        };
-
-        assert_eq!(event.old_freeze_authority, old_freeze_authority);
-        assert_eq!(event.new_freeze_authority, new_freeze_authority);
-        assert_eq!(event.transferred_by, transferred_by);
-    }
-
-    // =================================================================
-    // Constants and Edge Cases
-    // =================================================================
-
-    #[test]
-    fn test_max_supply_does_not_overflow() {
-        assert!(MAX_SUPPLY <= u64::MAX);
-    }
-
-    #[test]
-    fn test_supply_overflow_detection() {
-        let current = u64::MAX - 100;
-        let mint_amount = 200;
-
-        let result = current.checked_add(mint_amount);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_supply_safe_addition() {
-        let current = 1_000_000u64;
-        let mint_amount = 500_000u64;
-
-        let result = current.checked_add(mint_amount);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap(), 1_500_000u64);
     }
 }

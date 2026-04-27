@@ -28,7 +28,24 @@ use anchor_lang::prelude::*;
 // declare_id!() = the program's on-chain address
 declare_id!("7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb");
 
-// #[program] marks this module as containing all instruction handlers
+// Module declarations
+pub mod constants;
+pub mod states;
+pub mod events;
+pub mod errors;
+pub mod pdas;
+pub mod tests;
+
+// Re-exports
+pub use states::*;
+pub use events::*;
+pub use errors::*;
+pub use pdas::*;
+
+// =============================================================================
+// PROGRAM MODULE
+// =============================================================================
+
 #[program]
 pub mod compliance_aggregator {
     use super::*;
@@ -195,7 +212,7 @@ pub mod compliance_aggregator {
         module: Pubkey,
     ) -> Result<()> {
         // SECURITY CHECK: Only owner can add modules
-        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), ErrorCode::Unauthorized);
+        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
         let token_compliance = &mut ctx.accounts.token_compliance;
 
@@ -223,12 +240,12 @@ pub mod compliance_aggregator {
         module: Pubkey,
     ) -> Result<()> {
         // SECURITY CHECK: Only owner can add modules
-        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), ErrorCode::Unauthorized);
+        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
         let token_compliance = &mut ctx.accounts.token_compliance;
 
         // Check for duplicate module (CRIT-03 FIX)
-        require!(!token_compliance.modules.contains(&module), ErrorCode::DuplicateModule);
+        require!(!token_compliance.modules.contains(&module), crate::errors::ErrorCode::DuplicateModule);
 
         // Add the module
         token_compliance.modules.push(module);
@@ -249,12 +266,12 @@ pub mod compliance_aggregator {
         module: Pubkey,
     ) -> Result<()> {
         // SECURITY CHECK: Only owner can remove modules
-        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), ErrorCode::Unauthorized);
+        require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
         let token_compliance = &mut ctx.accounts.token_compliance;
 
         // Verify module exists before removing
-        require!(token_compliance.modules.contains(&module), ErrorCode::TokenNotRegistered);
+        require!(token_compliance.modules.contains(&module), crate::errors::ErrorCode::TokenNotRegistered);
 
         // Remove the specified module
         token_compliance.modules.retain(|&m| m != module);
@@ -431,9 +448,9 @@ pub mod compliance_aggregator {
     }
 }
 
-// =================================================================
+// =============================================================================
 // HELPER FUNCTIONS (Off-chain queries)
-// =================================================================
+// =============================================================================
 
 /// Derive the PDA for a token's compliance account (helper)
 pub fn derive_compliance_pda(aggregator: Pubkey, token: Pubkey) -> PdaInfo {
@@ -443,360 +460,5 @@ pub fn derive_compliance_pda(aggregator: Pubkey, token: Pubkey) -> PdaInfo {
     PdaInfo {
         pda,
         bump,
-    }
-}
-
-// =================================================================
-// DATA STRUCTURES (On-Chain Storage)
-// =================================================================
-
-/// ComplianceAggregatorState is the control account for the compliance aggregator.
-/// It is stored as a PDA with seeds [b"aggregator"].
-#[account]
-pub struct ComplianceAggregatorState {
-    pub owner: Pubkey,          // Who created this aggregator
-    pub aggregator_bump: u8,    // Bump for the aggregator PDA
-}
-
-/// TokenComplianceAccount stores compliance modules for a specific token.
-/// It is stored as a PDA with seeds: [b"compliance", aggregator_pubkey, token_pubkey]
-#[account]
-pub struct TokenComplianceAccount {
-    pub token: Pubkey,              // Token program address
-    pub modules: Vec<Pubkey>,       // List of compliance module addresses
-    pub bump: u8,                   // PDA bump
-}
-
-// =================================================================
-// QUERY RETURN TYPES
-// =================================================================
-
-/// AggregatorState - returned by get_state query
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct AggregatorState {
-    pub owner: Pubkey,              // Owner of the aggregator
-    pub aggregator_bump: u8,        // Bump for the aggregator PDA
-}
-
-/// PdaInfo - returned by derive_compliance_pda query
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct PdaInfo {
-    pub pda: Pubkey,
-    pub bump: u8,
-}
-
-// =================================================================
-// EVENTS
-// =================================================================
-
-/// Event emitted when a new compliance module is added
-#[event]
-pub struct ModuleAddedEvent {
-    pub token: Pubkey,
-    pub module: Pubkey,
-    pub added_by: Pubkey,
-}
-
-/// Event emitted when a compliance module is removed
-#[event]
-pub struct ModuleRemovedEvent {
-    pub token: Pubkey,
-    pub module: Pubkey,
-    pub removed_by: Pubkey,
-}
-
-/// Event emitted when a transfer compliance check is performed
-#[event]
-pub struct TransferCheckEvent {
-    pub token: Pubkey,
-    pub from: Pubkey,
-    pub to: Pubkey,
-    pub amount: u64,
-    pub allowed: bool,
-    pub reason: String,
-}
-
-// =================================================================
-// ERROR CODES
-// =================================================================
-
-#[error_code]
-pub enum ErrorCode {
-    /// Token is not registered in this aggregator
-    #[msg("Token not registered")]
-    TokenNotRegistered,
-
-    /// Caller is not authorized to perform this action
-    #[msg("Unauthorized")]
-    Unauthorized,
-
-    /// Module already exists for this token
-    #[msg("Module already exists for this token")]
-    DuplicateModule,
-
-    /// Compliance check failed: wallet not KYC verified
-    #[msg("Wallet not KYC verified")]
-    WalletNotKYCVerified,
-
-    /// Compliance check failed: balance exceeded
-    #[msg("Balance limit exceeded")]
-    BalanceLimitExceeded,
-
-    /// Compliance check failed: max holders exceeded
-    #[msg("Max holders exceeded")]
-    MaxHoldersExceeded,
-
-    /// Compliance check failed: transfer is locked
-    #[msg("Transfer is locked")]
-    TransferLocked,
-
-    /// Compliance check failed: amount is zero
-    #[msg("Zero amount transfer not allowed")]
-    ZeroAmountNotAllowed,
-
-    /// Compliance check failed: invalid addresses
-    #[msg("Invalid address in transfer")]
-    InvalidAddress,
-
-    /// Compliance check failed: max transfer exceeded
-    #[msg("Transfer amount exceeded")]
-    TransferAmountExceeded,
-}
-
-// =================================================================
-// COMPREHENSIVE TESTS
-// =================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // =================================================================
-    // ComplianceAggregatorState Tests
-    // =================================================================
-
-    #[test]
-    fn test_compliance_aggregator_state_structure() {
-        let state = ComplianceAggregatorState {
-            owner: Pubkey::new_unique(),
-            aggregator_bump: 3,
-        };
-
-        assert_ne!(state.owner, Pubkey::default());
-        assert_eq!(state.aggregator_bump, 3);
-    }
-
-    #[test]
-    fn test_compliance_aggregator_state_default_owner() {
-        let state = ComplianceAggregatorState {
-            owner: Pubkey::default(),
-            aggregator_bump: 0,
-        };
-
-        assert_eq!(state.owner, Pubkey::default());
-    }
-
-    // =================================================================
-    // TokenComplianceAccount Tests
-    // =================================================================
-
-    #[test]
-    fn test_token_compliance_account_structure() {
-        let token = Pubkey::new_unique();
-        let modules = vec![Pubkey::new_unique(), Pubkey::new_unique()];
-        let account = TokenComplianceAccount {
-            token,
-            modules,
-            bump: 5,
-        };
-
-        assert_eq!(account.token, token);
-        assert_eq!(account.modules.len(), 2);
-        assert_eq!(account.bump, 5);
-    }
-
-    #[test]
-    fn test_token_compliance_account_empty_modules() {
-        let account = TokenComplianceAccount {
-            token: Pubkey::new_unique(),
-            modules: vec![],
-            bump: 1,
-        };
-
-        assert_eq!(account.modules.len(), 0);
-    }
-
-    #[test]
-    fn test_token_compliance_account_single_module() {
-        let token = Pubkey::new_unique();
-        let module = Pubkey::new_unique();
-        let account = TokenComplianceAccount {
-            token,
-            modules: vec![module],
-            bump: 2,
-        };
-
-        assert_eq!(account.modules.len(), 1);
-        assert_eq!(account.modules[0], module);
-    }
-
-    // =================================================================
-    // Error Code Tests
-    // =================================================================
-
-    #[test]
-    fn test_error_codes_all_defined() {
-        let _token_not_registered = ErrorCode::TokenNotRegistered;
-        let _unauthorized = ErrorCode::Unauthorized;
-        let _duplicate_module = ErrorCode::DuplicateModule;
-        let _wallet_not_kyc_verified = ErrorCode::WalletNotKYCVerified;
-        let _balance_limit_exceeded = ErrorCode::BalanceLimitExceeded;
-        let _max_holders_exceeded = ErrorCode::MaxHoldersExceeded;
-        let _transfer_locked = ErrorCode::TransferLocked;
-        let _zero_amount_not_allowed = ErrorCode::ZeroAmountNotAllowed;
-        let _invalid_address = ErrorCode::InvalidAddress;
-        let _transfer_amount_exceeded = ErrorCode::TransferAmountExceeded;
-    }
-
-    // =================================================================
-    // Event Structure Tests
-    // =================================================================
-
-    #[test]
-    fn test_module_added_event() {
-        let event = ModuleAddedEvent {
-            token: Pubkey::new_unique(),
-            module: Pubkey::new_unique(),
-            added_by: Pubkey::new_unique(),
-        };
-
-        assert_ne!(event.token, Pubkey::default());
-        assert_ne!(event.module, Pubkey::default());
-    }
-
-    #[test]
-    fn test_module_removed_event() {
-        let event = ModuleRemovedEvent {
-            token: Pubkey::new_unique(),
-            module: Pubkey::new_unique(),
-            removed_by: Pubkey::new_unique(),
-        };
-
-        assert_ne!(event.token, Pubkey::default());
-    }
-
-    #[test]
-    fn test_transfer_check_event() {
-        let event = TransferCheckEvent {
-            token: Pubkey::new_unique(),
-            from: Pubkey::new_unique(),
-            to: Pubkey::new_unique(),
-            amount: 1000,
-            allowed: true,
-            reason: "All checks passed".to_string(),
-        };
-
-        assert!(event.allowed);
-        assert_eq!(event.amount, 1000);
-        assert_eq!(event.reason, "All checks passed");
-    }
-
-    // =================================================================
-    // PDA Derivation Tests
-    // =================================================================
-
-    #[test]
-    fn test_aggregator_pda_derivation() {
-        let seeds: &[&[u8]] = &[b"aggregator"];
-        let (pda, bump) = Pubkey::find_program_address(seeds, &id());
-
-        assert_ne!(pda, Pubkey::default());
-        // bump es un valor válido retornado por find_program_address
-    }
-
-    #[test]
-    fn test_token_compliance_pda_derivation() {
-        let aggregator = Pubkey::new_unique();
-        let token = Pubkey::new_unique();
-        let seeds = &[b"compliance", aggregator.as_ref(), token.as_ref()];
-        let (pda, _bump) = Pubkey::find_program_address(seeds, &id());
-
-        assert_ne!(pda, Pubkey::default());
-    }
-
-    #[test]
-    fn test_token_compliance_pda_unique_for_different_tokens() {
-        let aggregator = Pubkey::new_unique();
-        let token1 = Pubkey::new_unique();
-        let token2 = Pubkey::new_unique();
-
-        let seeds1 = &[b"compliance", aggregator.as_ref(), token1.as_ref()];
-        let seeds2 = &[b"compliance", aggregator.as_ref(), token2.as_ref()];
-
-        let (pda1, _) = Pubkey::find_program_address(seeds1, &id());
-        let (pda2, _) = Pubkey::find_program_address(seeds2, &id());
-
-        assert_ne!(pda1, pda2);
-    }
-
-    #[test]
-    fn test_token_compliance_pda_deterministic() {
-        let aggregator = Pubkey::new_unique();
-        let token = Pubkey::new_unique();
-        let seeds = &[b"compliance", aggregator.as_ref(), token.as_ref()];
-
-        let (pda1, _bump1) = Pubkey::find_program_address(seeds, &id());
-        let (pda2, _bump2) = Pubkey::find_program_address(seeds, &id());
-
-        assert_eq!(pda1, pda2);
-    }
-
-    // =================================================================
-    // Transfer Check Result Tests
-    // =================================================================
-
-    #[test]
-    fn test_transfer_check_allowed() {
-        let event = TransferCheckEvent {
-            token: Pubkey::new_unique(),
-            from: Pubkey::new_unique(),
-            to: Pubkey::new_unique(),
-            amount: 100,
-            allowed: true,
-            reason: "KYC verified".to_string(),
-        };
-
-        assert!(event.allowed);
-        assert_eq!(event.amount, 100);
-    }
-
-    #[test]
-    fn test_transfer_check_not_allowed() {
-        let event = TransferCheckEvent {
-            token: Pubkey::new_unique(),
-            from: Pubkey::new_unique(),
-            to: Pubkey::new_unique(),
-            amount: 0,
-            allowed: false,
-            reason: "Zero amount".to_string(),
-        };
-
-        assert!(!event.allowed);
-        assert_eq!(event.amount, 0);
-    }
-
-    #[test]
-    fn test_transfer_check_zero_amount() {
-        let event = TransferCheckEvent {
-            token: Pubkey::new_unique(),
-            from: Pubkey::new_unique(),
-            to: Pubkey::new_unique(),
-            amount: 0,
-            allowed: false,
-            reason: "".to_string(),
-        };
-
-        assert!(!event.allowed);
-        assert_eq!(event.reason.len(), 0);
     }
 }
