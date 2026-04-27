@@ -73,16 +73,16 @@ use std::str::FromStr;  // Required for Pubkey::from_str()
 /// Solana RWA Token Program ID (localnet development)
 /// This is the address of the solana_rwa program on localnet
 /// Like a deployed smart contract's address, but for local testing
-pub const SOLANA_RWA_PROGRAM_ID: &str = "EwAUDz8ZVXqJQqYYcd8ZEPSGpx2HvG61PweDThK5vrQt";
+pub const SOLANA_RWA_PROGRAM_ID: &str = "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe";
 
 /// Identity Registry Program ID (localnet development)
 /// This is the address of the identity_registry program on localnet
 /// Like a deployed smart contract's address, but for local testing
-pub const IDENTITY_REGISTRY_PROGRAM_ID: &str = "48szCrY5scr6MbqdTDJe8X8NAWejkRaiTe4VEyCGRTu9";
+pub const IDENTITY_REGISTRY_PROGRAM_ID: &str = "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc";
 
 /// Compliance Aggregator Program ID (localnet development)
 /// This is the address of the compliance_aggregator program on localnet
-pub const COMPLIANCE_AGGREGATOR_PROGRAM_ID: &str = "AmFr5NUWU3E4neLzKHe2pkX5yTochgFTUHtwMB7aDszK";
+pub const COMPLIANCE_AGGREGATOR_PROGRAM_ID: &str = "9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7";
 
 // =============================================================================
 // HELPER FUNCTIONS

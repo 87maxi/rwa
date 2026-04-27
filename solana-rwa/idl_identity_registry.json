@@ -1,5 +1,5 @@
 {
-  "address": "5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce",
+  "address": "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc",
   "metadata": {
     "name": "identity_registry",
     "version": "0.1.0",
@@ -10,9 +10,7 @@
     {
       "name": "initialize",
       "docs": [
-        "Initialize a new identity registry",
-        "",
-        "Creates the registry PDA that will control all identity registrations."
+        "Initialize a new identity registry"
       ],
       "discriminator": [
         175,
@@ -71,9 +69,7 @@
     {
       "name": "register_identity",
       "docs": [
-        "Register a new identity mapping (Pubkey-based)",
-        "",
-        "Creates a new IdentityAccount PDA for the wallet."
+        "Register a new identity mapping (Pubkey-based)"
       ],
       "discriminator": [
         164,
@@ -299,9 +295,7 @@
     {
       "name": "remove_identity",
       "docs": [
-        "Remove an identity mapping",
-        "",
-        "Only the identity owner or registry admin can remove."
+        "Remove an identity mapping"
       ],
       "discriminator": [
         146,
@@ -364,11 +358,13 @@
               },
               {
                 "kind": "account",
-                "path": "identity_account.wallet",
-                "account": "IdentityAccount"
+                "path": "identity_account_owner"
               }
             ]
           }
+        },
+        {
+          "name": "identity_account_owner"
         },
         {
           "name": "owner",
@@ -383,9 +379,7 @@
     {
       "name": "update_identity",
       "docs": [
-        "Update an existing identity mapping",
-        "",
-        "Only the identity owner or registry admin can update."
+        "Update an existing identity mapping"
       ],
       "discriminator": [
         130,
@@ -448,11 +442,13 @@
               },
               {
                 "kind": "account",
-                "path": "identity_account.wallet",
-                "account": "IdentityAccount"
+                "path": "identity_account_owner"
               }
             ]
           }
+        },
+        {
+          "name": "identity_account_owner"
         },
         {
           "name": "owner",
@@ -611,6 +607,10 @@
         "",
         "Seeds: [b\"identity\", registry_pubkey, wallet_pubkey]"
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -624,23 +624,52 @@
           },
           {
             "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "symbol",
-            "type": "string"
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "identity_data",
-            "type": "string"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "metadata_uri",
-            "type": "string"
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          },
+          {
+            "name": "symbol",
+            "type": {
+              "array": [
+                "u8",
+                10
+              ]
+            }
           },
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
           }
         ]
       }

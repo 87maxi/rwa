@@ -61,7 +61,7 @@ pub use errors::ErrorCode;
 pub use pdas::{derive_registry_pda, derive_identity_pda};
 
 // declare_id!() = the program's on-chain address
-declare_id!("5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce");
+declare_id!("6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc");
 
 // #[program] marks this module as containing all instruction handlers
 #[program]
@@ -121,7 +121,7 @@ pub mod identity_registry {
             bump,
             space = 8 + std::mem::size_of::<IdentityAccount>()
         )]
-        pub identity_account: Account<'info, IdentityAccount>,
+        pub identity_account: AccountLoader<'info, IdentityAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -140,10 +140,12 @@ pub mod identity_registry {
         /// IdentityAccount PDA (will be updated)
         #[account(
             mut,
-            seeds = [b"identity", registry.key().as_ref(), identity_account.wallet.key().as_ref()],
-            bump = identity_account.bump,
+            seeds = [b"identity", registry.key().as_ref(), identity_account_owner.key().as_ref()],
+            bump = identity_account.load()?.bump,
         )]
-        pub identity_account: Account<'info, IdentityAccount>,
+        pub identity_account: AccountLoader<'info, IdentityAccount>,
+        /// CHECK: used for PDA derivation
+        pub identity_account_owner: AccountInfo<'info>,
 
         /// The person updating (must be identity owner or registry admin)
         pub owner: Signer<'info>,
@@ -162,11 +164,13 @@ pub mod identity_registry {
         /// IdentityAccount PDA (will be closed, SOL returned to owner)
         #[account(
             mut,
-            seeds = [b"identity", registry.key().as_ref(), identity_account.wallet.key().as_ref()],
-            bump = identity_account.bump,
+            seeds = [b"identity", registry.key().as_ref(), identity_account_owner.key().as_ref()],
+            bump = identity_account.load()?.bump,
             close = owner // Return remaining SOL to owner
         )]
-        pub identity_account: Account<'info, IdentityAccount>,
+        pub identity_account: AccountLoader<'info, IdentityAccount>,
+        /// CHECK: used for PDA derivation
+        pub identity_account_owner: AccountInfo<'info>,
 
         /// Recipient for remaining SOL (must be identity owner)
         pub owner: Signer<'info>,
@@ -195,16 +199,13 @@ pub mod identity_registry {
         // SECURITY CHECK: Wallet must match owner
         require!(wallet == ctx.accounts.owner.key(), ErrorCode::WalletMismatch);
 
-        let identity_account = &mut ctx.accounts.identity_account;
+        let mut identity_account = ctx.accounts.identity_account.load_init()?;
 
         // Initialize the IdentityAccount PDA
         identity_account.wallet = ctx.accounts.owner.key();
         identity_account.identity = identity;
-        identity_account.name = String::from("");
-        identity_account.symbol = String::from("");
-        identity_account.identity_data = String::from("");
-        identity_account.metadata_uri = String::from("");
         identity_account.bump = ctx.bumps.identity_account;
+        // String fields are initialized to zeros by load_init (Pod)
 
         // Emit event for audit trail
         emit!(IdentityRegisteredEvent {
@@ -241,15 +242,15 @@ pub mod identity_registry {
         let identity_data_clone = identity_data.clone();
         let metadata_uri_clone = metadata_uri.clone();
 
-        let identity_account = &mut ctx.accounts.identity_account;
+        let mut identity_account = ctx.accounts.identity_account.load_init()?;
 
         // Initialize the IdentityAccount PDA with full data
         identity_account.wallet = ctx.accounts.owner.key();
         identity_account.identity = wallet;
-        identity_account.name = name;
-        identity_account.symbol = symbol;
-        identity_account.identity_data = identity_data;
-        identity_account.metadata_uri = metadata_uri;
+        crate::states::copy_str_to_bytes(&name, &mut identity_account.name);
+        crate::states::copy_str_to_bytes(&symbol, &mut identity_account.symbol);
+        crate::states::copy_str_to_bytes(&identity_data, &mut identity_account.identity_data);
+        crate::states::copy_str_to_bytes(&metadata_uri, &mut identity_account.metadata_uri);
         identity_account.bump = ctx.bumps.identity_account;
 
         // Emit event with full identity data for audit trail
@@ -275,7 +276,7 @@ pub mod identity_registry {
         identity_data: Option<String>,
         metadata_uri: Option<String>,
     ) -> Result<()> {
-        let identity_account = &mut ctx.accounts.identity_account;
+        let mut identity_account = ctx.accounts.identity_account.load_mut()?;
         let caller = ctx.accounts.owner.key();
 
         // SECURITY CHECK: Ownership verification
@@ -299,19 +300,19 @@ pub mod identity_registry {
         identity_account.identity = new_identity;
         if let Some(n) = name {
             require!(n.len() <= MAX_NAME_LENGTH, ErrorCode::StringTooLong);
-            identity_account.name = n;
+            crate::states::copy_str_to_bytes(&n, &mut identity_account.name);
         }
         if let Some(s) = symbol {
             require!(s.len() <= MAX_SYMBOL_LENGTH, ErrorCode::StringTooLong);
-            identity_account.symbol = s;
+            crate::states::copy_str_to_bytes(&s, &mut identity_account.symbol);
         }
         if let Some(d) = identity_data {
             require!(d.len() <= MAX_IDENTITY_DATA_LENGTH, ErrorCode::StringTooLong);
-            identity_account.identity_data = d;
+            crate::states::copy_str_to_bytes(&d, &mut identity_account.identity_data);
         }
         if let Some(u) = metadata_uri {
             require!(u.len() <= MAX_METADATA_URI_LENGTH, ErrorCode::StringTooLong);
-            identity_account.metadata_uri = u;
+            crate::states::copy_str_to_bytes(&u, &mut identity_account.metadata_uri);
         }
 
         msg!("Identity updated for wallet: {} (by {})", identity_account.wallet, caller);
@@ -320,7 +321,7 @@ pub mod identity_registry {
 
     /// Remove an identity mapping
     pub fn remove_identity(ctx: Context<RemoveIdentity>) -> Result<()> {
-        let identity_account = &ctx.accounts.identity_account;
+        let identity_account = ctx.accounts.identity_account.load()?;
         let caller = ctx.accounts.owner.key();
 
         // SECURITY CHECK: Ownership verification

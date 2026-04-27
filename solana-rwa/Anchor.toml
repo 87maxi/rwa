@@ -6,9 +6,9 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-compliance_aggregator = "7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb"
-solana_rwa = "2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX"
-identity_registry = "5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce"
+compliance_aggregator = "9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7"
+solana_rwa = "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe"
+identity_registry = "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc"
 
 [registry]
 url = "https://api.apr.dev"

@@ -26,7 +26,7 @@
 use anchor_lang::prelude::*;
 
 // declare_id!() = the program's on-chain address
-declare_id!("7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb");
+declare_id!("9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7");
 
 // Module declarations
 pub mod constants;
@@ -106,7 +106,7 @@ pub mod compliance_aggregator {
             bump,
             space = 8 + std::mem::size_of::<TokenComplianceAccount>()
         )]
-        pub token_compliance: Account<'info, TokenComplianceAccount>,
+        pub token_compliance: AccountLoader<'info, TokenComplianceAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -128,10 +128,12 @@ pub mod compliance_aggregator {
         /// TokenComplianceAccount PDA (will be updated)
         #[account(
             mut,
-            seeds = [b"compliance", aggregator.key().as_ref(), token_compliance.token.key().as_ref()],
-            bump = token_compliance.bump,
+            seeds = [b"compliance", aggregator.key().as_ref(), token_compliance_token.key().as_ref()],
+            bump = token_compliance.load()?.bump,
         )]
-        pub token_compliance: Account<'info, TokenComplianceAccount>,
+        pub token_compliance: AccountLoader<'info, TokenComplianceAccount>,
+        /// CHECK: used for PDA derivation
+        pub token_compliance_token: AccountInfo<'info>,
     }
 
     /// RemoveModule instruction - removes a module from TokenComplianceAccount PDA
@@ -152,11 +154,13 @@ pub mod compliance_aggregator {
         /// TokenComplianceAccount PDA (will be updated or closed)
         #[account(
             mut,
-            seeds = [b"compliance", aggregator.key().as_ref(), token_compliance.token.key().as_ref()],
-            bump = token_compliance.bump,
+            seeds = [b"compliance", aggregator.key().as_ref(), token_compliance_token.key().as_ref()],
+            bump = token_compliance.load()?.bump,
             close = owner // Close if last module removed
         )]
-        pub token_compliance: Account<'info, TokenComplianceAccount>,
+        pub token_compliance: AccountLoader<'info, TokenComplianceAccount>,
+        /// CHECK: used for PDA derivation
+        pub token_compliance_token: AccountInfo<'info>,
     }
 
     /// GetAggregatorState instruction - reads the aggregator PDA (read-only)
@@ -186,9 +190,9 @@ pub mod compliance_aggregator {
         /// TokenComplianceAccount PDA (read-only)
         #[account(
             seeds = [b"compliance", aggregator.key().as_ref(), token.key().as_ref()],
-            bump,
+            bump = token_compliance.load()?.bump,
         )]
-        pub token_compliance: Account<'info, TokenComplianceAccount>,
+        pub token_compliance: AccountLoader<'info, TokenComplianceAccount>,
     }
 
     // =================================================================
@@ -214,15 +218,13 @@ pub mod compliance_aggregator {
         // SECURITY CHECK: Only owner can add modules
         require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
-        let token_compliance = &mut ctx.accounts.token_compliance;
+        let mut token_compliance = ctx.accounts.token_compliance.load_init()?;
 
         // Initialize the TokenComplianceAccount PDA
         token_compliance.token = token;
-        token_compliance.modules = Vec::new();
+        token_compliance.module_count = 1;
+        token_compliance.modules[0] = module;
         token_compliance.bump = ctx.bumps.token_compliance;
-
-        // Add the module
-        token_compliance.modules.push(module);
 
         emit!(ModuleAddedEvent {
             token,
@@ -242,13 +244,23 @@ pub mod compliance_aggregator {
         // SECURITY CHECK: Only owner can add modules
         require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
-        let token_compliance = &mut ctx.accounts.token_compliance;
+        let mut token_compliance = ctx.accounts.token_compliance.load_mut()?;
 
-        // Check for duplicate module (CRIT-03 FIX)
-        require!(!token_compliance.modules.contains(&module), crate::errors::ErrorCode::DuplicateModule);
+        // Check for duplicate module
+        let mut already_exists = false;
+        for i in 0..(token_compliance.module_count as usize) {
+            if token_compliance.modules[i] == module {
+                already_exists = true;
+                break;
+            }
+        }
+        require!(!already_exists, crate::errors::ErrorCode::DuplicateModule);
 
         // Add the module
-        token_compliance.modules.push(module);
+        let count = token_compliance.module_count as usize;
+        require!(count < token_compliance.modules.len(), crate::errors::ErrorCode::Unauthorized);
+        token_compliance.modules[count] = module;
+        token_compliance.module_count += 1;
 
         emit!(ModuleAddedEvent {
             token: token_compliance.token,
@@ -268,13 +280,26 @@ pub mod compliance_aggregator {
         // SECURITY CHECK: Only owner can remove modules
         require!(ctx.accounts.aggregator.owner == ctx.accounts.owner.key(), crate::errors::ErrorCode::Unauthorized);
 
-        let token_compliance = &mut ctx.accounts.token_compliance;
+        let mut token_compliance = ctx.accounts.token_compliance.load_mut()?;
+
+        let mut index = None;
+        for i in 0..(token_compliance.module_count as usize) {
+            if token_compliance.modules[i] == module {
+                index = Some(i);
+                break;
+            }
+        }
 
         // Verify module exists before removing
-        require!(token_compliance.modules.contains(&module), crate::errors::ErrorCode::TokenNotRegistered);
+        require!(index.is_some(), crate::errors::ErrorCode::TokenNotRegistered);
 
         // Remove the specified module
-        token_compliance.modules.retain(|&m| m != module);
+        if let Some(i) = index {
+            let last_idx = (token_compliance.module_count - 1) as usize;
+            token_compliance.modules[i] = token_compliance.modules[last_idx];
+            token_compliance.modules[last_idx] = Pubkey::default();
+            token_compliance.module_count -= 1;
+        }
 
         emit!(ModuleRemovedEvent {
             token: token_compliance.token,
@@ -298,8 +323,8 @@ pub mod compliance_aggregator {
 
     /// Get module count for a token
     pub fn get_module_count(ctx: Context<GetModules>) -> Result<u64> {
-        let count = ctx.accounts.token_compliance.modules.len() as u64;
-        Ok(count)
+        let token_compliance = ctx.accounts.token_compliance.load()?;
+        Ok(token_compliance.module_count as u64)
     }
 
     /// Check if a transfer is allowed (compliance check)
@@ -390,9 +415,9 @@ pub mod compliance_aggregator {
         }
 
         // Check modules for this token
-        let modules = &ctx.accounts.token_compliance.modules;
+        let token_compliance = ctx.accounts.token_compliance.load()?;
 
-        if modules.is_empty() {
+        if token_compliance.module_count == 0 {
             emit!(TransferCheckEvent {
                 token,
                 from,
@@ -444,7 +469,9 @@ pub mod compliance_aggregator {
 
     /// Get all compliance modules for a token
     pub fn get_modules(ctx: Context<GetModules>) -> Result<Vec<Pubkey>> {
-        Ok(ctx.accounts.token_compliance.modules.clone())
+        let token_compliance = ctx.accounts.token_compliance.load()?;
+        let count = token_compliance.module_count as usize;
+        Ok(token_compliance.modules[..count].to_vec())
     }
 }
 

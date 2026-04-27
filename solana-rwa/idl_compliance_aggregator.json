@@ -1,5 +1,5 @@
 {
-  "address": "7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb",
+  "address": "9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7",
   "metadata": {
     "name": "compliance_aggregator",
     "version": "0.1.0",
@@ -191,11 +191,13 @@
               },
               {
                 "kind": "account",
-                "path": "token_compliance.token",
-                "account": "TokenComplianceAccount"
+                "path": "token_compliance_token"
               }
             ]
           }
+        },
+        {
+          "name": "token_compliance_token"
         }
       ],
       "args": [
@@ -674,11 +676,13 @@
               },
               {
                 "kind": "account",
-                "path": "token_compliance.token",
-                "account": "TokenComplianceAccount"
+                "path": "token_compliance_token"
               }
             ]
           }
+        },
+        {
+          "name": "token_compliance_token"
         }
       ],
       "args": [
@@ -902,6 +906,10 @@
         "TokenComplianceAccount stores compliance modules for a specific token.",
         "It is stored as a PDA with seeds: [b\"compliance\", aggregator_pubkey, token_pubkey]"
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -912,12 +920,28 @@
           {
             "name": "modules",
             "type": {
-              "vec": "pubkey"
+              "array": [
+                "pubkey",
+                10
+              ]
             }
+          },
+          {
+            "name": "module_count",
+            "type": "u8"
           },
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }

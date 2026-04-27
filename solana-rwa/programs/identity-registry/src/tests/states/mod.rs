@@ -35,25 +35,29 @@ mod tests {
     // =================================================================
     // IdentityAccount Tests
     // =================================================================
-
     #[test]
     fn test_identity_account_structure() {
         let wallet = Pubkey::new_unique();
         let identity = Pubkey::new_unique();
-        let account = IdentityAccount {
+        let mut account = IdentityAccount {
             wallet,
             identity,
-            name: "KYC".to_string(),
-            symbol: "K".to_string(),
-            identity_data: "verified".to_string(),
-            metadata_uri: "https://example.com/metadata".to_string(),
+            name: [0; 32],
+            symbol: [0; 10],
+            identity_data: [0; 64],
+            metadata_uri: [0; 128],
             bump: 7,
+            _padding: [0; 5],
         };
+        crate::states::copy_str_to_bytes("KYC", &mut account.name);
+        crate::states::copy_str_to_bytes("K", &mut account.symbol);
+        crate::states::copy_str_to_bytes("verified", &mut account.identity_data);
+        crate::states::copy_str_to_bytes("https://example.com/metadata", &mut account.metadata_uri);
 
         assert_eq!(account.wallet, wallet);
         assert_eq!(account.identity, identity);
-        assert_eq!(account.name, "KYC");
-        assert_eq!(account.symbol, "K");
+        assert_eq!(crate::states::bytes_to_str(&account.name), "KYC");
+        assert_eq!(crate::states::bytes_to_str(&account.symbol), "K");
         assert_eq!(account.bump, 7);
     }
 
@@ -62,14 +66,15 @@ mod tests {
         let account = IdentityAccount {
             wallet: Pubkey::new_unique(),
             identity: Pubkey::new_unique(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            identity_data: "".to_string(),
-            metadata_uri: "".to_string(),
+            name: [0; 32],
+            symbol: [0; 10],
+            identity_data: [0; 64],
+            metadata_uri: [0; 128],
             bump: 1,
+            _padding: [0; 5],
         };
 
-        assert_eq!(account.name.len(), 0);
-        assert_eq!(account.symbol.len(), 0);
+        assert_eq!(crate::states::bytes_to_str(&account.name).len(), 0);
+        assert_eq!(crate::states::bytes_to_str(&account.symbol).len(), 0);
     }
 }

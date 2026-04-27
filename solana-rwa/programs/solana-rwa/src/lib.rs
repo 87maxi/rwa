@@ -64,11 +64,11 @@ pub mod pdas;
 pub mod tests;
 
 // declare_id!() = the program's on-chain address
-declare_id!("2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX");
+declare_id!("6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe");
 
 // Re-export all public items for easy access
 pub use constants::MAX_SUPPLY;
-pub use states::{TokenState, BalanceAccount, FrozenAccount, AgentAccount, SupplyInfo};
+pub use states::{TokenState, BalanceAccount, FrozenAccount, AgentAccount, SupplyInfo, ACCOUNT_FROZEN, ACCOUNT_ACTIVE};
 pub use events::{OwnerTransferredEvent, TokensMintedEvent, AccountFrozenEvent, AccountUnfrozenEvent, FreezeAuthorityTransferredEvent};
 pub use errors::ErrorCode;
 pub use pdas::{derive_balance_pda, derive_frozen_pda, derive_agent_pda};
@@ -96,9 +96,9 @@ pub mod solana_rwa {
             payer = payer,
             seeds = [b"token", payer.key().as_ref()],
             bump,
-            space = 8 + 32 + 32 + 36 + 14 + 1 + 8 + 8 + 1  // discriminator(8) + owner(32) + freeze_authority(32) + name(4+32) + symbol(4+10) + decimals(1) + total_supply(8) + next_index(8) + bump(1) = 144
+            space = 8 + std::mem::size_of::<TokenState>()
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
 
         /// Solana's system program (required for account creation)
         pub system_program: Program<'info, System>,
@@ -110,21 +110,25 @@ pub mod solana_rwa {
         /// Token state account (will be modified - total_supply updated)
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Agent performing the mint (must be authorized by token owner)
         pub agent: Signer<'info>,
 
+        /// CHECK: Recipient wallet (used for PDA derivation)
+        pub recipient: AccountInfo<'info>,
         /// Individual balance PDA for the recipient
         #[account(
             mut,
-            seeds = [b"balance", token.key().as_ref(), balance_account.wallet.as_ref()],
+            seeds = [b"balance", token.key().as_ref(), recipient.key().as_ref()],
             bump,
         )]
-        pub balance_account: Account<'info, BalanceAccount>,
+        pub balance_account: AccountLoader<'info, BalanceAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -136,10 +140,12 @@ pub mod solana_rwa {
         /// Token state account (will be modified)
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Agent performing the burn (must be authorized)
         pub agent: Signer<'info>,
@@ -154,7 +160,7 @@ pub mod solana_rwa {
             seeds = [b"balance", token.key().as_ref(), sender.key().as_ref()],
             bump,
         )]
-        pub balance_account: Account<'info, BalanceAccount>,
+        pub balance_account: AccountLoader<'info, BalanceAccount>,
 
         /// System program for rent return
         pub system_program: Program<'info, System>,
@@ -165,10 +171,12 @@ pub mod solana_rwa {
     pub struct Transfer<'info> {
         /// Token state account (metadata only, total_supply unchanged)
         #[account(
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Sender: must sign to prove ownership
         pub from: Signer<'info>,
@@ -179,15 +187,18 @@ pub mod solana_rwa {
             seeds = [b"balance", token.key().as_ref(), from.key().as_ref()],
             bump,
         )]
-        pub from_balance: Account<'info, BalanceAccount>,
+        pub from_balance: AccountLoader<'info, BalanceAccount>,
 
+        /// Receiver's wallet (used for PDA derivation)
+        /// CHECK: Receiver address
+        pub receiver: AccountInfo<'info>,
         /// Receiver's individual balance PDA (will be credited)
         #[account(
             mut,
-            seeds = [b"balance", token.key().as_ref(), to_balance.wallet.as_ref()],
+            seeds = [b"balance", token.key().as_ref(), receiver.key().as_ref()],
             bump,
         )]
-        pub to_balance: Account<'info, BalanceAccount>,
+        pub to_balance: AccountLoader<'info, BalanceAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -199,10 +210,12 @@ pub mod solana_rwa {
         /// Token state account (will be modified)
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Must be the token owner
         #[account(mut)]
@@ -220,7 +233,7 @@ pub mod solana_rwa {
             bump,
             space = 8 + std::mem::size_of::<AgentAccount>()
         )]
-        pub agent_account: Account<'info, AgentAccount>,
+        pub agent_account: AccountLoader<'info, AgentAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -232,22 +245,27 @@ pub mod solana_rwa {
         /// Token state account
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Must be the token owner (receives returned SOL)
         pub payer: Signer<'info>,
 
+        /// Agent wallet (used for PDA derivation)
+        /// CHECK: Agent address
+        pub agent_to_remove: AccountInfo<'info>,
         /// Agent account to close (SOL returned to payer)
         #[account(
             mut,
-            seeds = [b"agent", token.key().as_ref(), agent_account.agent.as_ref()],
+            seeds = [b"agent", token.key().as_ref(), agent_to_remove.key().as_ref()],
             bump,
             close = payer
         )]
-        pub agent_account: Account<'info, AgentAccount>,
+        pub agent_account: AccountLoader<'info, AgentAccount>,
     }
 
     /// GetSupplyInfo instruction - query current supply information (read-only)
@@ -255,10 +273,12 @@ pub mod solana_rwa {
     pub struct GetSupplyInfo<'info> {
         /// Token state account (read-only)
         #[account(
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
     }
 
     /// TransferOwner instruction - transfers the token ownership
@@ -267,10 +287,12 @@ pub mod solana_rwa {
         /// Token state account (owner field will be modified)
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Current owner (must sign to authorize transfer)
         pub current_owner: Signer<'info>,
@@ -281,21 +303,26 @@ pub mod solana_rwa {
     pub struct FreezeAccount<'info> {
         /// Token state account
         #[account(
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Authority performing the freeze (must be freeze_authority)
         pub authority: Signer<'info>,
 
+        /// Wallet to freeze/unfreeze (used for PDA derivation)
+        /// CHECK: Wallet address
+        pub wallet_to_freeze: AccountInfo<'info>,
         /// Frozen status PDA (will be created if not exists)
         #[account(
             mut,
-            seeds = [b"frozen", token.key().as_ref(), frozen_account.wallet.as_ref()],
+            seeds = [b"frozen", token.key().as_ref(), wallet_to_freeze.key().as_ref()],
             bump,
         )]
-        pub frozen_account: Account<'info, FrozenAccount>,
+        pub frozen_account: AccountLoader<'info, FrozenAccount>,
 
         /// System program for account creation
         pub system_program: Program<'info, System>,
@@ -306,17 +333,19 @@ pub mod solana_rwa {
     pub struct UnfreezeAccount<'info> {
         /// Token state account
         #[account(
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
 
         /// Authority performing the unfreeze
         pub authority: Signer<'info>,
 
         /// Frozen status PDA (must exist to be modified)
         #[account(mut)]
-        pub frozen_account: Account<'info, FrozenAccount>,
+        pub frozen_account: AccountLoader<'info, FrozenAccount>,
     }
 
     /// TransferFreezeAuthority instruction - transfers the freeze authority
@@ -325,11 +354,13 @@ pub mod solana_rwa {
         /// Token state account (freeze_authority field will be modified)
         #[account(
             mut,
-            seeds = [b"token", token.owner.as_ref()],
-            bump = token.bump,
+            seeds = [b"token", token_owner.key().as_ref()],
+            bump = token.load()?.bump,
         )]
-        pub token: Account<'info, TokenState>,
-
+        pub token: AccountLoader<'info, TokenState>,
+        /// CHECK: used for PDA derivation
+        pub token_owner: AccountInfo<'info>,
+        
         /// Current freeze authority (must sign to authorize transfer)
         pub current_freeze_authority: Signer<'info>,
     }
@@ -340,16 +371,14 @@ pub mod solana_rwa {
 
     /// Initialize a new token
     pub fn initialize(ctx: Context<Initialize>, name: String, symbol: String, decimals: u8) -> Result<()> {
-        require!(name.len() <= 32, ErrorCode::InvalidString);
-        require!(symbol.len() <= 10, ErrorCode::InvalidString);
-        let token = &mut ctx.accounts.token;
+        let mut token = ctx.accounts.token.load_init()?;
         
         msg!("Token initialized: {} ({}) with {} decimals", name, symbol, decimals);
 
         token.owner = ctx.accounts.payer.key();
         token.freeze_authority = ctx.accounts.payer.key();
-        token.name = name;
-        token.symbol = symbol;
+        crate::states::copy_str_to_bytes(&name, &mut token.name);
+        crate::states::copy_str_to_bytes(&symbol, &mut token.symbol);
         token.decimals = decimals;
         token.total_supply = 0;
         token.next_index = 0;
@@ -360,8 +389,8 @@ pub mod solana_rwa {
 
     /// Mint new tokens
     pub fn mint(ctx: Context<Mint>, amount: u64) -> Result<()> {
-        let token = &mut ctx.accounts.token;
-        let balance_account = &mut ctx.accounts.balance_account;
+        let mut token = ctx.accounts.token.load_mut()?;
+        let mut balance_account = ctx.accounts.balance_account.load_mut()?;
 
         require!(token.owner == ctx.accounts.agent.key(), ErrorCode::Unauthorized);
         require!(amount > 0, ErrorCode::InvalidAmount);
@@ -372,8 +401,8 @@ pub mod solana_rwa {
 
         token.total_supply = new_supply;
 
-        // Initialize balance account if zero balance
-        if balance_account.balance == 0 {
+        // Initialize balance account if zero balance (using pubkey check as default wallet is 0)
+        if balance_account.wallet == Pubkey::default() {
             balance_account.wallet = ctx.accounts.agent.key();
         }
         balance_account.balance = balance_account.balance.checked_add(amount)
@@ -392,8 +421,8 @@ pub mod solana_rwa {
 
     /// Burn tokens
     pub fn burn(ctx: Context<Burn>, from: Pubkey, amount: u64) -> Result<()> {
-        let token = &mut ctx.accounts.token;
-        let balance_account = &mut ctx.accounts.balance_account;
+        let mut token = ctx.accounts.token.load_mut()?;
+        let mut balance_account = ctx.accounts.balance_account.load_mut()?;
 
         require!(token.owner == ctx.accounts.agent.key(), ErrorCode::Unauthorized);
         require!(balance_account.balance >= amount, ErrorCode::InsufficientBalance);
@@ -408,9 +437,9 @@ pub mod solana_rwa {
 
     /// Transfer tokens
     pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
-        let _token = &ctx.accounts.token;
-        let from_balance = &mut ctx.accounts.from_balance;
-        let to_balance = &mut ctx.accounts.to_balance;
+        let token = ctx.accounts.token.load()?;
+        let mut from_balance = ctx.accounts.from_balance.load_mut()?;
+        let mut to_balance = ctx.accounts.to_balance.load_mut()?;
         let from_key = ctx.accounts.from.key();
         let to_key = to_balance.wallet;
 
@@ -428,15 +457,15 @@ pub mod solana_rwa {
 
     /// Freeze an account
     pub fn freeze_account(ctx: Context<FreezeAccount>, account: Pubkey) -> Result<()> {
-        let token = &ctx.accounts.token;
-        let frozen_account = &mut ctx.accounts.frozen_account;
+        let token = ctx.accounts.token.load()?;
+        let mut frozen_account = ctx.accounts.frozen_account.load_mut()?;
 
         require!(token.freeze_authority == ctx.accounts.authority.key(), ErrorCode::NotFreezeAuthority);
 
         if frozen_account.wallet == Pubkey::default() {
             frozen_account.wallet = account;
         }
-        frozen_account.frozen = true;
+        frozen_account.frozen = ACCOUNT_FROZEN;
 
         emit!(AccountFrozenEvent {
             account,
@@ -449,12 +478,12 @@ pub mod solana_rwa {
 
     /// Unfreeze an account
     pub fn unfreeze_account(ctx: Context<UnfreezeAccount>, account: Pubkey) -> Result<()> {
-        let token = &ctx.accounts.token;
+        let token = ctx.accounts.token.load()?;
 
         require!(token.freeze_authority == ctx.accounts.authority.key(), ErrorCode::NotFreezeAuthority);
 
-        let frozen_account = &mut ctx.accounts.frozen_account;
-        frozen_account.frozen = false;
+        let mut frozen_account = ctx.accounts.frozen_account.load_mut()?;
+        frozen_account.frozen = ACCOUNT_ACTIVE;
 
         emit!(AccountUnfrozenEvent {
             account,
@@ -467,7 +496,7 @@ pub mod solana_rwa {
 
     /// TransferOwner instruction handler
     pub fn transfer_owner(ctx: Context<TransferOwner>, new_owner: Pubkey) -> Result<()> {
-        let token = &mut ctx.accounts.token;
+        let mut token = ctx.accounts.token.load_mut()?;
 
         require!(token.owner == ctx.accounts.current_owner.key(), ErrorCode::Unauthorized);
         require!(token.owner != new_owner, ErrorCode::SameOwner);
@@ -490,7 +519,7 @@ pub mod solana_rwa {
         ctx: Context<TransferFreezeAuthority>,
         new_freeze_authority: Pubkey,
     ) -> Result<()> {
-        let token = &mut ctx.accounts.token;
+        let mut token = ctx.accounts.token.load_mut()?;
 
         require!(
             token.freeze_authority == ctx.accounts.current_freeze_authority.key(),
@@ -521,7 +550,7 @@ pub mod solana_rwa {
 
     /// GetSupplyInfo query function
     pub fn get_supply_info(ctx: Context<GetSupplyInfo>) -> Result<SupplyInfo> {
-        let token = &ctx.accounts.token;
+        let token = ctx.accounts.token.load()?;
         
         let current_supply = token.total_supply;
         let remaining_supply = MAX_SUPPLY.checked_sub(current_supply)
@@ -536,11 +565,11 @@ pub mod solana_rwa {
 
     /// Add an agent
     pub fn add_agent(ctx: Context<AddAgent>, agent: Pubkey) -> Result<()> {
-        let token = &mut ctx.accounts.token;
+        let mut token = ctx.accounts.token.load_mut()?;
 
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
 
-        let agent_account = &mut ctx.accounts.agent_account;
+        let mut agent_account = ctx.accounts.agent_account.load_init()?;
         agent_account.agent = agent;
         agent_account.bump = ctx.bumps.agent_account;
 
@@ -550,8 +579,8 @@ pub mod solana_rwa {
 
     /// Remove an agent
     pub fn remove_agent(ctx: Context<RemoveAgent>) -> Result<()> {
-        let token = &ctx.accounts.token;
-        let agent_key = ctx.accounts.agent_account.agent;
+        let token = ctx.accounts.token.load()?;
+        let agent_key = ctx.accounts.agent_account.load()?.agent;
 
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
 

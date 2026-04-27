@@ -1,5 +1,5 @@
 {
-  "address": "2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX",
+  "address": "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe",
   "metadata": {
     "name": "solana_rwa",
     "version": "0.1.0",
@@ -43,11 +43,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "payer",
@@ -143,11 +145,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "agent",
@@ -249,11 +253,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "authority",
@@ -261,6 +267,12 @@
             "Authority performing the freeze (must be freeze_authority)"
           ],
           "signer": true
+        },
+        {
+          "name": "wallet_to_freeze",
+          "docs": [
+            "Wallet to freeze/unfreeze (used for PDA derivation)"
+          ]
         },
         {
           "name": "frozen_account",
@@ -287,8 +299,7 @@
               },
               {
                 "kind": "account",
-                "path": "frozen_account.wallet",
-                "account": "FrozenAccount"
+                "path": "wallet_to_freeze"
               }
             ]
           }
@@ -343,11 +354,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         }
       ],
       "args": [],
@@ -466,11 +479,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "agent",
@@ -478,6 +493,9 @@
             "Agent performing the mint (must be authorized by token owner)"
           ],
           "signer": true
+        },
+        {
+          "name": "recipient"
         },
         {
           "name": "balance_account",
@@ -505,8 +523,7 @@
               },
               {
                 "kind": "account",
-                "path": "balance_account.wallet",
-                "account": "BalanceAccount"
+                "path": "recipient"
               }
             ]
           }
@@ -562,11 +579,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "payer",
@@ -574,6 +593,12 @@
             "Must be the token owner (receives returned SOL)"
           ],
           "signer": true
+        },
+        {
+          "name": "agent_to_remove",
+          "docs": [
+            "Agent wallet (used for PDA derivation)"
+          ]
         },
         {
           "name": "agent_account",
@@ -599,8 +624,7 @@
               },
               {
                 "kind": "account",
-                "path": "agent_account.agent",
-                "account": "AgentAccount"
+                "path": "agent_to_remove"
               }
             ]
           }
@@ -643,11 +667,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "from",
@@ -688,6 +714,12 @@
           }
         },
         {
+          "name": "receiver",
+          "docs": [
+            "Receiver's wallet (used for PDA derivation)"
+          ]
+        },
+        {
           "name": "to_balance",
           "docs": [
             "Receiver's individual balance PDA (will be credited)"
@@ -713,8 +745,7 @@
               },
               {
                 "kind": "account",
-                "path": "to_balance.wallet",
-                "account": "BalanceAccount"
+                "path": "receiver"
               }
             ]
           }
@@ -770,11 +801,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "current_freeze_authority",
@@ -827,11 +860,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "current_owner",
@@ -883,11 +918,13 @@
               },
               {
                 "kind": "account",
-                "path": "token.owner",
-                "account": "TokenState"
+                "path": "token_owner"
               }
             ]
           }
+        },
+        {
+          "name": "token_owner"
         },
         {
           "name": "authority",
@@ -991,6 +1028,32 @@
         183,
         39,
         61
+      ]
+    },
+    {
+      "name": "AgentAddedEvent",
+      "discriminator": [
+        102,
+        33,
+        66,
+        117,
+        74,
+        229,
+        75,
+        88
+      ]
+    },
+    {
+      "name": "AgentRemovedEvent",
+      "discriminator": [
+        230,
+        121,
+        232,
+        246,
+        203,
+        30,
+        3,
+        195
       ]
     },
     {
@@ -1129,6 +1192,10 @@
         "AgentAccount stores an authorized agent.",
         "Seeds: [b\"agent\", token_pubkey, agent_pubkey]"
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -1139,6 +1206,55 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentAddedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentRemovedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "removed_by",
+            "type": "pubkey"
           }
         ]
       }
@@ -1149,6 +1265,10 @@
         "BalanceAccount stores a single wallet's token balance.",
         "Seeds: [b\"balance\", token_pubkey, wallet_pubkey]"
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -1163,6 +1283,15 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
           }
         ]
       }
@@ -1193,6 +1322,10 @@
         "FrozenAccount stores the frozen status of a wallet account.",
         "Seeds: [b\"frozen\", token_pubkey, wallet_pubkey]"
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -1202,11 +1335,20 @@
           },
           {
             "name": "frozen",
-            "type": "bool"
+            "type": "u8"
           },
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }
@@ -1258,8 +1400,12 @@
       "name": "TokenState",
       "docs": [
         "TokenState is the main control account for the token program.",
-        "It is stored as a PDA with seeds [b\"token\"]."
+        "It is stored as a PDA with seeds [b\"token\", owner]."
       ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -1272,18 +1418,6 @@
             "type": "pubkey"
           },
           {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "symbol",
-            "type": "string"
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
             "name": "total_supply",
             "type": "u64"
           },
@@ -1292,8 +1426,39 @@
             "type": "u64"
           },
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "symbol",
+            "type": {
+              "array": [
+                "u8",
+                10
+              ]
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
           }
         ]
       }

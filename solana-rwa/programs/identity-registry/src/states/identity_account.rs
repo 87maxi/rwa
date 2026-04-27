@@ -3,14 +3,15 @@ use anchor_lang::prelude::*;
 /// IdentityAccount stores a single identity record using a PDA.
 ///
 /// Seeds: [b"identity", registry_pubkey, wallet_pubkey]
-#[account]
-#[derive(Default)]
+#[account(zero_copy)]
+#[repr(C)]
 pub struct IdentityAccount {
-    pub wallet: Pubkey,           // The owner of this identity
-    pub identity: Pubkey,         // The identity credential
-    pub name: String,             // Human-readable name
-    pub symbol: String,           // Short symbol
-    pub identity_data: String,    // Additional identity data
-    pub metadata_uri: String,     // URI to metadata
-    pub bump: u8,                 // PDA bump
-}
+    pub wallet: Pubkey,           // 32
+    pub identity: Pubkey,         // 32
+    pub name: [u8; 32],           // 32
+    pub identity_data: [u8; 64],  // 64
+    pub metadata_uri: [u8; 128], // 128
+    pub symbol: [u8; 10],         // 10
+    pub bump: u8,                 // 1
+    pub _padding: [u8; 5],        // 5
+} // Total: 304 bytes (8-byte aligned)

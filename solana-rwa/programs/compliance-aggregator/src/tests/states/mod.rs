@@ -29,15 +29,24 @@ mod tests {
     #[test]
     fn test_token_compliance_account_structure() {
         let token = Pubkey::new_unique();
-        let modules = vec![Pubkey::new_unique(), Pubkey::new_unique()];
+        let mut modules = [Pubkey::default(); 10];
+        let mod1 = Pubkey::new_unique();
+        let mod2 = Pubkey::new_unique();
+        modules[0] = mod1;
+        modules[1] = mod2;
+        
         let account = TokenComplianceAccount {
             token,
             modules,
+            module_count: 2,
             bump: 5,
+            _padding: [0; 6],
         };
-
+ 
         assert_eq!(account.token, token);
-        assert_eq!(account.modules.len(), 2);
+        assert_eq!(account.module_count, 2);
+        assert_eq!(account.modules[0], mod1);
+        assert_eq!(account.modules[1], mod2);
         assert_eq!(account.bump, 5);
     }
 
@@ -45,24 +54,31 @@ mod tests {
     fn test_token_compliance_account_empty_modules() {
         let account = TokenComplianceAccount {
             token: Pubkey::new_unique(),
-            modules: vec![],
+            modules: [Pubkey::default(); 10],
+            module_count: 0,
             bump: 1,
+            _padding: [0; 6],
         };
-
-        assert_eq!(account.modules.len(), 0);
+ 
+        assert_eq!(account.module_count, 0);
     }
 
     #[test]
     fn test_token_compliance_account_single_module() {
         let token = Pubkey::new_unique();
         let module = Pubkey::new_unique();
+        let mut modules = [Pubkey::default(); 10];
+        modules[0] = module;
+        
         let account = TokenComplianceAccount {
             token,
-            modules: vec![module],
+            modules,
+            module_count: 1,
             bump: 2,
+            _padding: [0; 6],
         };
-
-        assert_eq!(account.modules.len(), 1);
+ 
+        assert_eq!(account.module_count, 1);
         assert_eq!(account.modules[0], module);
     }
 }

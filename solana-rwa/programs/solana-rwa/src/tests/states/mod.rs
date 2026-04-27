@@ -5,7 +5,7 @@ mod tests {
     use super::*;
     use crate::states::token_state::TokenState;
     use crate::states::balance::BalanceAccount;
-    use crate::states::frozen::FrozenAccount;
+    use crate::states::frozen::{FrozenAccount, ACCOUNT_FROZEN, ACCOUNT_ACTIVE};
     use crate::states::agent::AgentAccount;
     use crate::states::supply_info::SupplyInfo;
     use crate::MAX_SUPPLY;
@@ -18,19 +18,22 @@ mod tests {
     #[test]
     fn test_token_state_default_creation() {
         let dummy_pubkey = Pubkey::default();
-        let state = TokenState {
+        let mut state = TokenState {
             owner: dummy_pubkey,
             freeze_authority: dummy_pubkey,
-            name: "Test Token".to_string(),
-            symbol: "TT".to_string(),
+            name: [0; 32],
+            symbol: [0; 10],
             decimals: 9,
             total_supply: 0,
             next_index: 0,
             bump: 255,
+            _padding: [0; 4],
         };
+        crate::states::copy_str_to_bytes("Test Token", &mut state.name);
+        crate::states::copy_str_to_bytes("TT", &mut state.symbol);
 
-        assert_eq!(state.name, "Test Token");
-        assert_eq!(state.symbol, "TT");
+        assert_eq!(crate::states::bytes_to_str(&state.name), "Test Token");
+        assert_eq!(crate::states::bytes_to_str(&state.symbol), "TT");
         assert_eq!(state.decimals, 9);
         assert_eq!(state.total_supply, 0);
         assert_eq!(state.bump, 255);
@@ -47,6 +50,7 @@ mod tests {
             wallet,
             balance: 1000,
             bump: 1,
+            _padding: [0; 7],
         };
 
         assert_eq!(balance_account.wallet, wallet);
@@ -61,6 +65,7 @@ mod tests {
             wallet,
             balance: 0,
             bump: 0,
+            _padding: [0; 7],
         };
 
         assert_eq!(balance_account.balance, 0);
@@ -75,11 +80,12 @@ mod tests {
         let wallet = Pubkey::new_unique();
         let frozen_account = FrozenAccount {
             wallet,
-            frozen: true,
+            frozen: ACCOUNT_FROZEN,
             bump: 2,
+            _padding: [0; 6],
         };
 
-        assert!(frozen_account.frozen);
+        assert_eq!(frozen_account.frozen, ACCOUNT_FROZEN);
     }
 
     #[test]
@@ -87,11 +93,12 @@ mod tests {
         let wallet = Pubkey::new_unique();
         let frozen_account = FrozenAccount {
             wallet,
-            frozen: false,
+            frozen: ACCOUNT_ACTIVE,
             bump: 3,
+            _padding: [0; 6],
         };
 
-        assert!(!frozen_account.frozen);
+        assert_eq!(frozen_account.frozen, ACCOUNT_ACTIVE);
     }
 
     // =================================================================
@@ -104,6 +111,7 @@ mod tests {
         let agent_account = AgentAccount {
             agent,
             bump: 4,
+            _padding: [0; 7],
         };
 
         assert_eq!(agent_account.agent, agent);
