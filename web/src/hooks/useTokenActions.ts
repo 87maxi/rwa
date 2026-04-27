@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 import {
@@ -25,7 +25,7 @@ import {
   buildIdentityRegisterWithDataInstruction,
   buildIdentityUpdateInstruction,
   buildIdentityRemoveInstruction,
-  buildIdentityGetInstruction,
+  getIdentityPda,
   executeTransaction,
 } from '@/anchor/client';
 import {
@@ -76,6 +76,28 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
+  // Refs to stabilize callbacks and avoid exhaustive-deps warnings
+  const signTransactionRef = useRef(signTransaction);
+  const sendTransactionRef = useRef(sendTransaction);
+  const publicKeyRef = useRef(publicKey);
+  const walletRef = useRef(wallet);
+
+  useEffect(() => {
+    signTransactionRef.current = signTransaction;
+  }, [signTransaction]);
+
+  useEffect(() => {
+    sendTransactionRef.current = sendTransaction;
+  }, [sendTransaction]);
+
+  useEffect(() => {
+    publicKeyRef.current = publicKey;
+  }, [publicKey]);
+
+  useEffect(() => {
+    walletRef.current = wallet;
+  }, [wallet]);
+
   // Note: No mounted state needed - actions are triggered by user interaction (not render)
   // so they don't cause hydration mismatch issues
 
@@ -85,62 +107,101 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
   };
 
   /**
-   * Sign and send a transaction using the wallet adapter.
-   * Returns the transaction signature on success.
-   */
-  const signAndSend = useCallback(async (
-    transaction: Transaction,
-    programId: PublicKey
-  ): Promise<string> => {
-    if (!publicKey) {
-      throw new Error('Wallet not connected. Please connect your wallet first.');
-    }
-    if (!signTransaction) {
-      throw new Error('Wallet does not support transaction signing. Please use a wallet like Phantom or Solflare.');
-    }
+    * Sign and send a transaction using the wallet adapter.
+    * Uses sendRawTransaction approach to avoid "Plugin Closed" errors with Backpack.
+    *
+    * Fase 6: Fix para error "Plugin Closed" con Backpack wallet.
+    *
+    * Problema: sendTransaction del wallet-adapter requiere que el plugin permanezca
+    * abierto después de firmar. Backpack cierra el plugin después de firmar,
+    * causando el error "WalletSendTransactionError: Plugin Closed".
+    *
+    * Solución: Usar signTransaction + connection.sendRawTransaction() directamente.
+    * Esto permite que el plugin se cierre después de firmar sin afectar el envío.
+    */
+   const signAndSend = useCallback(async (
+     transaction: Transaction,
+     programId: PublicKey
+   ): Promise<string> => {
+     const currentPublicKey = publicKeyRef.current;
+     if (!currentPublicKey) {
+       throw new Error('Wallet not connected. Please connect your wallet first.');
+     }
+     const currentSignTransaction = signTransactionRef.current;
+     if (!currentSignTransaction) {
+       throw new Error('Wallet does not support transaction signing. Please use a wallet like Phantom or Solflare.');
+     }
 
-    // Get latest blockhash
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+     // Get latest blockhash
+     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
 
-    // Set transaction fields
-    transaction.recentBlockhash = blockhash;
-    transaction.lastValidBlockHeight = lastValidBlockHeight;
-    transaction.feePayer = publicKey;
+     // Set transaction fields
+     transaction.recentBlockhash = blockhash;
+     transaction.lastValidBlockHeight = lastValidBlockHeight;
+     transaction.feePayer = currentPublicKey;
 
-    try {
-      // Sign with wallet - this stores signatures internally in the adapter
-      const signedTransaction = await signTransaction(transaction);
+     try {
+       // Sign with wallet - returns a SerializedTransaction
+       const signedTransaction = await currentSignTransaction(transaction);
 
-      // Send using wallet adapter's sendTransaction which properly handles signatures
-      // The wallet adapter stores signatures internally and sends them with the transaction
-      const sig = await sendTransaction(signedTransaction, connection, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      });
+       // Send using sendRawTransaction instead of wallet adapter's sendTransaction.
+       // This avoids the "Plugin Closed" error because we don't depend on the
+       // wallet plugin being open after signing.
+       const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
+       
+       console.log('[useTokenActions] Sending raw transaction...');
+       const sig = await connection.sendRawTransaction(serializedTransaction, {
+         skipPreflight: false,
+         preflightCommitment: 'confirmed',
+         maxRetries: 3,
+       });
 
-      // Confirm
-      await connection.confirmTransaction(
-        { signature: sig, blockhash, lastValidBlockHeight },
-        'confirmed'
-      );
+       console.log('[useTokenActions] Transaction sent, signature:', sig.slice(0, 32) + '...');
 
-      return sig;
-    } catch (err: unknown) {
-      // Handle wallet rejection
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('User rejected') || message.includes('rejected') || message.includes('User canceled')) {
-        throw new Error('Transaction rejected by user.');
-      }
-      if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
-        throw new Error('Failed to get a valid blockhash. Please try again.');
-      }
-      if (message.includes('No signers') || message.includes('no signers')) {
-        throw new Error('Transaction signing failed. The wallet did not sign the transaction. Please ensure your wallet is connected and try again.');
-      }
-      throw err;
-    }
-  }, [publicKey, signTransaction, sendTransaction, connection]);
+       // Confirm
+       await connection.confirmTransaction(
+         { signature: sig, blockhash, lastValidBlockHeight },
+         'confirmed'
+       );
+
+       console.log('[useTokenActions] Transaction confirmed');
+
+       return sig;
+     } catch (err: unknown) {
+       // Handle wallet rejection
+       const message = err instanceof Error ? err.message : String(err);
+       if (message.includes('User rejected') || message.includes('rejected') || message.includes('User canceled')) {
+         throw new Error('Transaction rejected by user.');
+       }
+       if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
+         throw new Error('Failed to get a valid blockhash. Please try again.');
+       }
+       if (message.includes('No signers') || message.includes('no signers')) {
+         throw new Error('Transaction signing failed. The wallet did not sign the transaction. Please ensure your wallet is connected and try again.');
+       }
+       if (message.includes('Plugin Closed') || message.includes('plugin closed')) {
+         // Fallback: try sendRawTransaction if sendTransaction failed with Plugin Closed
+         console.warn('[useTokenActions] sendTransaction failed with Plugin Closed, retrying with sendRawTransaction...');
+         
+         const signedTransaction = await currentSignTransaction(transaction);
+         const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
+         
+         const sig = await connection.sendRawTransaction(serializedTransaction, {
+           skipPreflight: false,
+           preflightCommitment: 'confirmed',
+           maxRetries: 3,
+         });
+
+         await connection.confirmTransaction(
+           { signature: sig, blockhash, lastValidBlockHeight },
+           'confirmed'
+         );
+
+         return sig;
+       }
+       throw err;
+     }
+   }, [connection]);
 
   const getProgramPublicKey = useCallback(() => {
     const network = getCurrentNetwork();
@@ -170,14 +231,14 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     symbol: string,
     decimals: number
   ): Promise<TransactionResult> => {
-    // Check wallet connected AND signing support
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
     if (!tokenAccountPubkey) {
       return { signature: null, loading: false, error: 'Token account not provided', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare. Localnet mock wallets cannot sign transactions.', success: false };
     }
 
@@ -205,7 +266,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildInitializeInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         name,
         symbol,
         decimals,
@@ -225,17 +286,18 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Mint tokens
   const mintTokens = useCallback(async (
     recipient: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -261,7 +323,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildMintInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         recipientPubkey,
         amountBigInt,
         programId
@@ -280,7 +342,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer tokens
   const transferTokens = useCallback(async (
@@ -288,10 +350,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     to: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -321,7 +384,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildTransferInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         fromPubkey,
         toPubkey,
         amountBigInt,
@@ -341,17 +404,18 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Burn tokens
   const burnTokens = useCallback(async (
     from: string,
     amount: number | bigint
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -377,7 +441,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildBurnInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
+        fromPubkey,
         fromPubkey,
         amountBigInt,
         programId
@@ -396,16 +461,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Freeze account
   const freezeAccount = useCallback(async (
     account: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -427,10 +493,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const programId = getProgramPublicKey();
       const tokenState = new PublicKey(tokenAccountPubkey);
       const accountPubkey = new PublicKey(account);
+      const currentPublicKey = publicKeyRef.current!;
 
       const { keys, data } = buildFreezeInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         accountPubkey,
         programId
       );
@@ -448,16 +515,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Unfreeze account
   const unfreezeAccount = useCallback(async (
     account: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -482,7 +550,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildUnfreezeInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         accountPubkey,
         programId
       );
@@ -500,16 +568,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Add agent
   const addAgent = useCallback(async (
     agent: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -532,10 +601,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const tokenState = new PublicKey(tokenAccountPubkey);
       const agentPubkey = new PublicKey(agent);
 
+      // Derive agent account PDA: seeds = [b"agent", tokenState, agentPubkey]
+      const [agentAccountPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("agent"), tokenState.toBuffer(), agentPubkey.toBuffer()],
+        programId
+      );
+
       const { keys, data } = buildAddAgentInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         agentPubkey,
+        agentAccountPda,
         programId
       );
 
@@ -552,16 +628,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Remove agent
   const removeAgent = useCallback(async (
     agent: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -586,7 +663,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildRemoveAgentInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         agentPubkey,
         programId
       );
@@ -604,16 +681,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer owner
   const transferOwner = useCallback(async (
     newOwner: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -638,7 +716,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildTransferOwnerInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         newOwnerPubkey,
         programId
       );
@@ -656,16 +734,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Transfer freeze authority
   const transferFreezeAuthority = useCallback(async (
     newFreezeAuthority: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
     if (!tokenAccountPubkey) {
@@ -690,7 +769,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildTransferFreezeAuthorityInstruction(
         tokenState,
-        publicKey,
+        currentPublicKey,
         newFreezeAuthorityPubkey,
         programId
       );
@@ -708,7 +787,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [tokenAccountPubkey, publicKey, signAndSend, getProgramPublicKey, createInstruction]);
+  }, [tokenAccountPubkey, signAndSend, getProgramPublicKey, createInstruction]);
 
   // Get supply info (read-only query)
   const getSupplyInfo = useCallback(async (): Promise<SupplyInfo | null> => {
@@ -768,7 +847,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
   const initializeComplianceAggregator = useCallback(async (
     aggregatorAccount: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected', success: false };
     }
 
@@ -791,7 +871,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildComplianceInitializeInstruction(
         aggregatorState,
-        publicKey,
+        currentPublicKey,
         programId
       );
 
@@ -808,7 +888,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Compliance: Add module
   const addComplianceModule = useCallback(async (
@@ -816,10 +896,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     tokenProgramId: string,
     moduleProgramId: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -846,13 +927,15 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const programId = new PublicKey(programIdStr);
       const aggregatorState = new PublicKey(aggregatorAccount);
       const token = new PublicKey(tokenProgramId);
-      const module = new PublicKey(moduleProgramId);
+      const modulePubkey = new PublicKey(moduleProgramId);
 
+      const tokenCompliance = new PublicKey(tokenProgramId);
       const { keys, data } = buildComplianceAddModuleInstruction(
         aggregatorState,
-        publicKey,
+        currentPublicKey,
         token,
-        module,
+        modulePubkey,
+        tokenCompliance,
         programId
       );
 
@@ -869,7 +952,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Compliance: Remove module
   const removeComplianceModule = useCallback(async (
@@ -877,10 +960,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     tokenProgramId: string,
     moduleProgramId: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -907,13 +991,13 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const programId = new PublicKey(programIdStr);
       const aggregatorState = new PublicKey(aggregatorAccount);
       const token = new PublicKey(tokenProgramId);
-      const module = new PublicKey(moduleProgramId);
+      const modulePubkey = new PublicKey(moduleProgramId);
 
+      const tokenCompliance = new PublicKey(tokenProgramId);
       const { keys, data } = buildComplianceRemoveModuleInstruction(
         aggregatorState,
-        publicKey,
-        token,
-        module,
+        currentPublicKey,
+        tokenCompliance,
         programId
       );
 
@@ -930,16 +1014,17 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Compliance: Rebalance modules
   const rebalanceModules = useCallback(async (
     aggregatorAccount: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -962,7 +1047,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildComplianceRebalanceInstruction(
         aggregatorState,
-        publicKey,
+        currentPublicKey,
         programId
       );
 
@@ -979,7 +1064,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Compliance: Get state (read-only query)
   const getAggregatorState = useCallback(async (
@@ -1046,7 +1131,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
   const initializeIdentityRegistry = useCallback(async (
     registryAccount: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected', success: false };
     }
 
@@ -1069,7 +1155,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildIdentityInitializeInstruction(
         registryState,
-        publicKey,
+        currentPublicKey,
         programId
       );
 
@@ -1086,7 +1172,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Identity: Register identity
   const registerIdentity = useCallback(async (
@@ -1094,10 +1180,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     wallet: string,
     identity: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -1128,8 +1215,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildIdentityRegisterInstruction(
         registryState,
-        publicKey,
-        publicKey,
+        currentPublicKey,
+        currentPublicKey,
         walletPubkey,
         identityPubkey,
         programId
@@ -1148,7 +1235,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Identity: Register identity with data
   const registerIdentityWithData = useCallback(async (
@@ -1159,10 +1246,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     identityData: string,
     metadataUri: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -1203,8 +1291,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildIdentityRegisterWithDataInstruction(
         registryState,
-        publicKey,
-        publicKey,
+        currentPublicKey,
+        currentPublicKey,
         walletPubkey,
         name,
         symbol,
@@ -1226,7 +1314,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Identity: Update identity
   const updateIdentity = useCallback(async (
@@ -1234,10 +1322,11 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     wallet: string,
     newIdentity: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -1268,7 +1357,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildIdentityUpdateInstruction(
         registryState,
-        publicKey,
+        currentPublicKey,
         walletPubkey,
         newIdentityPubkey,
         programId
@@ -1287,17 +1376,18 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Identity: Remove identity
   const removeIdentity = useCallback(async (
     registryAccount: string,
     wallet: string
   ): Promise<TransactionResult> => {
-    if (!publicKey) {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
       return { signature: null, loading: false, error: 'Wallet not connected. Please connect your wallet first.', success: false };
     }
-    if (!signTransaction) {
+    if (!signTransactionRef.current) {
       return { signature: null, loading: false, error: 'Wallet does not support transaction signing. Please connect a wallet like Phantom or Solflare.', success: false };
     }
 
@@ -1324,7 +1414,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildIdentityRemoveInstruction(
         registryState,
-        publicKey,
+        currentPublicKey,
         walletPubkey,
         programId
       );
@@ -1342,7 +1432,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signAndSend, createInstruction]);
+  }, [signAndSend, createInstruction]);
 
   // Identity: Get identity (read-only query)
   const getIdentity = useCallback(async (
@@ -1363,36 +1453,18 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const registryState = new PublicKey(registryAccount);
       const walletPubkey = new PublicKey(wallet);
 
-      const { keys, data } = buildIdentityGetInstruction(
-        registryState,
-        walletPubkey,
-        programId
-      );
+      // Derive the identity account PDA using the helper function
+      const identityAccount = getIdentityPda(registryState, walletPubkey, programId);
 
-      // Create instruction for query
-      const instruction = new TransactionInstruction({
-        keys,
-        data,
-        programId,
-      });
-
-      // Simulate the transaction to get the return data
-      const transaction = new Transaction();
-      transaction.add(instruction);
-      const simulation = await connection.simulateTransaction(transaction);
-
-      if (simulation.value.err) {
-        throw new Error(simulation.value.err.toString());
-      }
-
-      // Extract return data from simulation
-      if (!simulation.value.returnData) {
-        console.warn('No return data in identity response');
+      // Fetch the account info directly (no instruction simulation needed)
+      const accountInfo = await connection.getAccountInfo(identityAccount);
+      
+      if (!accountInfo?.data) {
+        console.warn('No identity account found');
         return null;
       }
 
-      // The return data comes as base64 encoded bytes
-      const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
+      const decodedData = Buffer.from(accountInfo.data);
       
       if (decodedData.length < 64) {
         console.warn('Invalid identity data length:', decodedData.length);

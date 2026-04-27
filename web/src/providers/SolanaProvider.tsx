@@ -4,13 +4,21 @@ import React, { useMemo, useCallback } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-  LedgerWalletAdapter,
-  TrezorWalletAdapter,
-  CoinbaseWalletAdapter,
-} from '@solana/wallet-adapter-wallets';
+
+// Fase 3: Migración a Wallet Standard
+// Los adapters legacy solo se usan para wallets que NO soportan Wallet Standard
+// (Ledger y Trezor requieren conexión hardware específica)
+import { LedgerWalletAdapter, TrezorWalletAdapter } from '@solana/wallet-adapter-wallets';
+
+// Hook para convertir adapters legacy a adapters Wallet Standard
+// Detecta automáticamente wallets que implementan Wallet Standard (Phantom, Solflare, Backpack, etc.)
+import { useStandardWalletAdapters } from '@solana/wallet-standard-wallet-adapter-react';
+
+// NOTE (Fase 1.2 + Fase 3): CoinbaseWalletAdapter fue removido porque causa conflictos
+// con window.ethereum. El error "Backpack couldn't override window.ethereum" está relacionado
+// con múltiples extensiones intentando modificar el mismo objeto global.
+// Con Wallet Standard, Backpack, Phantom, Solflare y otras wallets compatibles
+// son auto-detectadas sin necesidad de adapters manuales.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type NetworkType, getConnectionUrl } from '@/config/solana';
 import { useSolanaNotification, useWalletErrorHandling } from '@/hooks/useSolanaNotification';
@@ -75,18 +83,34 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
     return getConnectionUrl(network);
   }, [endpoint, network]);
 
-  // Available wallets - agnostic support for multiple Solana wallets
-  const wallets = useMemo(
+  // Available wallets - Fase 3: Híbrido Wallet Standard + Legacy
+  //
+  // Enfoque Wallet Standard:
+  // - useStandardWalletAdapters detecta automáticamente todas las wallets que
+  //   implementan el Wallet Standard (Phantom, Solflare, Backpack, etc.)
+  // - No es necesario instanciar adapters manuales para wallets compatibles
+  //
+  // Enfoque Legacy (solo para wallets que NO soportan Wallet Standard):
+  // - LedgerWalletAdapter: requiere conexión hardware específica
+  // - TrezorWalletAdapter: requiere conexión hardware específica
+  //
+  // Beneficios:
+  // 1. Eliminación de conflictos window.ethereum (Backpack, Coinbase auto-detectados)
+  // 2. Soporte automático para nuevas wallets compatibles con Wallet Standard
+  // 3. Menos código de mantenimiento
+  // 4. Compatibilidad con wallets de hardware (Ledger, Trezor)
+  const legacyAdapters = useMemo(
     () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
+      // Legacy adapters para wallets de hardware que no soportan Wallet Standard
       new LedgerWalletAdapter(),
       new TrezorWalletAdapter(),
-      new CoinbaseWalletAdapter(),
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [solanaNetwork]
+    []
   );
+
+  // Convert legacy adapters to Wallet Standard adapters where possible
+  // This enables auto-detection of Phantom, Solflare, Backpack, etc.
+  const wallets = useStandardWalletAdapters(legacyAdapters);
 
   return (
     <QueryClientProvider client={queryClient}>
