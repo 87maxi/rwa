@@ -6,7 +6,8 @@
     "test": "ts-mocha tests/**/*.ts --bootstrap-global --timeout 100000"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.32.1"
+    "@coral-xyz/anchor": "^0.32.1",
+    "@playwright/mcp": "^0.0.38"
   },
   "devDependencies": {
     "@solana/web3.js": "^1.98.4",
