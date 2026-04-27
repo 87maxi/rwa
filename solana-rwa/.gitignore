@@ -33,6 +33,7 @@ test-ledger/
 
 # Surfpool: Ignore logs and temporary files, but keep state files
 .surfpool/logs/
+.surfpool/runbook-outputs/
 .surfpool/*.lock
 # Keep state files for deployment tracking:
 # .surfpool/state/deployment.*.tx-state.json
