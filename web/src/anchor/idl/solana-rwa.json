@@ -1,5 +1,5 @@
 {
-  "address": "2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX",
+  "address": "6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe",
   "metadata": {
     "name": "solana_rwa",
     "version": "0.1.0",
@@ -994,6 +994,32 @@
       ]
     },
     {
+      "name": "AgentAddedEvent",
+      "discriminator": [
+        102,
+        33,
+        66,
+        117,
+        74,
+        229,
+        75,
+        88
+      ]
+    },
+    {
+      "name": "AgentRemovedEvent",
+      "discriminator": [
+        230,
+        121,
+        232,
+        246,
+        203,
+        30,
+        3,
+        195
+      ]
+    },
+    {
       "name": "FreezeAuthorityTransferredEvent",
       "discriminator": [
         209,
@@ -1144,6 +1170,46 @@
       }
     },
     {
+      "name": "AgentAddedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentRemovedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "removed_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "BalanceAccount",
       "docs": [
         "BalanceAccount stores a single wallet's token balance.",
@@ -1258,7 +1324,7 @@
       "name": "TokenState",
       "docs": [
         "TokenState is the main control account for the token program.",
-        "It is stored as a PDA with seeds [b\"token\"]."
+        "It is stored as a PDA with seeds [b\"token\", owner]."
       ],
       "type": {
         "kind": "struct",

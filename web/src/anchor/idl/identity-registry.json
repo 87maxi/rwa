@@ -1,5 +1,5 @@
 {
-  "address": "5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce",
+  "address": "6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc",
   "metadata": {
     "name": "identity_registry",
     "version": "0.1.0",
@@ -10,9 +10,7 @@
     {
       "name": "initialize",
       "docs": [
-        "Initialize a new identity registry",
-        "",
-        "Creates the registry PDA that will control all identity registrations."
+        "Initialize a new identity registry"
       ],
       "discriminator": [
         175,
@@ -71,9 +69,7 @@
     {
       "name": "register_identity",
       "docs": [
-        "Register a new identity mapping (Pubkey-based)",
-        "",
-        "Creates a new IdentityAccount PDA for the wallet."
+        "Register a new identity mapping (Pubkey-based)"
       ],
       "discriminator": [
         164,
@@ -299,9 +295,7 @@
     {
       "name": "remove_identity",
       "docs": [
-        "Remove an identity mapping",
-        "",
-        "Only the identity owner or registry admin can remove."
+        "Remove an identity mapping"
       ],
       "discriminator": [
         146,
@@ -383,9 +377,7 @@
     {
       "name": "update_identity",
       "docs": [
-        "Update an existing identity mapping",
-        "",
-        "Only the identity owner or registry admin can update."
+        "Update an existing identity mapping"
       ],
       "discriminator": [
         130,

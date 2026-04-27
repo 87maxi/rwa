@@ -11,63 +11,36 @@ import { Connection, clusterApiUrl } from '@solana/web3.js';
 export type NetworkType = 'localnet' | 'devnet' | 'mainnet';
 
 /**
- * Program IDs configuration with environment variable support.
- * Falls back to defaults for localnet, requires env vars for devnet/mainnet.
+ * Default Program IDs from Anchor.toml / declare_id!() (source of truth).
+ * Used as fallback when environment variables are not set.
+ * @see solana-rwa/Anchor.toml [programs.localnet]
  */
-// getProgramIds is used internally for dynamic program ID resolution
-/**
- * Program IDs from Anchor IDLs (source of truth)
- * @see web/src/anchor/idl/ for IDL JSON files
- */
-const IDL_PROGRAM_IDS = {
-  solanaRwa: '2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX',
-  identityRegistry: '5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce',
-  complianceAggregator: '7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb',
+const DEFAULT_PROGRAM_IDS = {
+  solanaRwa: '6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe',
+  identityRegistry: '6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc',
+  complianceAggregator: '9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7',
 } as const;
 
 /**
- * Get program IDs for a network.
- * Priority: env vars > IDL defaults
- */
-function getProgramIds(network: NetworkType) {
-  return {
-    localnet: {
-      solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-      identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-      complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
-    },
-    devnet: {
-      solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-      identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-      complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
-    },
-    mainnet: {
-      solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-      identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-      complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
-    },
-  }[network];
-}
-
-/**
  * Program IDs configuration with environment variable override.
- * Defaults come from Anchor IDLs (web/src/anchor/idl/).
+ * Priority: env vars > DEFAULT_PROGRAM_IDS from Anchor.toml.
+ * Env var names use the _LOCALNET_ / _DEVNET_ / _MAINNET_ suffix to match .env files.
  */
 export const PROGRAM_IDS = {
   localnet: {
-    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
+    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_LOCALNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.solanaRwa,
+    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_LOCALNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.identityRegistry,
+    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_LOCALNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.complianceAggregator,
   },
   devnet: {
-    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_DEVNET_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
+    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_DEVNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.solanaRwa,
+    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_DEVNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.identityRegistry,
+    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_DEVNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.complianceAggregator,
   },
   mainnet: {
-    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.solanaRwa,
-    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.identityRegistry,
-    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_MAINNET_PROGRAM_ID || IDL_PROGRAM_IDS.complianceAggregator,
+    solanaRwa: process.env.NEXT_PUBLIC_SOLANA_RWA_MAINNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.solanaRwa,
+    identityRegistry: process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_MAINNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.identityRegistry,
+    complianceAggregator: process.env.NEXT_PUBLIC_COMPLIANCE_AGGREGATOR_MAINNET_PROGRAM_ID || DEFAULT_PROGRAM_IDS.complianceAggregator,
   },
 } as const;
 

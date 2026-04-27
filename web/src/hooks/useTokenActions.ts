@@ -46,19 +46,21 @@ export interface SupplyInfo {
   remainingSupply: bigint;
 }
 
-// Aggregator state return type
+// Aggregator state return type (matches ComplianceAggregatorState Rust struct)
 export interface AggregatorState {
   owner: string;
-  totalUniqueTokens: number;
-  totalModuleEntries: number;
-  tokenModuleCount: number;
-  nextIndex: bigint;
+  aggregatorBump: number;
 }
 
-// Identity state return type
+// Identity state return type (matches IdentityAccount Rust struct)
 export interface IdentityInfo {
   wallet: string;
   identity: string;
+  name: string;
+  symbol: string;
+  identityData: string;
+  metadataUri: string;
+  bump: number;
 }
 
 // Token action result
@@ -122,89 +124,89 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     * Solución: Usar signTransaction + connection.sendRawTransaction() directamente.
     * Esto permite que el plugin se cierre después de firmar sin afectar el envío.
     */
-   const signAndSend = useCallback(async (
-     transaction: Transaction,
-     programId: PublicKey
-   ): Promise<string> => {
-     const currentPublicKey = publicKeyRef.current;
-     if (!currentPublicKey) {
-       throw new Error('Wallet not connected. Please connect your wallet first.');
-     }
-     const currentSignTransaction = signTransactionRef.current;
-     if (!currentSignTransaction) {
-       throw new Error('Wallet does not support transaction signing. Please use a wallet like Phantom or Solflare.');
-     }
+  const signAndSend = useCallback(async (
+    transaction: Transaction,
+    programId: PublicKey
+  ): Promise<string> => {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
+    }
+    const currentSignTransaction = signTransactionRef.current;
+    if (!currentSignTransaction) {
+      throw new Error('Wallet does not support transaction signing. Please use a wallet like Phantom or Solflare.');
+    }
 
-     // Get latest blockhash
-     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    // Get latest blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
 
-     // Set transaction fields
-     transaction.recentBlockhash = blockhash;
-     transaction.lastValidBlockHeight = lastValidBlockHeight;
-     transaction.feePayer = currentPublicKey;
+    // Set transaction fields
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    transaction.feePayer = currentPublicKey;
 
-     try {
-       // Sign with wallet - returns a SerializedTransaction
-       const signedTransaction = await currentSignTransaction(transaction);
+    try {
+      // Sign with wallet - returns a SerializedTransaction
+      const signedTransaction = await currentSignTransaction(transaction);
 
-       // Send using sendRawTransaction instead of wallet adapter's sendTransaction.
-       // This avoids the "Plugin Closed" error because we don't depend on the
-       // wallet plugin being open after signing.
-       const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
-       
-       console.log('[useTokenActions] Sending raw transaction...');
-       const sig = await connection.sendRawTransaction(serializedTransaction, {
-         skipPreflight: false,
-         preflightCommitment: 'confirmed',
-         maxRetries: 3,
-       });
+      // Send using sendRawTransaction instead of wallet adapter's sendTransaction.
+      // This avoids the "Plugin Closed" error because we don't depend on the
+      // wallet plugin being open after signing.
+      const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
 
-       console.log('[useTokenActions] Transaction sent, signature:', sig.slice(0, 32) + '...');
+      console.log('[useTokenActions] Sending raw transaction...');
+      const sig = await connection.sendRawTransaction(serializedTransaction, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
 
-       // Confirm
-       await connection.confirmTransaction(
-         { signature: sig, blockhash, lastValidBlockHeight },
-         'confirmed'
-       );
+      console.log('[useTokenActions] Transaction sent, signature:', sig.slice(0, 32) + '...');
 
-       console.log('[useTokenActions] Transaction confirmed');
+      // Confirm
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        'confirmed'
+      );
 
-       return sig;
-     } catch (err: unknown) {
-       // Handle wallet rejection
-       const message = err instanceof Error ? err.message : String(err);
-       if (message.includes('User rejected') || message.includes('rejected') || message.includes('User canceled')) {
-         throw new Error('Transaction rejected by user.');
-       }
-       if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
-         throw new Error('Failed to get a valid blockhash. Please try again.');
-       }
-       if (message.includes('No signers') || message.includes('no signers')) {
-         throw new Error('Transaction signing failed. The wallet did not sign the transaction. Please ensure your wallet is connected and try again.');
-       }
-       if (message.includes('Plugin Closed') || message.includes('plugin closed')) {
-         // Fallback: try sendRawTransaction if sendTransaction failed with Plugin Closed
-         console.warn('[useTokenActions] sendTransaction failed with Plugin Closed, retrying with sendRawTransaction...');
-         
-         const signedTransaction = await currentSignTransaction(transaction);
-         const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
-         
-         const sig = await connection.sendRawTransaction(serializedTransaction, {
-           skipPreflight: false,
-           preflightCommitment: 'confirmed',
-           maxRetries: 3,
-         });
+      console.log('[useTokenActions] Transaction confirmed');
 
-         await connection.confirmTransaction(
-           { signature: sig, blockhash, lastValidBlockHeight },
-           'confirmed'
-         );
+      return sig;
+    } catch (err: unknown) {
+      // Handle wallet rejection
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('User rejected') || message.includes('rejected') || message.includes('User canceled')) {
+        throw new Error('Transaction rejected by user.');
+      }
+      if (message.includes('blockhash not found') || message.includes('Blockhash not found')) {
+        throw new Error('Failed to get a valid blockhash. Please try again.');
+      }
+      if (message.includes('No signers') || message.includes('no signers')) {
+        throw new Error('Transaction signing failed. The wallet did not sign the transaction. Please ensure your wallet is connected and try again.');
+      }
+      if (message.includes('Plugin Closed') || message.includes('plugin closed')) {
+        // Fallback: try sendRawTransaction if sendTransaction failed with Plugin Closed
+        console.warn('[useTokenActions] sendTransaction failed with Plugin Closed, retrying with sendRawTransaction...');
 
-         return sig;
-       }
-       throw err;
-     }
-   }, [connection]);
+        const signedTransaction = await currentSignTransaction(transaction);
+        const serializedTransaction = signedTransaction.serialize({ verifySignatures: false });
+
+        const sig = await connection.sendRawTransaction(serializedTransaction, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+
+        await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight },
+          'confirmed'
+        );
+
+        return sig;
+      }
+      throw err;
+    }
+  }, [connection]);
 
   const getProgramPublicKey = useCallback(() => {
     const network = getCurrentNetwork();
@@ -839,7 +841,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       // The return data comes as base64 encoded bytes
       const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
-      
+
       if (decodedData.length < 24) {
         console.warn('Invalid supply info data length:', decodedData.length);
         return null;
@@ -1123,8 +1125,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       // The return data comes as base64 encoded bytes
       const decodedData = Buffer.from(simulation.value.returnData.data[0], 'base64');
-      
-      if (decodedData.length < 52) {
+
+      if (decodedData.length < 33) {
         console.warn('Invalid aggregator state data length:', decodedData.length);
         return null;
       }
@@ -1477,15 +1479,15 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       // Fetch the account info directly (no instruction simulation needed)
       const accountInfo = await connection.getAccountInfo(identityAccount);
-      
+
       if (!accountInfo?.data) {
         console.warn('No identity account found');
         return null;
       }
 
       const decodedData = Buffer.from(accountInfo.data);
-      
-      if (decodedData.length < 64) {
+
+      if (decodedData.length < 304) {
         console.warn('Invalid identity data length:', decodedData.length);
         return null;
       }

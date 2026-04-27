@@ -131,6 +131,53 @@ export function deriveTokenStatePda(
 }
 
 /**
+ * Derive the Registry PDA.
+ * Seeds: [b"registry"]
+ * @see IDL: identity-registry.json - registry PDA seeds
+ */
+export function deriveRegistryPda(
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("registry")],
+    programId
+  );
+  return pda;
+}
+
+/**
+ * Derive the Aggregator PDA.
+ * Seeds: [b"aggregator"]
+ * @see IDL: compliance-aggregator.json - aggregator PDA seeds
+ */
+export function deriveAggregatorPda(
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("aggregator")],
+    programId
+  );
+  return pda;
+}
+
+/**
+ * Derive the Compliance PDA for a token.
+ * Seeds: [b"compliance", aggregator, token]
+ * @see IDL: compliance-aggregator.json - compliance PDA seeds
+ */
+export function deriveCompliancePda(
+  aggregator: PublicKey,
+  token: PublicKey,
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("compliance"), aggregator.toBuffer(), token.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
+/**
  * Token state account data structure (matches Anchor struct)
  */
 export interface BalanceEntry {
@@ -204,7 +251,7 @@ export function buildInitializeInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  
+
   // Serialize strings using Anchor's format (4-byte u32 LE length prefix + UTF-8 bytes)
   const nameBuffer = serializeAnchorString(name);
   const symbolBuffer = serializeAnchorString(symbol);
@@ -214,7 +261,7 @@ export function buildInitializeInstruction(
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
-  
+
   // Write discriminator (8 bytes)
   DISCRIMINATORS.initialize.forEach((b, i) => {
     data[offset + i] = b;
@@ -322,7 +369,7 @@ export function buildBurnInstruction(
 /**
    * Build transfer instruction
    */
-  export function buildTransferInstruction(
+export function buildTransferInstruction(
   tokenState: PublicKey,
   from: PublicKey,
   fromBalance: PublicKey,
@@ -364,7 +411,7 @@ export function buildBurnInstruction(
   * @param account - Frozen status PDA to freeze
   * @param _programId - Program ID (reserved for future use)
   */
-  export function buildFreezeInstruction(
+export function buildFreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
@@ -402,7 +449,7 @@ export function buildBurnInstruction(
   * @param account - Frozen status PDA to unfreeze
   * @param _programId - Program ID (reserved for future use)
   */
-  export function buildUnfreezeInstruction(
+export function buildUnfreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
@@ -440,7 +487,7 @@ export function buildBurnInstruction(
   * @param agentAccount - Agent account PDA (seeds: [b"agent", tokenState, agent])
   * @param _programId - Program ID (reserved for future use)
   */
-  export function buildAddAgentInstruction(
+export function buildAddAgentInstruction(
   tokenState: PublicKey,
   payer: PublicKey,
   agent: PublicKey,
@@ -518,7 +565,7 @@ export function buildRemoveAgentInstruction(
   * @param newOwner - New owner pubkey (written in data payload)
   * @param _programId - Program ID (reserved for future use)
   */
-  export function buildTransferOwnerInstruction(
+export function buildTransferOwnerInstruction(
   tokenState: PublicKey,
   currentOwner: PublicKey,
   newOwner: PublicKey,
@@ -555,7 +602,7 @@ export function buildRemoveAgentInstruction(
   * @param newFreezeAuthority - New freeze authority pubkey (written in data payload)
   * @param _programId - Program ID (reserved for future use)
   */
-  export function buildTransferFreezeAuthorityInstruction(
+export function buildTransferFreezeAuthorityInstruction(
   tokenState: PublicKey,
   currentFreezeAuthority: PublicKey,
   newFreezeAuthority: PublicKey,
@@ -637,7 +684,7 @@ export function buildComplianceInitializeInstruction(
 /**
    * Build compliance add module instruction
    */
-  export function buildComplianceAddModuleInstruction(
+export function buildComplianceAddModuleInstruction(
   aggregatorState: PublicKey,
   owner: PublicKey,
   token: PublicKey,
@@ -677,7 +724,7 @@ export function buildComplianceInitializeInstruction(
 /**
    * Build compliance remove module instruction
    */
-  export function buildComplianceRemoveModuleInstruction(
+export function buildComplianceRemoveModuleInstruction(
   aggregatorState: PublicKey,
   owner: PublicKey,
   tokenCompliance: PublicKey,
@@ -944,7 +991,7 @@ export function buildIdentityInitializeInstruction(
 /**
     * Build identity register identity instruction
     */
-  export function buildIdentityRegisterInstruction(
+export function buildIdentityRegisterInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   payer: PublicKey,
@@ -1014,7 +1061,7 @@ export function buildIdentityRegisterWithDataInstruction(
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
-  
+
   // Write discriminator (8 bytes)
   DISCRIMINATORS.identity_register_identity_with_data.forEach((b, i) => {
     data[offset + i] = b;
@@ -1067,7 +1114,7 @@ export function buildIdentityRegisterWithDataInstruction(
     *              name_option(1 + 4 + len) + symbol_option(1 + 4 + len) +
     *              identity_data_option(1 + 4 + len) + metadata_uri_option(1 + 4 + len)
     */
-  export function buildIdentityUpdateInstruction(
+export function buildIdentityUpdateInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   wallet: PublicKey,
@@ -1089,7 +1136,7 @@ export function buildIdentityRegisterWithDataInstruction(
   const symbolSize = serializeOptionString(symbol);
   const identityDataSize = serializeOptionString(identityData);
   const metadataUriSize = serializeOptionString(metadataUri);
-  
+
   const data = Buffer.alloc(8 + 32 + 32 + nameSize + symbolSize + identityDataSize + metadataUriSize);
   let offset = 0;
 
@@ -1245,45 +1292,210 @@ export function parseSupplyInfo(data: Buffer): {
 }
 
 /**
+ * Helper to read a fixed-size byte array as a string (null-terminated or full).
+ */
+function readFixedString(data: Buffer, offset: number, length: number): string {
+  const bytes = data.slice(offset, offset + length);
+  const nullIdx = bytes.indexOf(0);
+  return bytes.slice(0, nullIdx === -1 ? length : nullIdx).toString('utf-8');
+}
+
+/**
  * Parse AggregatorState from account data
- * Format: owner (32 bytes) + totalUniqueTokens (4 bytes u32) + totalModuleEntries (4 bytes u32) +
- *         tokenModuleCount (4 bytes u32) + nextIndex (8 bytes u64)
+ * ComplianceAggregatorState (regular Account): owner (32) + bump (1)
  */
 export function parseAggregatorState(data: Buffer): {
   owner: string;
-  totalUniqueTokens: number;
-  totalModuleEntries: number;
-  tokenModuleCount: number;
-  nextIndex: bigint;
+  aggregatorBump: number;
 } {
-  if (data.length < 52) {
-    throw new Error('Invalid AggregatorState data length: expected at least 52 bytes');
+  if (data.length < 33) {
+    throw new Error('Invalid AggregatorState data length');
   }
 
   return {
-    owner: data.slice(0, 32).toString('hex'),
-    totalUniqueTokens: data.readUInt32LE(32),
-    totalModuleEntries: data.readUInt32LE(36),
-    tokenModuleCount: data.readUInt32LE(40),
-    nextIndex: BigInt(data.readBigUInt64LE(44)),
+    owner: new PublicKey(data.slice(0, 32)).toBase58(),
+    aggregatorBump: data[32],
   };
 }
 
 /**
- * Parse IdentityInfo from account data
- * Format: wallet (32 bytes) + identity (32 bytes)
+ * Helper to read an Anchor-serialized string from a buffer.
+ * Returns the string value and total bytes consumed (4 byte length prefix + string bytes).
+ */
+function readAnchorString(data: Buffer, offset: number): { value: string; bytesRead: number } {
+  if (offset + 4 > data.length) {
+    throw new Error(`Not enough data to read string length at offset ${offset}`);
+  }
+  const len = data.readUInt32LE(offset);
+  const strStart = offset + 4;
+  if (strStart + len > data.length) {
+    throw new Error(`Not enough data to read string of length ${len} at offset ${strStart}`);
+  }
+  return {
+    value: data.slice(strStart, strStart + len).toString('utf-8'),
+    bytesRead: 4 + len,
+  };
+}
+
+/**
+ * Parse IdentityAccount from account data (zero_copy)
+ * Structure: wallet(32), identity(32), name(32), data(64), uri(128), symbol(10), bump(1), padding(5) = 304 bytes
  */
 export function parseIdentityInfo(data: Buffer): {
   wallet: string;
   identity: string;
+  name: string;
+  symbol: string;
+  identityData: string;
+  metadataUri: string;
+  bump: number;
 } {
-  if (data.length < 64) {
-    throw new Error('Invalid IdentityInfo data length: expected 64 bytes');
+  if (data.length < 304) {
+    throw new Error(`Invalid IdentityAccount data length: expected 304, got ${data.length}`);
   }
 
+  let offset = 0;
+  const wallet = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const identity = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const name = readFixedString(data, offset, 32);
+  offset += 32;
+  const identityData = readFixedString(data, offset, 64);
+  offset += 64;
+  const metadataUri = readFixedString(data, offset, 128);
+  offset += 128;
+  const symbol = readFixedString(data, offset, 10);
+  offset += 10;
+  const bump = data[offset];
+
   return {
-    wallet: data.slice(0, 32).toString('hex'),
-    identity: data.slice(32, 64).toString('hex'),
+    wallet,
+    identity,
+    name,
+    symbol,
+    identityData,
+    metadataUri,
+    bump,
+  };
+}
+
+/**
+ * Parse TokenState from account data (zero_copy)
+ * Structure: owner(32), authority(32), supply(8), index(8), name(32), symbol(10), decimals(1), bump(1), padding(4) = 128 bytes
+ */
+export function parseTokenState(data: Buffer): {
+  owner: string;
+  freezeAuthority: string;
+  totalSupply: bigint;
+  nextIndex: bigint;
+  name: string;
+  symbol: string;
+  decimals: number;
+  bump: number;
+} {
+  if (data.length < 128) {
+    throw new Error(`Invalid TokenState data length: expected 128, got ${data.length}`);
+  }
+
+  let offset = 0;
+  const owner = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const freezeAuthority = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const totalSupply = BigInt(data.readBigUInt64LE(offset));
+  offset += 8;
+  const nextIndex = BigInt(data.readBigUInt64LE(offset));
+  offset += 8;
+  const name = readFixedString(data, offset, 32);
+  offset += 32;
+  const symbol = readFixedString(data, offset, 10);
+  offset += 10;
+  const decimals = data[offset];
+  offset += 1;
+  const bump = data[offset];
+
+  return {
+    owner,
+    freezeAuthority,
+    totalSupply,
+    nextIndex,
+    name,
+    symbol,
+    decimals,
+    bump,
+  };
+}
+
+/**
+ * Parse BalanceAccount from account data (zero_copy)
+ * Structure: wallet(32), balance(8), bump(1), padding(7) = 48 bytes
+ */
+export function parseBalanceAccount(data: Buffer): {
+  wallet: string;
+  balance: bigint;
+  bump: number;
+} {
+  if (data.length < 48) {
+    throw new Error('Invalid BalanceAccount data length');
+  }
+  return {
+    wallet: new PublicKey(data.slice(0, 32)).toBase58(),
+    balance: BigInt(data.readBigUInt64LE(32)),
+    bump: data[40],
+  };
+}
+
+/**
+ * Parse FrozenAccount from account data (zero_copy)
+ * Structure: wallet(32), frozen(1), bump(1), padding(6) = 40 bytes
+ */
+export function parseFrozenAccount(data: Buffer): {
+  wallet: string;
+  frozen: boolean;
+  bump: number;
+} {
+  if (data.length < 40) {
+    throw new Error('Invalid FrozenAccount data length');
+  }
+  return {
+    wallet: new PublicKey(data.slice(0, 32)).toBase58(),
+    frozen: data[32] === 1, // ACCOUNT_FROZEN = 1
+    bump: data[33],
+  };
+}
+
+/**
+ * Parse TokenComplianceAccount from account data (zero_copy)
+ * Structure: token(32), modules(320), moduleCount(1), bump(1), padding(6) = 360 bytes
+ */
+export function parseTokenCompliance(data: Buffer): {
+  token: string;
+  modules: string[];
+  moduleCount: number;
+  bump: number;
+} {
+  if (data.length < 360) {
+    throw new Error('Invalid TokenCompliance data length');
+  }
+  let offset = 0;
+  const token = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+
+  const moduleCount = data[offset + 320];
+  const modules: string[] = [];
+  for (let i = 0; i < moduleCount; i++) {
+    modules.push(new PublicKey(data.slice(offset + (i * 32), offset + (i * 32) + 32)).toBase58());
+  }
+  offset += 320;
+  offset += 1; // moduleCount
+  const bump = data[offset];
+
+  return {
+    token,
+    modules,
+    moduleCount,
+    bump,
   };
 }
 

@@ -26,7 +26,7 @@ export default function ManagePage() {
   const [amount, setAmount] = useState('');
   const [agentAddress, setAgentAddress] = useState('');
   const [accountToFreeze, setAccountToFreeze] = useState('');
-  
+
   // New form states for additional operations
   const [newOwner, setNewOwner] = useState('');
   const [newFreezeAuthority, setNewFreezeAuthority] = useState('');
@@ -38,7 +38,7 @@ export default function ManagePage() {
   const [identityName, setIdentityName] = useState('');
   const [identitySymbol, setIdentitySymbol] = useState('');
   const [metadataUri, setMetadataUri] = useState('');
-  
+
   // Display states for read-only info
   const [supplyInfo, setSupplyInfo] = useState<SupplyInfo | null>(null);
   const [aggregatorState, setAggregatorState] = useState<AggregatorState | null>(null);
@@ -49,34 +49,34 @@ export default function ManagePage() {
   // @see solana-rwa/idl_solana_rwa.json - TokenState PDA seeds
   const tokenStatePda = useMemo(() => {
     if (!publicKey) return null;
-    
+
     try {
       const network = getCurrentNetwork();
       const programIdStr = PROGRAM_IDS[network]?.solanaRwa;
       if (!programIdStr) return null;
-      
+
       const programId = new PublicKey(programIdStr);
       // Derive PDA from "token" constant + owner wallet and program ID
       const [derivedPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("token"), publicKey.toBuffer()],
         programId
       );
-      
+
       return derivedPda.toString();
     } catch {
       return null;
     }
   }, [publicKey]);
-  
+
   const tokenActions = useTokenActions(tokenStatePda);
-  
+
   // Notification system
   const { success, error: showError } = useSolanaNotification();
 
   const handleTransfer = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -104,7 +104,7 @@ export default function ManagePage() {
   const handleMint = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -132,7 +132,7 @@ export default function ManagePage() {
   const handleBurn = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -160,7 +160,7 @@ export default function ManagePage() {
   const handleFreeze = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -187,7 +187,7 @@ export default function ManagePage() {
   const handleAddAgent = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -214,7 +214,7 @@ export default function ManagePage() {
   const handleTransferOwner = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -241,7 +241,7 @@ export default function ManagePage() {
   const handleTransferFreezeAuthority = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -267,7 +267,7 @@ export default function ManagePage() {
 
   const handleGetSupplyInfo = useCallback(async () => {
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
 
@@ -289,7 +289,7 @@ export default function ManagePage() {
   const handleInitializeCompliance = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -316,7 +316,7 @@ export default function ManagePage() {
   const handleAddComplianceModule = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -342,7 +342,7 @@ export default function ManagePage() {
 
   const handleGetAggregatorState = useCallback(async () => {
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
 
@@ -350,7 +350,7 @@ export default function ManagePage() {
       const state = await tokenActions.getAggregatorState(aggregatorAccount);
       setAggregatorState(state);
       if (state) {
-        success(`Aggregator state loaded: ${state.totalUniqueTokens} tokens`);
+        success(`Aggregator state loaded. Owner: ${state.owner.slice(0, 8)}...`);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch aggregator state';
@@ -364,7 +364,7 @@ export default function ManagePage() {
   const handleInitializeIdentity = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -391,7 +391,7 @@ export default function ManagePage() {
   const handleRegisterIdentity = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -418,7 +418,7 @@ export default function ManagePage() {
   const handleRegisterIdentityWithData = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
     setTransactionHash(null);
@@ -454,7 +454,7 @@ export default function ManagePage() {
 
   const handleGetIdentity = useCallback(async () => {
     if (!connected || !publicKey) return;
-    
+
     setErrorMessage(null);
     setIsLoading(true);
 
@@ -612,11 +612,10 @@ export default function ManagePage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`tab-button ${
-                    activeTab === tab.id
+                  className={`tab-button ${activeTab === tab.id
                       ? 'tab-button-active'
                       : 'tab-button-inactive'
-                  }`}
+                    }`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
@@ -901,7 +900,7 @@ export default function ManagePage() {
             <div className="p-8">
               <h3 className="text-2xl font-bold text-foreground mb-2">Compliance Management</h3>
               <p className="text-foreground-tertiary mb-8">Manage compliance modules for your token.</p>
-              
+
               {/* Initialize Aggregator */}
               <div className="glass-card p-6 mb-8">
                 <h4 className="text-xl font-bold text-foreground mb-4">Initialize Compliance Aggregator</h4>
@@ -1001,16 +1000,8 @@ export default function ManagePage() {
                         <p className="text-sm font-mono text-foreground">{aggregatorState.owner}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-foreground-tertiary mb-1">Total Unique Tokens</p>
-                        <p className="text-lg font-bold text-foreground">{aggregatorState.totalUniqueTokens}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-foreground-tertiary mb-1">Total Module Entries</p>
-                        <p className="text-lg font-bold text-foreground">{aggregatorState.totalModuleEntries}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-foreground-tertiary mb-1">Token Module Count</p>
-                        <p className="text-lg font-bold text-foreground">{aggregatorState.tokenModuleCount}</p>
+                        <p className="text-sm text-foreground-tertiary mb-1">Aggregator Bump</p>
+                        <p className="text-lg font-bold text-foreground">{aggregatorState.aggregatorBump}</p>
                       </div>
                     </div>
                   </div>
@@ -1024,7 +1015,7 @@ export default function ManagePage() {
             <div className="p-8">
               <h3 className="text-2xl font-bold text-foreground mb-2">Identity Management</h3>
               <p className="text-foreground-tertiary mb-8">Manage identity registrations on the blockchain.</p>
-              
+
               {/* Initialize Registry */}
               <div className="glass-card p-6 mb-8">
                 <h4 className="text-xl font-bold text-foreground mb-4">Initialize Identity Registry</h4>

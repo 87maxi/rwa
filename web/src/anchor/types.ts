@@ -5,13 +5,15 @@
  * These types serve as the source of truth for program interfaces.
  */
 
+import { PROGRAM_IDS } from '@/config/solana';
+
 // ============================================================================
-// PROGRAM ADDRESSES (from IDLs)
+// PROGRAM ADDRESSES (re-exported from config/solana.ts — single source of truth)
 // ============================================================================
 
-export const SOLANA_RWA_PROGRAM_ID = '2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX';
-export const IDENTITY_REGISTRY_PROGRAM_ID = '5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce';
-export const COMPLIANCE_AGGREGATOR_PROGRAM_ID = '7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb';
+export const SOLANA_RWA_PROGRAM_ID = PROGRAM_IDS.localnet.solanaRwa;
+export const IDENTITY_REGISTRY_PROGRAM_ID = PROGRAM_IDS.localnet.identityRegistry;
+export const COMPLIANCE_AGGREGATOR_PROGRAM_ID = PROGRAM_IDS.localnet.complianceAggregator;
 
 // ============================================================================
 // INSTRUCTION DISCRIMINATORS (from IDLs)
@@ -180,25 +182,27 @@ export interface SupplyInfoData {
 
 /**
  * IdentityRegistryState - Main registry state
- * Fields: owner, identity_count, identities
+ * Rust struct: owner, registry_bump
+ * Seeds: [b"registry"]
  */
 export interface IdentityRegistryStateData {
-  owner: string;
-  identityCount: number;
-  identities: string[];
+  owner: string;         // Pubkey - Who created this registry
+  registryBump: number;  // u8 - PDA bump for registry
 }
 
 /**
  * IdentityAccount - Individual identity record
- * Fields: wallet, name, kyc_status, aml_status, created_at, updated_at
+ * Rust struct: wallet, identity, name, symbol, identity_data, metadata_uri, bump
+ * Seeds: [b"identity", registry_pubkey, wallet_pubkey]
  */
 export interface IdentityAccountData {
-  wallet: string;
-  name: string;
-  kycStatus: number;
-  amlStatus: number;
-  createdAt: bigint;
-  updatedAt: bigint;
+  wallet: string;        // Pubkey - The owner of this identity
+  identity: string;      // Pubkey - The identity credential
+  name: string;          // String - Human-readable name
+  symbol: string;        // String - Short symbol
+  identityData: string;  // String - Additional identity data
+  metadataUri: string;   // String - URI to metadata
+  bump: number;          // u8 - PDA bump
 }
 
 /**
@@ -207,34 +211,33 @@ export interface IdentityAccountData {
 
 /**
  * ComplianceAggregatorState - Main aggregator state
- * Fields: owner, module_count, modules
+ * Rust struct: owner, aggregator_bump
+ * Seeds: [b"aggregator"]
  */
 export interface ComplianceAggregatorStateData {
-  owner: string;
-  moduleCount: number;
-  modules: string[];
+  owner: string;           // Pubkey - Who created this aggregator
+  aggregatorBump: number;  // u8 - Bump for the aggregator PDA
 }
 
 /**
  * TokenComplianceAccount - Token-specific compliance settings
- * Fields: token, aggregator, weights, limits, rules
+ * Rust struct: token, modules (Vec<Pubkey>), bump
+ * Seeds: [b"compliance", aggregator_pubkey, token_pubkey]
  */
 export interface TokenComplianceAccountData {
-  token: string;
-  aggregator: string;
-  weights: number[];
-  limits: Record<string, bigint>;
-  rules: string[];
+  token: string;       // Pubkey - Token program address
+  modules: string[];   // [Pubkey; 10] - List of compliance module addresses
+  moduleCount: number; // u8 - Current number of modules
+  bump: number;        // u8 - PDA bump
 }
 
 /**
- * AggregatorState - Return type for compliance state queries
- * Fields: total_modules, active_modules, compliance_score
+ * AggregatorState - Return type for get_state queries
+ * Rust struct: owner, aggregator_bump
  */
 export interface AggregatorStateData {
-  totalModules: number;
-  activeModules: number;
-  complianceScore: number;
+  owner: string;           // Pubkey - Owner of the aggregator
+  aggregatorBump: number;  // u8 - Bump for the aggregator PDA
 }
 
 /**
