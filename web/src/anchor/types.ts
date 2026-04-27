@@ -118,58 +118,60 @@ export const COMPLIANCE_AGGREGATOR_SEEDS = {
 
 /**
  * TokenState - Main token state account
- * Fields: owner, name, symbol, decimals, total_supply, next_index,
- *         balances, frozen_accounts, agents, compliance_modules
+ * Rust struct: owner, freeze_authority, name, symbol, decimals, total_supply, next_index, bump
+ * Seeds: [b"token", owner]
  */
 export interface TokenStateData {
-  owner: string;
-  name: string;
-  symbol: string;
-  decimals: number;
-  totalSupply: bigint;
-  nextIndex: number;
-  balances: Array<{ account: string; amount: bigint }>;
-  frozenAccounts: string[];
-  agents: string[];
-  complianceModules: string[];
+  owner: string;           // Pubkey - Who created this token
+  freezeAuthority: string; // Pubkey - Freeze authority
+  name: string;            // String - Token name
+  symbol: string;          // String - Token symbol
+  decimals: number;        // u8 - Decimal places
+  totalSupply: bigint;     // u64 - Total tokens minted
+  nextIndex: bigint;       // u64 - Counter for future use
+  bump: number;            // u8 - PDA bump for token
 }
 
 /**
  * BalanceEntry - Token balance record
- * Fields: account, amount
+ * Rust struct: wallet, balance, bump
+ * Seeds: [b"balance", token_state, wallet]
  */
 export interface BalanceEntryData {
-  account: string;
-  amount: bigint;
+  wallet: string;    // Pubkey - Wallet address
+  balance: bigint;   // u64 - Balance in smallest units
+  bump: number;      // u8 - PDA bump
 }
 
 /**
  * AgentAccount - Agent permission record
- * Fields: agent, permissions
+ * Rust struct: agent, bump
+ * Seeds: [b"agent", token_state, agent]
  */
 export interface AgentAccountData {
-  agent: string;
-  permissions: number;
+  agent: string;  // Pubkey - Agent wallet address
+  bump: number;   // u8 - PDA bump
 }
 
 /**
  * FrozenAccount - Frozen account record
- * Fields: account, reason, timestamp
+ * Rust struct: wallet, frozen, bump
+ * Seeds: [b"frozen", token_state, wallet]
  */
 export interface FrozenAccountData {
-  account: string;
-  reason: string;
-  timestamp: bigint;
+  wallet: string;  // Pubkey - Wallet address
+  frozen: boolean; // bool - true = frozen, false = active
+  bump: number;    // u8 - PDA bump
 }
 
 /**
  * SupplyInfo - Return type for get_supply_info
- * Fields: total_supply, circulating_supply, decimals
+ * Rust struct: current_supply, max_supply, remaining_supply
  */
 export interface SupplyInfoData {
-  totalSupply: bigint;
-  circulatingSupply: bigint;
-  decimals: number;
+  currentSupply: bigint;    // u64 - Current supply
+  maxSupply: bigint;        // u64 - Max supply
+  remainingSupply: bigint;  // u64 - Remaining supply
 }
 
 /**
@@ -368,7 +370,9 @@ export interface IdentityRegisterWithDataArgs {
  * Identity Update instruction arguments
  */
 export interface IdentityUpdateArgs {
-  name: string;
-  kycStatus: number;
-  amlStatus: number;
+  newIdentity: string; // Pubkey as string
+  name?: string | null;
+  symbol?: string | null;
+  identityData?: string | null;
+  metadataUri?: string | null;
 }

@@ -57,6 +57,79 @@ const DISCRIMINATORS: Record<string, number[]> = {
   // It uses the account's data directly, no discriminator needed
 };
 
+// =============================================================================
+// PDA DERIVATION HELPERS
+// =============================================================================
+// These functions derive PDAs based on the seeds defined in the IDL.
+// They ensure consistency between the frontend and the smart contract.
+
+/**
+ * Derive the PDA for a BalanceAccount.
+ * Seeds: [b"balance", token_state, wallet]
+ * @see IDL: solana-rwa.json - balance_account PDA seeds
+ */
+export function deriveBalancePda(
+  tokenState: PublicKey,
+  wallet: PublicKey,
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("balance"), tokenState.toBuffer(), wallet.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
+/**
+ * Derive the PDA for a FrozenAccount.
+ * Seeds: [b"frozen", token_state, wallet]
+ * @see IDL: solana-rwa.json - frozen_account PDA seeds
+ */
+export function deriveFrozenPda(
+  tokenState: PublicKey,
+  wallet: PublicKey,
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("frozen"), tokenState.toBuffer(), wallet.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
+/**
+ * Derive the PDA for an AgentAccount.
+ * Seeds: [b"agent", token_state, agent]
+ * @see IDL: solana-rwa.json - agent_account PDA seeds
+ */
+export function deriveAgentPda(
+  tokenState: PublicKey,
+  agent: PublicKey,
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("agent"), tokenState.toBuffer(), agent.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
+/**
+ * Derive the TokenState PDA.
+ * Seeds: [b"token", owner]
+ * @see IDL: solana-rwa.json - token PDA seeds
+ */
+export function deriveTokenStatePda(
+  owner: PublicKey,
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("token"), owner.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
 /**
  * Token state account data structure (matches Anchor struct)
  */
@@ -401,17 +474,25 @@ export function buildBurnInstruction(
 }
 
 /**
- * Build remove agent instruction
+ * Build remove agent instruction.
+ *
+ * Accounts from RemoveAgent struct (IDL):
+ * - token: TokenState PDA (writable, read-only for this operation)
+ * - payer: Signer (must be token owner)
+ * - agent_account: AgentAccount PDA (writable, closes account, returns SOL to payer)
+ *
+ * PDA derivation for agent_account: [b"agent", token_state, agent]
+ * @see IDL: solana-rwa.json - remove_agent accounts
  */
 export function buildRemoveAgentInstruction(
   tokenState: PublicKey,
   payer: PublicKey,
-  agent: PublicKey,
+  agentAccount: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  // Anchor layout: discriminator(8) + agent(32) = 40 bytes
-  const data = Buffer.alloc(40);
+  // No arguments in data - just discriminator (the agent pubkey is stored in agent_account PDA)
+  const data = Buffer.alloc(8);
   let offset = 0;
 
   DISCRIMINATORS.remove_agent.forEach((b, i) => {
@@ -419,14 +500,12 @@ export function buildRemoveAgentInstruction(
   });
   offset += 8;
 
-  // Write 'agent' pubkey (32 bytes)
-  agent.toBuffer().copy(data, offset);
-
+  // Account order from RemoveAgent struct in IDL: token, payer, agent_account
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
-      { pubkey: agent, isSigner: false, isWritable: true },
+      { pubkey: agentAccount, isSigner: false, isWritable: true },
     ],
     data,
   };
@@ -698,13 +777,13 @@ export function buildComplianceAddModuleToExistingInstruction(
   // Write 'module' pubkey (32 bytes)
   module.toBuffer().copy(data, offset);
 
-  // Account order: aggregator, owner, token_compliance, system_program
+  // Account order: aggregator, owner, token_compliance
+  // NOTE: NO system_program - AddModuleToExisting struct doesn't include it
   return {
     keys: [
-      { pubkey: aggregatorState, isSigner: false, isWritable: true },
+      { pubkey: aggregatorState, isSigner: false, isWritable: false },
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: tokenCompliance, isSigner: false, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };
@@ -758,6 +837,13 @@ export function buildComplianceGetModuleCountInstruction(
 
 /**
  * Build compliance can transfer instruction (read-only query)
+ *
+ * Parameters match Rust can_transfer() signature:
+ * token, from, to, amount, sender_kyc, recipient_kyc, sender_balance, recipient_balance, total_holders
+ *
+ * Data layout: discriminator(8) + token(32) + from(32) + to(32) + amount(8) +
+ *              sender_kyc(32) + recipient_kyc(32) + sender_balance(8) +
+ *              recipient_balance(8) + total_holders(8) = 200 bytes
  */
 export function buildComplianceCanTransferInstruction(
   aggregatorState: PublicKey,
@@ -765,10 +851,17 @@ export function buildComplianceCanTransferInstruction(
   from: PublicKey,
   to: PublicKey,
   amount: bigint,
+  senderKyc: PublicKey,
+  recipientKyc: PublicKey,
+  senderBalance: bigint,
+  recipientBalance: bigint,
+  totalHolders: bigint,
   _programId: PublicKey
 ): InstructionResult {
-  // Anchor layout: discriminator(8) + token(32) + from(32) + to(32) + amount(8) = 112 bytes
-  const data = Buffer.alloc(112);
+  // Anchor layout: discriminator(8) + token(32) + from(32) + to(32) + amount(8) +
+  //                sender_kyc(32) + recipient_kyc(32) + sender_balance(8) +
+  //                recipient_balance(8) + total_holders(8) = 200 bytes
+  const data = Buffer.alloc(200);
   let offset = 0;
 
   DISCRIMINATORS.compliance_can_transfer.forEach((b, i) => {
@@ -790,13 +883,33 @@ export function buildComplianceCanTransferInstruction(
 
   // Write 'amount' (8 bytes, u64)
   data.writeBigUInt64LE(amount, offset);
+  offset += 8;
 
+  // Write 'sender_kyc' pubkey (32 bytes)
+  senderKyc.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'recipient_kyc' pubkey (32 bytes)
+  recipientKyc.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'sender_balance' (8 bytes, u64)
+  data.writeBigUInt64LE(senderBalance, offset);
+  offset += 8;
+
+  // Write 'recipient_balance' (8 bytes, u64)
+  data.writeBigUInt64LE(recipientBalance, offset);
+  offset += 8;
+
+  // Write 'total_holders' (8 bytes, u64)
+  data.writeBigUInt64LE(totalHolders, offset);
+
+  // Account order from IDL: aggregator, token, token_compliance
   return {
     keys: [
       { pubkey: aggregatorState, isSigner: false, isWritable: false },
       { pubkey: token, isSigner: false, isWritable: false },
-      { pubkey: from, isSigner: false, isWritable: false },
-      { pubkey: to, isSigner: false, isWritable: false },
+      { pubkey: token, isSigner: false, isWritable: false }, // token_compliance derives from token
     ],
     data,
   };
@@ -829,15 +942,15 @@ export function buildIdentityInitializeInstruction(
 }
 
 /**
-   * Build identity register identity instruction
-   */
+    * Build identity register identity instruction
+    */
   export function buildIdentityRegisterInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   payer: PublicKey,
   wallet: PublicKey,
   identity: PublicKey,
-  _programId: PublicKey
+  programId: PublicKey
 ): InstructionResult {
   // Anchor layout: discriminator(8) + wallet(32) + identity(32) = 72 bytes
   const data = Buffer.alloc(72);
@@ -855,13 +968,19 @@ export function buildIdentityInitializeInstruction(
   // Write 'identity' pubkey (32 bytes)
   identity.toBuffer().copy(data, offset);
 
+  // Derive identity_account PDA: [b"identity", registry, owner]
+  const [identityAccountPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("identity"), registryState.toBuffer(), owner.toBuffer()],
+    programId
+  );
+
   // Account order from RegisterIdentity struct: payer, registry, owner, identity_account, system_program
   return {
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: registryState, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: identityAccountPda, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -935,20 +1054,46 @@ export function buildIdentityRegisterWithDataInstruction(
 }
 
 /**
-   * Build identity update identity instruction
-   */
+    * Build identity update identity instruction
+    *
+    * Parameters match Rust/IDL signature:
+    * - new_identity: Pubkey (required)
+    * - name: Option<String> (optional)
+    * - symbol: Option<String> (optional)
+    * - identity_data: Option<String> (optional)
+    * - metadata_uri: Option<String> (optional)
+    *
+    * Data layout: discriminator(8) + wallet(32) + newIdentity(32) +
+    *              name_option(1 + 4 + len) + symbol_option(1 + 4 + len) +
+    *              identity_data_option(1 + 4 + len) + metadata_uri_option(1 + 4 + len)
+    */
   export function buildIdentityUpdateInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   wallet: PublicKey,
   newIdentity: PublicKey,
-  _programId: PublicKey
+  name: string | null,
+  symbol: string | null,
+  identityData: string | null,
+  metadataUri: string | null,
+  programId: PublicKey
 ): InstructionResult {
-  // Anchor layout: discriminator(8) + wallet(32) + newIdentity(32) = 72 bytes
-  // wallet is used for PDA derivation: [b"identity", registry.key(), wallet.key()]
-  const data = Buffer.alloc(72);
+  // Calculate data size: discriminator(8) + wallet(32) + newIdentity(32) + options
+  function serializeOptionString(s: string | null): number {
+    if (s === null || s === undefined) return 1; // None = 0x00
+    // Some = 0x01 + u32 length (LE) + string bytes
+    return 1 + 4 + Buffer.byteLength(s);
+  }
+
+  const nameSize = serializeOptionString(name);
+  const symbolSize = serializeOptionString(symbol);
+  const identityDataSize = serializeOptionString(identityData);
+  const metadataUriSize = serializeOptionString(metadataUri);
+  
+  const data = Buffer.alloc(8 + 32 + 32 + nameSize + symbolSize + identityDataSize + metadataUriSize);
   let offset = 0;
 
+  // Write discriminator (8 bytes)
   DISCRIMINATORS.identity_update_identity.forEach((b, i) => {
     data[offset + i] = b;
   });
@@ -960,12 +1105,67 @@ export function buildIdentityRegisterWithDataInstruction(
 
   // Write 'newIdentity' pubkey (32 bytes)
   newIdentity.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'name' option
+  if (name === null || name === undefined) {
+    data[offset++] = 0; // None
+  } else {
+    data[offset++] = 1; // Some
+    const bytes = Buffer.from(name, 'utf8');
+    data.writeUInt32LE(bytes.length, offset);
+    offset += 4;
+    bytes.copy(data, offset);
+    offset += bytes.length;
+  }
+
+  // Write 'symbol' option
+  if (symbol === null || symbol === undefined) {
+    data[offset++] = 0; // None
+  } else {
+    data[offset++] = 1; // Some
+    const bytes = Buffer.from(symbol, 'utf8');
+    data.writeUInt32LE(bytes.length, offset);
+    offset += 4;
+    bytes.copy(data, offset);
+    offset += bytes.length;
+  }
+
+  // Write 'identity_data' option
+  if (identityData === null || identityData === undefined) {
+    data[offset++] = 0; // None
+  } else {
+    data[offset++] = 1; // Some
+    const bytes = Buffer.from(identityData, 'utf8');
+    data.writeUInt32LE(bytes.length, offset);
+    offset += 4;
+    bytes.copy(data, offset);
+    offset += bytes.length;
+  }
+
+  // Write 'metadata_uri' option
+  if (metadataUri === null || metadataUri === undefined) {
+    data[offset++] = 0; // None
+  } else {
+    data[offset++] = 1; // Some
+    const bytes = Buffer.from(metadataUri, 'utf8');
+    data.writeUInt32LE(bytes.length, offset);
+    offset += 4;
+    bytes.copy(data, offset);
+    offset += bytes.length;
+  }
+
+  // Derive identity_account PDA: [b"identity", registry, wallet]
+  const [identityAccountPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("identity"), registryState.toBuffer(), wallet.toBuffer()],
+    programId
+  );
 
   // Account order from UpdateIdentity struct: registry (read-only), identity_account (writable), owner
   return {
     keys: [
       { pubkey: registryState, isSigner: false, isWritable: false },
-      { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: identityAccountPda, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
     ],
     data,
@@ -973,16 +1173,16 @@ export function buildIdentityRegisterWithDataInstruction(
 }
 
 /**
- * Build identity remove identity instruction
- */
+  * Build identity remove identity instruction
+  */
 export function buildIdentityRemoveInstruction(
   registryState: PublicKey,
   owner: PublicKey,
   wallet: PublicKey,
-  _programId: PublicKey
+  programId: PublicKey
 ): InstructionResult {
-  // Anchor layout: discriminator(8) + wallet(32) = 40 bytes
-  const data = Buffer.alloc(40);
+  // remove_identity has no args (empty args array in IDL)
+  const data = Buffer.alloc(8);
   let offset = 0;
 
   DISCRIMINATORS.identity_remove_identity.forEach((b, i) => {
@@ -990,13 +1190,17 @@ export function buildIdentityRemoveInstruction(
   });
   offset += 8;
 
-  // Write 'wallet' pubkey (32 bytes)
-  wallet.toBuffer().copy(data, offset);
+  // Derive identity_account PDA: [b"identity", registry, wallet]
+  const [identityAccountPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("identity"), registryState.toBuffer(), wallet.toBuffer()],
+    programId
+  );
 
+  // Account order from RemoveIdentity struct: registry, identity_account, owner
   return {
     keys: [
-      { pubkey: registryState, isSigner: false, isWritable: true },
-      { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: registryState, isSigner: false, isWritable: false },
+      { pubkey: identityAccountPda, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: true, isWritable: false },
     ],
     data,
