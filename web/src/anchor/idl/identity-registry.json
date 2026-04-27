@@ -1,0 +1,777 @@
+{
+  "address": "5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce",
+  "metadata": {
+    "name": "identity_registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Identity registry program for RWA token platform"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize a new identity registry",
+        "",
+        "Creates the registry PDA that will control all identity registrations."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Who pays for the registry account creation"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "docs": [
+            "The new registry PDA account (stores owner info only)",
+            "Seeds: [b\"registry\"]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "Solana's system program (required for account creation)"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_identity",
+      "docs": [
+        "Register a new identity mapping (Pubkey-based)",
+        "",
+        "Creates a new IdentityAccount PDA for the wallet."
+      ],
+      "discriminator": [
+        164,
+        118,
+        227,
+        177,
+        47,
+        176,
+        187,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Payer for rent (new identity PDA needs rent exemption)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "docs": [
+            "Registry PDA (must be signed via seeds for authorization)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The wallet being registered (must sign to prove authority)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "identity_account",
+          "docs": [
+            "New IdentityAccount PDA (will be created)",
+            "Seeds: [b\"identity\", registry.key(), owner.key()]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "identity",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "register_identity_with_data",
+      "docs": [
+        "Register a new identity with string-based identity data (MEDIUM-01: with length validation)"
+      ],
+      "discriminator": [
+        108,
+        188,
+        121,
+        153,
+        200,
+        193,
+        22,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Payer for rent (new identity PDA needs rent exemption)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "docs": [
+            "Registry PDA (must be signed via seeds for authorization)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The wallet being registered (must sign to prove authority)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "identity_account",
+          "docs": [
+            "New IdentityAccount PDA (will be created)",
+            "Seeds: [b\"identity\", registry.key(), owner.key()]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "identity_data",
+          "type": "string"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "remove_identity",
+      "docs": [
+        "Remove an identity mapping",
+        "",
+        "Only the identity owner or registry admin can remove."
+      ],
+      "discriminator": [
+        146,
+        93,
+        160,
+        7,
+        61,
+        138,
+        181,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "docs": [
+            "Registry PDA (for authorization)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity_account",
+          "docs": [
+            "IdentityAccount PDA (will be closed, SOL returned to owner)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "identity_account.wallet",
+                "account": "IdentityAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Recipient for remaining SOL (must be identity owner)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_identity",
+      "docs": [
+        "Update an existing identity mapping",
+        "",
+        "Only the identity owner or registry admin can update."
+      ],
+      "discriminator": [
+        130,
+        54,
+        88,
+        104,
+        222,
+        124,
+        238,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "docs": [
+            "Registry PDA (for authorization)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity_account",
+          "docs": [
+            "IdentityAccount PDA (will be updated)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "identity_account.wallet",
+                "account": "IdentityAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The person updating (must be identity owner or registry admin)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_identity",
+          "type": "pubkey"
+        },
+        {
+          "name": "name",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "symbol",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "identity_data",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "metadata_uri",
+          "type": {
+            "option": "string"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "IdentityAccount",
+      "discriminator": [
+        194,
+        90,
+        181,
+        160,
+        182,
+        206,
+        116,
+        158
+      ]
+    },
+    {
+      "name": "IdentityRegistryState",
+      "discriminator": [
+        50,
+        240,
+        176,
+        174,
+        121,
+        45,
+        186,
+        90
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "IdentityRegisteredEvent",
+      "discriminator": [
+        112,
+        105,
+        60,
+        169,
+        239,
+        101,
+        136,
+        146
+      ]
+    },
+    {
+      "name": "IdentityRegisteredWithDataEvent",
+      "discriminator": [
+        225,
+        35,
+        81,
+        5,
+        53,
+        32,
+        105,
+        170
+      ]
+    },
+    {
+      "name": "IdentityRemovedEvent",
+      "discriminator": [
+        115,
+        141,
+        35,
+        9,
+        143,
+        85,
+        108,
+        230
+      ]
+    },
+    {
+      "name": "IdentityUpdatedEvent",
+      "discriminator": [
+        231,
+        70,
+        137,
+        19,
+        34,
+        252,
+        160,
+        227
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "WalletAlreadyRegistered",
+      "msg": "Wallet already registered"
+    },
+    {
+      "code": 6001,
+      "name": "WalletNotRegistered",
+      "msg": "Wallet not registered"
+    },
+    {
+      "code": 6002,
+      "name": "NotIdentityOwner",
+      "msg": "Caller is not the identity owner or registry admin"
+    },
+    {
+      "code": 6003,
+      "name": "StringTooLong",
+      "msg": "String length exceeds maximum allowed"
+    },
+    {
+      "code": 6004,
+      "name": "WalletMismatch",
+      "msg": "Wallet does not match owner"
+    }
+  ],
+  "types": [
+    {
+      "name": "IdentityAccount",
+      "docs": [
+        "IdentityAccount stores a single identity record using a PDA.",
+        "",
+        "Seeds: [b\"identity\", registry_pubkey, wallet_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "identity_data",
+            "type": "string"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRegisteredEvent",
+      "docs": [
+        "Event emitted when a new identity is registered"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRegisteredWithDataEvent",
+      "docs": [
+        "Event emitted when a new identity is registered with string-based data (MEDIUM-01)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "identity_data",
+            "type": "string"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRegistryState",
+      "docs": [
+        "IdentityRegistryState is the control account for the identity registry.",
+        "It is stored as a PDA with seeds [b\"registry\"]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "registry_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRemovedEvent",
+      "docs": [
+        "Event emitted when an identity is removed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "removed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "was_admin_override",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityUpdatedEvent",
+      "docs": [
+        "Event emitted when an identity is updated"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "updated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_admin_override",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ]
+}

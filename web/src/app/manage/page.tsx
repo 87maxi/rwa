@@ -45,7 +45,8 @@ export default function ManagePage() {
   const [identityInfo, setIdentityInfo] = useState<IdentityInfo | null>(null);
 
   // Derive PDA for the token state account from the owner wallet
-  // The token state is a PDA seeded with: [owner_wallet_bytes]
+  // The token state is a PDA seeded with: [b"token", owner_wallet_bytes]
+  // @see solana-rwa/idl_solana_rwa.json - TokenState PDA seeds
   const tokenStatePda = useMemo(() => {
     if (!publicKey) return null;
     
@@ -55,9 +56,9 @@ export default function ManagePage() {
       if (!programIdStr) return null;
       
       const programId = new PublicKey(programIdStr);
-      // Derive PDA from owner wallet and program ID
+      // Derive PDA from "token" constant + owner wallet and program ID
       const [derivedPda] = PublicKey.findProgramAddressSync(
-        [publicKey.toBuffer()],
+        [Buffer.from("token"), publicKey.toBuffer()],
         programId
       );
       

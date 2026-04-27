@@ -4,6 +4,7 @@ import { SolanaProvider } from "@/providers/SolanaProvider";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { ClientOnly } from "@/components/ClientOnly";
+import { WalletDebugPanel } from "@/components/WalletDebugPanel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,6 +42,10 @@ export default function RootLayout({
           </ClientOnly>
           <ClientOnly fallback={<div className="fixed top-4 right-20 z-50 w-48 h-10" />}>
             <NetworkStatus />
+          </ClientOnly>
+          {/* Fase 1.1 - Debug panel para diagnóstico de wallet (oculto por defecto) */}
+          <ClientOnly fallback={<div className="fixed bottom-4 right-4 z-[9999]" />}>
+            <WalletDebugPanel />
           </ClientOnly>
         </SolanaProvider>
       </body>

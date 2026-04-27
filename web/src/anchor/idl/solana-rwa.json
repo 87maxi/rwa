@@ -1,0 +1,1326 @@
+{
+  "address": "2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX",
+  "metadata": {
+    "name": "solana_rwa",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_agent",
+      "docs": [
+        "Add an agent"
+      ],
+      "discriminator": [
+        214,
+        206,
+        14,
+        110,
+        178,
+        131,
+        218,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (will be modified)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Must be the token owner"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "new_agent",
+          "docs": [
+            "New agent wallet (used for PDA derivation)"
+          ]
+        },
+        {
+          "name": "agent_account",
+          "docs": [
+            "New agent account PDA (will be created)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "new_agent"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "agent",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "burn",
+      "docs": [
+        "Burn tokens"
+      ],
+      "discriminator": [
+        116,
+        110,
+        29,
+        56,
+        107,
+        219,
+        42,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (will be modified)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "Agent performing the burn (must be authorized)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "sender",
+          "docs": [
+            "Sender wallet (must sign and have balance)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "balance_account",
+          "docs": [
+            "Individual balance PDA for the sender"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "sender"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for rent return"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "from",
+          "type": "pubkey"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "freeze_account",
+      "docs": [
+        "Freeze an account"
+      ],
+      "discriminator": [
+        253,
+        75,
+        82,
+        133,
+        167,
+        238,
+        43,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Authority performing the freeze (must be freeze_authority)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "frozen_account",
+          "docs": [
+            "Frozen status PDA (will be created if not exists)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  111,
+                  122,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "frozen_account.wallet",
+                "account": "FrozenAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "get_supply_info",
+      "docs": [
+        "GetSupplyInfo query function"
+      ],
+      "discriminator": [
+        195,
+        15,
+        219,
+        198,
+        89,
+        216,
+        184,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "SupplyInfo"
+        }
+      }
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize a new token"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Who pays the rent for creating the account"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token",
+          "docs": [
+            "The new TokenState PDA account (stores token metadata only)",
+            "Seeds: [b\"token\"]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "Solana's system program (required for account creation)"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "decimals",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "mint",
+      "docs": [
+        "Mint new tokens"
+      ],
+      "discriminator": [
+        51,
+        57,
+        225,
+        47,
+        182,
+        146,
+        137,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (will be modified - total_supply updated)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "Agent performing the mint (must be authorized by token owner)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "balance_account",
+          "docs": [
+            "Individual balance PDA for the recipient"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "balance_account.wallet",
+                "account": "BalanceAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "remove_agent",
+      "docs": [
+        "Remove an agent"
+      ],
+      "discriminator": [
+        126,
+        25,
+        90,
+        199,
+        104,
+        237,
+        225,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Must be the token owner (receives returned SOL)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "agent_account",
+          "docs": [
+            "Agent account to close (SOL returned to payer)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "agent_account.agent",
+                "account": "AgentAccount"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer",
+      "docs": [
+        "Transfer tokens"
+      ],
+      "discriminator": [
+        163,
+        52,
+        200,
+        231,
+        140,
+        3,
+        69,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (metadata only, total_supply unchanged)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "from",
+          "docs": [
+            "Sender: must sign to prove ownership"
+          ],
+          "signer": true
+        },
+        {
+          "name": "from_balance",
+          "docs": [
+            "Sender's individual balance PDA (will be debited)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "from"
+              }
+            ]
+          }
+        },
+        {
+          "name": "to_balance",
+          "docs": [
+            "Receiver's individual balance PDA (will be credited)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "to_balance.wallet",
+                "account": "BalanceAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_freeze_authority",
+      "docs": [
+        "TransferFreezeAuthority instruction handler"
+      ],
+      "discriminator": [
+        235,
+        44,
+        91,
+        221,
+        224,
+        5,
+        187,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (freeze_authority field will be modified)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "current_freeze_authority",
+          "docs": [
+            "Current freeze authority (must sign to authorize transfer)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_freeze_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_owner",
+      "docs": [
+        "TransferOwner instruction handler"
+      ],
+      "discriminator": [
+        245,
+        25,
+        221,
+        175,
+        106,
+        229,
+        225,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account (owner field will be modified)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "current_owner",
+          "docs": [
+            "Current owner (must sign to authorize transfer)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unfreeze_account",
+      "docs": [
+        "Unfreeze an account"
+      ],
+      "discriminator": [
+        28,
+        255,
+        156,
+        206,
+        139,
+        228,
+        5,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "token",
+          "docs": [
+            "Token state account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token.owner",
+                "account": "TokenState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Authority performing the unfreeze"
+          ],
+          "signer": true
+        },
+        {
+          "name": "frozen_account",
+          "docs": [
+            "Frozen status PDA (must exist to be modified)"
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "account",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AgentAccount",
+      "discriminator": [
+        241,
+        119,
+        69,
+        140,
+        233,
+        9,
+        112,
+        50
+      ]
+    },
+    {
+      "name": "BalanceAccount",
+      "discriminator": [
+        44,
+        165,
+        195,
+        3,
+        17,
+        107,
+        110,
+        188
+      ]
+    },
+    {
+      "name": "FrozenAccount",
+      "discriminator": [
+        158,
+        228,
+        34,
+        188,
+        28,
+        83,
+        228,
+        244
+      ]
+    },
+    {
+      "name": "TokenState",
+      "discriminator": [
+        218,
+        112,
+        6,
+        149,
+        55,
+        186,
+        168,
+        163
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AccountFrozenEvent",
+      "discriminator": [
+        83,
+        200,
+        223,
+        28,
+        165,
+        34,
+        41,
+        80
+      ]
+    },
+    {
+      "name": "AccountUnfrozenEvent",
+      "discriminator": [
+        135,
+        144,
+        78,
+        251,
+        120,
+        183,
+        39,
+        61
+      ]
+    },
+    {
+      "name": "FreezeAuthorityTransferredEvent",
+      "discriminator": [
+        209,
+        213,
+        80,
+        147,
+        203,
+        22,
+        159,
+        154
+      ]
+    },
+    {
+      "name": "OwnerTransferredEvent",
+      "discriminator": [
+        241,
+        226,
+        150,
+        214,
+        252,
+        128,
+        127,
+        217
+      ]
+    },
+    {
+      "name": "TokensMintedEvent",
+      "discriminator": [
+        197,
+        87,
+        251,
+        124,
+        83,
+        45,
+        57,
+        62
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance"
+    },
+    {
+      "code": 6002,
+      "name": "AccountFrozen",
+      "msg": "Account frozen"
+    },
+    {
+      "code": 6003,
+      "name": "DuplicateAgent",
+      "msg": "Agent already exists"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount: amount must be greater than zero"
+    },
+    {
+      "code": 6005,
+      "name": "SupplyExceeded",
+      "msg": "Supply exceeded maximum cap"
+    },
+    {
+      "code": 6006,
+      "name": "SupplyOverflow",
+      "msg": "Supply overflow"
+    },
+    {
+      "code": 6007,
+      "name": "SameOwner",
+      "msg": "New owner cannot be the same as current owner"
+    },
+    {
+      "code": 6008,
+      "name": "NotFreezeAuthority",
+      "msg": "Caller is not the freeze authority"
+    },
+    {
+      "code": 6009,
+      "name": "SameFreezeAuthority",
+      "msg": "New freeze authority cannot be the same as current"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidString",
+      "msg": "Invalid string length"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountFrozenEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccountUnfrozenEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "unfrozen_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentAccount",
+      "docs": [
+        "AgentAccount stores an authorized agent.",
+        "Seeds: [b\"agent\", token_pubkey, agent_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BalanceAccount",
+      "docs": [
+        "BalanceAccount stores a single wallet's token balance.",
+        "Seeds: [b\"balance\", token_pubkey, wallet_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FreezeAuthorityTransferredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_freeze_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_freeze_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "transferred_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FrozenAccount",
+      "docs": [
+        "FrozenAccount stores the frozen status of a wallet account.",
+        "Seeds: [b\"frozen\", token_pubkey, wallet_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnerTransferredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "transferred_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupplyInfo",
+      "docs": [
+        "SupplyInfo - returned by get_supply_info query"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "current_supply",
+            "type": "u64"
+          },
+          {
+            "name": "max_supply",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_supply",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenState",
+      "docs": [
+        "TokenState is the main control account for the token program.",
+        "It is stored as a PDA with seeds [b\"token\"]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "freeze_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "total_supply",
+            "type": "u64"
+          },
+          {
+            "name": "next_index",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensMintedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_supply",
+            "type": "u64"
+          },
+          {
+            "name": "minted_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}
