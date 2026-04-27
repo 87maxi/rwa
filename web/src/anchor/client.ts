@@ -53,7 +53,8 @@ const DISCRIMINATORS: Record<string, number[]> = {
   identity_register_identity_with_data: [108, 188, 121, 153, 200, 193, 22, 7],
   identity_update_identity: [130, 54, 88, 104, 222, 124, 238, 252],
   identity_remove_identity: [146, 93, 160, 7, 61, 138, 181, 113],
-  identity_get_identity: [239, 148, 144, 13, 242, 216, 55, 213],
+  // Note: identity_get is a view function (query), not a transaction instruction
+  // It uses the account's data directly, no discriminator needed
 };
 
 /**
@@ -93,6 +94,34 @@ export function getProgramId(
 /**
  * Build initialize instruction
  */
+/**
+ * Serializes a string according to Anchor's format:
+ * 4 bytes length prefix (u32 LE) + UTF-8 bytes.
+ *
+ * According to Anchor documentation: "A String requires 4 bytes for the length
+ * prefix plus the number of bytes in the string."
+ *
+ * Fase 6.3: Fix para error "memory allocation failed, out of memory" en Surfpool.
+ *
+ * Problema: El formato anterior usaba 8 bytes para el prefijo, pero Anchor usa
+ * exactamente 4 bytes (u32 LE) para el prefijo de longitud de los Strings.
+ *
+ * Solución: Usar prefijo de 4 bytes (u32 LE) para la longitud del string.
+ */
+function serializeAnchorString(s: string): Buffer {
+  const utf8Buffer = Buffer.from(s, 'utf-8');
+  // Anchor String type: 4-byte u32 LE length prefix + UTF-8 bytes
+  const prefix = Buffer.alloc(4);
+  prefix.writeUInt32LE(utf8Buffer.length, 0);
+  return Buffer.concat([prefix, utf8Buffer]);
+}
+
+/**
+ * Build initialize instruction for Token State.
+ *
+ * Fase 6.3: Fix para error "memory allocation failed, out of memory" en Surfpool.
+ * El formato de datos ahora coincide con Anchor's String serialization (4-byte u32 LE prefix).
+ */
 export function buildInitializeInstruction(
   tokenState: PublicKey,
   owner: PublicKey,
@@ -102,32 +131,32 @@ export function buildInitializeInstruction(
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
-  const nameBuffer = Buffer.from(name, 'utf-8');
-  const symbolBuffer = Buffer.from(symbol, 'utf-8');
+  
+  // Serialize strings using Anchor's format (4-byte u32 LE length prefix + UTF-8 bytes)
+  const nameBuffer = serializeAnchorString(name);
+  const symbolBuffer = serializeAnchorString(symbol);
 
-  const dataLength = 8 + 1 + nameBuffer.length + 1 + symbolBuffer.length + 1;
+  // Data layout: 8-byte discriminator + 4-byte name length + name bytes + 4-byte symbol length + symbol bytes + 1-byte decimals
+  const dataLength = 8 + nameBuffer.length + symbolBuffer.length + 1;
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
-  // Write discriminator
+  
+  // Write discriminator (8 bytes)
   DISCRIMINATORS.initialize.forEach((b, i) => {
     data[offset + i] = b;
   });
   offset += 8;
 
-  // Write name (length-prefixed string)
-  data[offset] = nameBuffer.length;
-  offset += 1;
+  // Write name (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   nameBuffer.copy(data, offset);
   offset += nameBuffer.length;
 
-  // Write symbol (length-prefixed string)
-  data[offset] = symbolBuffer.length;
-  offset += 1;
+  // Write symbol (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   symbolBuffer.copy(data, offset);
   offset += symbolBuffer.length;
 
-  // Write decimals
+  // Write decimals (1 byte)
   data[offset] = decimals;
 
   // Account order must match Anchor struct: payer, token, system_program
@@ -256,9 +285,13 @@ export function buildBurnInstruction(
 }
 
 /**
- * Build freeze account instruction
- */
-export function buildFreezeInstruction(
+  * Build freeze account instruction
+  * @param tokenState - Token state PDA (read-only in FreezeAccount struct)
+  * @param agent - Authority performing the freeze (must be freeze_authority)
+  * @param account - Frozen status PDA to freeze
+  * @param _programId - Program ID (reserved for future use)
+  */
+  export function buildFreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
@@ -277,10 +310,10 @@ export function buildFreezeInstruction(
   // Write 'account' pubkey (32 bytes)
   account.toBuffer().copy(data, offset);
 
-  // Account order: token, authority, frozen_account, system_program
+  // Account order: token (read-only), authority, frozen_account, system_program
   return {
     keys: [
-      { pubkey: tokenState, isSigner: false, isWritable: true },
+      { pubkey: tokenState, isSigner: false, isWritable: false },
       { pubkey: agent, isSigner: true, isWritable: false },
       { pubkey: account, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
@@ -290,9 +323,13 @@ export function buildFreezeInstruction(
 }
 
 /**
- * Build unfreeze account instruction
- */
-export function buildUnfreezeInstruction(
+  * Build unfreeze account instruction
+  * @param tokenState - Token state PDA (read-only in UnfreezeAccount struct)
+  * @param agent - Authority performing the unfreeze
+  * @param account - Frozen status PDA to unfreeze
+  * @param _programId - Program ID (reserved for future use)
+  */
+  export function buildUnfreezeInstruction(
   tokenState: PublicKey,
   agent: PublicKey,
   account: PublicKey,
@@ -311,10 +348,10 @@ export function buildUnfreezeInstruction(
   // Write 'account' pubkey (32 bytes)
   account.toBuffer().copy(data, offset);
 
-  // Account order: token, authority, frozen_account
+  // Account order: token (read-only), authority, frozen_account
   return {
     keys: [
-      { pubkey: tokenState, isSigner: false, isWritable: true },
+      { pubkey: tokenState, isSigner: false, isWritable: false },
       { pubkey: agent, isSigner: true, isWritable: false },
       { pubkey: account, isSigner: false, isWritable: true },
     ],
@@ -323,12 +360,18 @@ export function buildUnfreezeInstruction(
 }
 
 /**
- * Build add agent instruction
- */
-export function buildAddAgentInstruction(
+  * Build add agent instruction
+  * @param tokenState - Token state PDA
+  * @param payer - Payer (must be token owner)
+  * @param agent - New agent wallet pubkey
+  * @param agentAccount - Agent account PDA (seeds: [b"agent", tokenState, agent])
+  * @param _programId - Program ID (reserved for future use)
+  */
+  export function buildAddAgentInstruction(
   tokenState: PublicKey,
   payer: PublicKey,
   agent: PublicKey,
+  agentAccount: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
   // programId parameter reserved for future use
@@ -344,11 +387,13 @@ export function buildAddAgentInstruction(
   // Write 'agent' pubkey (32 bytes)
   agent.toBuffer().copy(data, offset);
 
+  // Account order from AddAgent struct: token, payer, new_agent, agent_account, system_program
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: agent, isSigner: false, isWritable: false },
+      { pubkey: agentAccount, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
@@ -388,9 +433,13 @@ export function buildRemoveAgentInstruction(
 }
 
 /**
- * Build transfer owner instruction - transfers token ownership
- */
-export function buildTransferOwnerInstruction(
+  * Build transfer owner instruction - transfers token ownership
+  * @param tokenState - Token state PDA (writable to update owner)
+  * @param currentOwner - Current owner (must sign)
+  * @param newOwner - New owner pubkey (written in data payload)
+  * @param _programId - Program ID (reserved for future use)
+  */
+  export function buildTransferOwnerInstruction(
   tokenState: PublicKey,
   currentOwner: PublicKey,
   newOwner: PublicKey,
@@ -408,6 +457,9 @@ export function buildTransferOwnerInstruction(
   // Write 'newOwner' pubkey (32 bytes)
   newOwner.toBuffer().copy(data, offset);
 
+  // Account order from TransferOwner struct: token, current_owner
+  // NOTE: Rust TransferOwner struct only has 2 accounts (no new_owner account)
+  // The new_owner is passed as data, not as an account
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
@@ -418,9 +470,13 @@ export function buildTransferOwnerInstruction(
 }
 
 /**
- * Build transfer freeze authority instruction
- */
-export function buildTransferFreezeAuthorityInstruction(
+  * Build transfer freeze authority instruction
+  * @param tokenState - Token state PDA (writable to update freeze_authority)
+  * @param currentFreezeAuthority - Current freeze authority (must sign)
+  * @param newFreezeAuthority - New freeze authority pubkey (written in data payload)
+  * @param _programId - Program ID (reserved for future use)
+  */
+  export function buildTransferFreezeAuthorityInstruction(
   tokenState: PublicKey,
   currentFreezeAuthority: PublicKey,
   newFreezeAuthority: PublicKey,
@@ -438,6 +494,9 @@ export function buildTransferFreezeAuthorityInstruction(
   // Write 'newFreezeAuthority' pubkey (32 bytes)
   newFreezeAuthority.toBuffer().copy(data, offset);
 
+  // Account order from TransferFreezeAuthority struct: token, current_freeze_authority
+  // NOTE: Rust TransferFreezeAuthority struct only has 2 accounts (no new_freeze_authority account)
+  // The new_freeze_authority is passed as data, not as an account
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
@@ -618,6 +677,132 @@ export function buildComplianceGetStateInstruction(
 }
 
 /**
+ * Build compliance add module to existing token instruction
+ */
+export function buildComplianceAddModuleToExistingInstruction(
+  aggregatorState: PublicKey,
+  owner: PublicKey,
+  tokenCompliance: PublicKey,
+  module: PublicKey,
+  _programId: PublicKey
+): InstructionResult {
+  // Anchor layout: discriminator(8) + module(32) = 40 bytes
+  const data = Buffer.alloc(40);
+  let offset = 0;
+
+  DISCRIMINATORS.compliance_add_module_to_existing.forEach((b, i) => {
+    data[offset + i] = b;
+  });
+  offset += 8;
+
+  // Write 'module' pubkey (32 bytes)
+  module.toBuffer().copy(data, offset);
+
+  // Account order: aggregator, owner, token_compliance, system_program
+  return {
+    keys: [
+      { pubkey: aggregatorState, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: tokenCompliance, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  };
+}
+
+/**
+ * Build compliance get modules instruction (read-only query)
+ */
+export function buildComplianceGetModulesInstruction(
+  aggregatorState: PublicKey,
+  _programId: PublicKey
+): InstructionResult {
+  // Only discriminator needed (no parameters)
+  const data = Buffer.alloc(8);
+  let offset = 0;
+
+  DISCRIMINATORS.compliance_get_modules.forEach((b, i) => {
+    data[offset + i] = b;
+  });
+
+  return {
+    keys: [
+      { pubkey: aggregatorState, isSigner: false, isWritable: false },
+    ],
+    data,
+  };
+}
+
+/**
+ * Build compliance get module count instruction (read-only query)
+ */
+export function buildComplianceGetModuleCountInstruction(
+  aggregatorState: PublicKey,
+  _programId: PublicKey
+): InstructionResult {
+  // Only discriminator needed (no parameters)
+  const data = Buffer.alloc(8);
+  let offset = 0;
+
+  DISCRIMINATORS.compliance_get_module_count.forEach((b, i) => {
+    data[offset + i] = b;
+  });
+
+  return {
+    keys: [
+      { pubkey: aggregatorState, isSigner: false, isWritable: false },
+    ],
+    data,
+  };
+}
+
+/**
+ * Build compliance can transfer instruction (read-only query)
+ */
+export function buildComplianceCanTransferInstruction(
+  aggregatorState: PublicKey,
+  token: PublicKey,
+  from: PublicKey,
+  to: PublicKey,
+  amount: bigint,
+  _programId: PublicKey
+): InstructionResult {
+  // Anchor layout: discriminator(8) + token(32) + from(32) + to(32) + amount(8) = 112 bytes
+  const data = Buffer.alloc(112);
+  let offset = 0;
+
+  DISCRIMINATORS.compliance_can_transfer.forEach((b, i) => {
+    data[offset + i] = b;
+  });
+  offset += 8;
+
+  // Write 'token' pubkey (32 bytes)
+  token.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'from' pubkey (32 bytes)
+  from.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'to' pubkey (32 bytes)
+  to.toBuffer().copy(data, offset);
+  offset += 32;
+
+  // Write 'amount' (8 bytes, u64)
+  data.writeBigUInt64LE(amount, offset);
+
+  return {
+    keys: [
+      { pubkey: aggregatorState, isSigner: false, isWritable: false },
+      { pubkey: token, isSigner: false, isWritable: false },
+      { pubkey: from, isSigner: false, isWritable: false },
+      { pubkey: to, isSigner: false, isWritable: false },
+    ],
+    data,
+  };
+}
+
+/**
  * Build identity registry initialize instruction
  */
 export function buildIdentityInitializeInstruction(
@@ -684,7 +869,9 @@ export function buildIdentityInitializeInstruction(
 }
 
 /**
- * Build identity register identity with data instruction
+ * Build identity register identity with data instruction.
+ *
+ * Fase 6.3: Fix para formato de Strings. Usar 4-byte u32 LE prefix en lugar de 1-byte u8.
  */
 export function buildIdentityRegisterWithDataInstruction(
   registryState: PublicKey,
@@ -697,16 +884,19 @@ export function buildIdentityRegisterWithDataInstruction(
   metadataUri: string,
   _programId: PublicKey
 ): InstructionResult {
-  // Anchor layout: discriminator(8) + wallet(32) + name_len(1) + name + symbol_len(1) + symbol + identity_data_len(1) + identity_data + metadata_uri_len(1) + metadata_uri
-  const nameBuffer = Buffer.from(name, 'utf-8');
-  const symbolBuffer = Buffer.from(symbol, 'utf-8');
-  const identityDataBuffer = Buffer.from(identityData, 'utf-8');
-  const metadataUriBuffer = Buffer.from(metadataUri, 'utf-8');
+  // Serialize strings using Anchor's format (4-byte u32 LE length prefix + UTF-8 bytes)
+  const nameBuffer = serializeAnchorString(name);
+  const symbolBuffer = serializeAnchorString(symbol);
+  const identityDataBuffer = serializeAnchorString(identityData);
+  const metadataUriBuffer = serializeAnchorString(metadataUri);
 
-  const dataLength = 8 + 32 + 1 + nameBuffer.length + 1 + symbolBuffer.length + 1 + identityDataBuffer.length + 1 + metadataUriBuffer.length;
+  // Anchor layout: discriminator(8) + wallet(32) + name(4+len) + symbol(4+len) + identity_data(4+len) + metadata_uri(4+len)
+  const dataLength = 8 + 32 + nameBuffer.length + symbolBuffer.length + identityDataBuffer.length + metadataUriBuffer.length;
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
+  
+  // Write discriminator (8 bytes)
   DISCRIMINATORS.identity_register_identity_with_data.forEach((b, i) => {
     data[offset + i] = b;
   });
@@ -716,23 +906,19 @@ export function buildIdentityRegisterWithDataInstruction(
   wallet.toBuffer().copy(data, offset);
   offset += 32;
 
-  data[offset] = nameBuffer.length;
-  offset += 1;
+  // Write name (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   nameBuffer.copy(data, offset);
   offset += nameBuffer.length;
 
-  data[offset] = symbolBuffer.length;
-  offset += 1;
+  // Write symbol (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   symbolBuffer.copy(data, offset);
   offset += symbolBuffer.length;
 
-  data[offset] = identityDataBuffer.length;
-  offset += 1;
+  // Write identity_data (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   identityDataBuffer.copy(data, offset);
   offset += identityDataBuffer.length;
 
-  data[offset] = metadataUriBuffer.length;
-  offset += 1;
+  // Write metadata_uri (Anchor String format: 4-byte u32 LE length prefix + UTF-8 bytes)
   metadataUriBuffer.copy(data, offset);
   offset += metadataUriBuffer.length;
 
@@ -818,31 +1004,20 @@ export function buildIdentityRemoveInstruction(
 }
 
 /**
- * Build identity get identity instruction (read-only query)
+ * Get Identity PDA
+ * Derives the identity account PDA for a given wallet
+ * Seeds: [b"identity", registry, wallet]
  */
-export function buildIdentityGetInstruction(
+export function getIdentityPda(
   registryState: PublicKey,
   wallet: PublicKey,
-  _programId: PublicKey
-): InstructionResult {
-  // Anchor layout: discriminator(8) + wallet(32) = 40 bytes
-  const data = Buffer.alloc(40);
-  let offset = 0;
-
-  DISCRIMINATORS.identity_get_identity.forEach((b, i) => {
-    data[offset + i] = b;
-  });
-  offset += 8;
-
-  // Write 'wallet' pubkey (32 bytes)
-  wallet.toBuffer().copy(data, offset);
-
-  return {
-    keys: [
-      { pubkey: registryState, isSigner: false, isWritable: false },
-    ],
-    data,
-  };
+  programId: PublicKey
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("identity"), registryState.toBuffer(), wallet.toBuffer()],
+    programId
+  );
+  return pda;
 }
 
 /**
