@@ -1,0 +1,10 @@
+use anchor_lang::prelude::*;
+
+/// AgentAccount stores an authorized agent.
+/// Seeds: [b"agent", token_pubkey, agent_pubkey]
+#[account]
+#[derive(Default)]
+pub struct AgentAccount {
+    pub agent: Pubkey,    // Agent wallet address
+    pub bump: u8,         // PDA bump
+}
