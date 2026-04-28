@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { WalletName } from '@solana/wallet-adapter-base';
+import { WalletLogger } from '@/wallet';
 
 /**
  * Custom hook for managing Solana wallet connections.
@@ -39,8 +40,14 @@ export function useWalletManager() {
   // Ref for logging previous state
   const lastConnectionStateRef = useRef({ connected, connecting, wallet: wallet?.adapter.name });
 
+  // Initialize WalletLogger for detailed connection tracking
+  const logger = useMemo(() => new WalletLogger({
+    enabled: process.env.NODE_ENV !== 'production',
+    minLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  }), []);
+
   // ============================================================
-  // Fase 1.3 - Logging de estado de conexión para diagnóstico
+  // Connection state logging via WalletLogger
   // ============================================================
   useEffect(() => {
     const currentState = { connected, connecting, wallet: wallet?.adapter.name };
@@ -50,37 +57,37 @@ export function useWalletManager() {
       currentState.wallet !== lastConnectionStateRef.current.wallet;
 
     if (stateChanged) {
-      const timestamp = new Date().toISOString();
-      const prefix = `[${timestamp}] [WalletManager]`;
-
-      console.log(`${prefix} STATE CHANGE:`, {
-        connected: currentState.connected,
-        connecting: currentState.connecting,
-        wallet: currentState.wallet,
-        publicKey: publicKey?.toString()?.slice(0, 8) + '...',
-        pendingWallet: pendingWallet,
-      });
-
       if (currentState.connected) {
-        console.log(`${prefix} ✓ CONNECTED successfully via wallet: ${currentState.wallet}`);
+        logger.logConnection({
+          wallet: currentState.wallet || 'unknown',
+          status: 'connected',
+          publicKey,
+        });
       } else if (currentState.connecting) {
-        console.log(`${prefix} ⏳ CONNECTING to wallet: ${currentState.wallet || pendingWallet || 'unknown'}`);
+        logger.logConnection({
+          wallet: currentState.wallet || pendingWallet || 'unknown',
+          status: 'connecting',
+        });
       } else if (lastConnectionStateRef.current.connected && !currentState.connected) {
-        console.log(`${prefix} ✗ DISCONNECTED`);
+        logger.logConnection({
+          wallet: lastConnectionStateRef.current.wallet || 'unknown',
+          status: 'disconnected',
+        });
       }
 
       lastConnectionStateRef.current = currentState;
     }
-  }, [connected, connecting, wallet, publicKey, pendingWallet]);
+  }, [connected, connecting, wallet, publicKey, pendingWallet, logger]);
 
   // Log available wallets on mount and when wallets change
   useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`${timestamp} [WalletManager] Available wallets (${wallets.length}):`);
-    wallets.forEach((w, i) => {
-      console.log(`  ${i + 1}. ${w.adapter.name} | readyState: ${w.readyState} | icon: ${w.adapter.icon || 'none'}`);
+    wallets.forEach((w) => {
+      logger.info('wallet', `Available wallet: ${w.adapter.name}`, {
+        readyState: w.readyState,
+        hasIcon: !!w.adapter.icon,
+      });
     });
-  }, [wallets]);
+  }, [wallets, logger]);
 
   // Clear error when connected
   useEffect(() => {

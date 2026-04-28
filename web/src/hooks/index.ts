@@ -11,6 +11,11 @@ export { useSolanaNotification, type Notification, type NotificationType } from 
 export { useWalletErrorHandling } from './useSolanaNotification';
 export { useWalletManager } from './useWalletManager';
 
+// Re-export new modular hooks
+export { useSolanaTransaction } from './useSolanaTransaction';
+export { useComplianceActions } from './useComplianceActions';
+export { useIdentityActions } from './useIdentityActions';
+
 // Re-export Anchor client utilities
 export {
   getIdentityPda,

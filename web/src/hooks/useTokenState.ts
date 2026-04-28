@@ -20,7 +20,6 @@ export interface TokenState {
   symbol: string;
   decimals: number;
   totalSupply: bigint;
-  nextIndex: bigint;
   balances: BalanceEntry[];
   frozenAccounts: FrozenEntry[];
   agents: string[];
@@ -118,26 +117,32 @@ export function useTokenState(tokenAccountPubkey: string | null): TokenStateResp
 }
 
 /**
- * Deserialize TokenState from Borsh-encoded data
- * Uses correct Borsh deserialization matching Anchor's Rust struct layout
+ * Deserialize TokenState from zero_copy layout data.
+ * Uses #[repr(C)] layout matching Anchor's zero_copy account serialization.
  *
- * Rust struct layout (from lib.rs):
- * pub struct TokenState {
- *     pub owner: Pubkey,           // 32 bytes
- *     pub name: String,            // 4 bytes len + str
- *     pub symbol: String,          // 4 bytes len + str
- *     pub decimals: u8,            // 1 byte
- *     pub totalSupply: u64,        // 8 bytes
- *     pub nextIndex: u64,          // 8 bytes (agents counter)
- *     pub balances: Vec<BalanceEntry>,
- *     pub frozen_accounts: Vec<FrozenEntry>,
- *     pub agents: Vec<Pubkey>,     // Vec is length-prefixed
- *     pub compliance_modules: Vec<Pubkey>,
- * }
+ * Optimized Rust struct layout (zero_copy, repr(C)) - 120 bytes:
+ *   pub struct TokenState {
+ *       pub owner: Pubkey,           // Offset 0:   32 bytes
+ *       pub freeze_authority: Pubkey, // Offset 32:  32 bytes
+ *       pub total_supply: u64,        // Offset 64:  8 bytes
+ *       pub name: [u8; 32],           // Offset 72:  32 bytes (fixed array, null-padded)
+ *       pub symbol: [u8; 8],          // Offset 104: 8 bytes (fixed array, null-padded)
+ *       pub decimals: u8,             // Offset 112: 1 byte
+ *       pub bump: u8,                 // Offset 113: 1 byte
+ *       pub _padding: [u8; 6],        // Offset 114: 6 bytes
+ *   }
+ *   Total: 120 bytes (no discriminator, no Vecs)
+ *
+ * Note: Anchor zero_copy accounts do NOT include an 8-byte discriminator prefix.
+ * The discriminator is only used in instruction data, not in account data for zero_copy.
  */
-function deserializeTokenState(data: Buffer, discriminatorSize: number = 8): TokenState {
-  if (data.length < discriminatorSize + 32 + 4) {
-    throw new Error(`Invalid data length: ${data.length}, expected at least ${discriminatorSize + 32 + 4}`);
+function deserializeTokenState(data: Buffer): TokenState {
+  // Anchor AccountLoader adds 8-byte discriminator prefix even for zero_copy
+  const discriminatorSize = 8;
+  const minSize = discriminatorSize + 120;
+
+  if (data.length < minSize) {
+    throw new Error(`Invalid data length: ${data.length}, expected at least ${minSize} bytes for TokenState`);
   }
 
   let offset = discriminatorSize;
@@ -147,10 +152,8 @@ function deserializeTokenState(data: Buffer, discriminatorSize: number = 8): Tok
       throw new Error(`Cannot read pubkey: not enough data at offset ${offset}`);
     }
     const pubkeyBytes = data.slice(offset, offset + 32);
-    // Convert to base58 using manual implementation
-    const pubkey = pubkeyBytes.toString('hex');
     offset += 32;
-    return pubkey;
+    return hexToBase58(pubkeyBytes.toString('hex'));
   };
 
   const readU8 = (): number => {
@@ -162,115 +165,65 @@ function deserializeTokenState(data: Buffer, discriminatorSize: number = 8): Tok
     return value;
   };
 
-  // readU16 is available for future use when u16 fields are added
-  // const readU16 = (): number => {
-  //   if (offset + 2 > data.length) {
-  //     throw new Error(`Cannot read u16: not enough data at offset ${offset}`);
-  //   }
-  //   const value = data.readUInt16LE(offset);
-  //   offset += 2;
-  //   return value;
-  // };
-
-  const readU32 = (): number => {
-    if (offset + 4 > data.length) {
-      throw new Error(`Cannot read u32: not enough data at offset ${offset}`);
-    }
-    const value = data.readUInt32LE(offset);
-    offset += 4;
-    return value;
-  };
-
   const readU64 = (): bigint => {
     if (offset + 8 > data.length) {
       throw new Error(`Cannot read u64: not enough data at offset ${offset}`);
     }
-    // Read little-endian u64 using DataView for correctness
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const value = view.getBigUint64(offset, true); // true = little-endian
+    const value = view.getBigUint64(offset, true); // little-endian
     offset += 8;
     return value;
   };
 
-  // readI64 is available for future use when i64 fields are added
-  // const readI64 = (): bigint => {
-  //   if (offset + 8 > data.length) {
-  //     throw new Error(`Cannot read i64: not enough data at offset ${offset}`);
-  //   }
-  //   // Read signed 64-bit integer (little-endian) manually
-  //   let value = 0n;
-  //   for (let i = 7; i >= 0; i--) {
-  //     value = (value << 8n) | BigInt(data[offset + i]);
-  //   }
-  //   // Convert to signed if necessary
-  //   const maxU64 = 2n ** 64n - 1n;
-  //   const halfMaxU64 = 2n ** 63n;
-  //   if (value > maxU64) {
-  //     throw new Error('Value exceeds u64 range');
-  //   }
-  //   if (value >= halfMaxU64) {
-  //     value = value - (2n ** 64n); // Convert to signed
-  //   }
-  //   offset += 8;
-  //   return value;
-  // };
-
-  const readString = (): string => {
-    const len = readU32();
-    if (offset + len > data.length) {
-      throw new Error(`Cannot read string: length ${len} exceeds buffer at offset ${offset}`);
+  /**
+   * Read a fixed-size null-padded string from a [u8; N] array.
+   * Reads until the first null byte (0x00) or the array end.
+   */
+  const readFixedString = (length: number): string => {
+    if (offset + length > data.length) {
+      throw new Error(`Cannot read fixed string: length ${length} exceeds buffer at offset ${offset}`);
     }
-    const str = data.slice(offset, offset + len).toString('utf-8');
-    offset += len;
-    return str;
+    const slice = data.slice(offset, offset + length);
+    offset += length;
+    // Find null terminator or use full slice
+    const nullIndex = slice.indexOf(0);
+    const strBytes = nullIndex >= 0 ? slice.slice(0, nullIndex) : slice;
+    return strBytes.toString('utf-8').trim();
   };
 
-  const readPubkeyVec = (): string[] => {
-    const len = readU32();
-    const vec: string[] = [];
-    for (let i = 0; i < len; i++) {
-      vec.push(readPubkey());
-    }
-    return vec;
+  const readPadding = (length: number) => {
+    offset += length;
   };
 
-  const readBalanceEntryVec = (): BalanceEntry[] => {
-    const len = readU32();
-    const vec: BalanceEntry[] = [];
-    for (let i = 0; i < len; i++) {
-      vec.push({
-        key: readPubkey(),
-        value: readU64(),
-      });
-    }
-    return vec;
-  };
-
-  const readFrozenEntryVec = (): FrozenEntry[] => {
-    const len = readU32();
-    const vec: FrozenEntry[] = [];
-    for (let i = 0; i < len; i++) {
-      vec.push({
-        key: readPubkey(),
-        frozen: readU8() !== 0,
-      });
-    }
-    return vec;
-  };
-
-  // Note: discriminator already skipped at line 133 (offset = discriminatorSize)
+  // Offset 0:   owner: Pubkey (32 bytes)
+  const owner = readPubkey();
+  // Offset 32:  freeze_authority: Pubkey (32 bytes)
+  const freezeAuthority = readPubkey();
+  // Offset 64:  total_supply: u64 (8 bytes)
+  const totalSupply = readU64();
+  // Offset 72:  name: [u8; 32] (32 bytes)
+  const name = readFixedString(32);
+  // Offset 104: symbol: [u8; 8] (8 bytes)
+  const symbol = readFixedString(8);
+  // Offset 112: decimals: u8 (1 byte)
+  const decimals = readU8();
+  // Offset 113: bump: u8 (1 byte)
+  const bump = readU8();
+  // Offset 114: _padding: [u8; 6] (6 bytes)
+  readPadding(6);
 
   return {
-    owner: readPubkey(),
-    name: readString(),
-    symbol: readString(),
-    decimals: readU8(),
-    totalSupply: readU64(),
-    nextIndex: readU64(),
-    balances: readBalanceEntryVec(),
-    frozenAccounts: readFrozenEntryVec(),
-    agents: readPubkeyVec(),
-    complianceModules: readPubkeyVec(),
+    owner,
+    name,
+    symbol,
+    decimals,
+    totalSupply,
+    // PDA architecture: balances, frozen, agents are separate accounts (PDAs)
+    // These are empty in TokenState as they don't exist as Vec fields
+    balances: [],
+    frozenAccounts: [],
+    agents: [],
+    complianceModules: [],
   };
 }
 

@@ -254,8 +254,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
     if (name.length > 32) {
       return { signature: null, loading: false, error: 'Token name too long (max 32 chars)', success: false };
     }
-    if (symbol.length > 8) {
-      return { signature: null, loading: false, error: 'Token symbol too long (max 8 chars)', success: false };
+    if (symbol.length > 10) {
+      return { signature: null, loading: false, error: 'Token symbol too long (max 10 chars)', success: false };
     }
     if (decimals < 0 || decimals > 18) {
       return { signature: null, loading: false, error: 'Decimals must be between 0 and 18', success: false };
@@ -331,6 +331,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildMintInstruction(
         tokenState,
         currentPublicKey,
+        currentPublicKey,
+        recipientPubkey,
         balanceAccountPda,
         amountBigInt,
         programId
@@ -394,8 +396,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildTransferInstruction(
         tokenState,
+        currentPublicKey,
         fromPubkey,
         fromBalancePda,
+        toPubkey,
         toBalancePda,
         amountBigInt,
         programId
@@ -454,6 +458,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildBurnInstruction(
         tokenState,
         currentPublicKey,
+        currentPublicKey,
         fromPubkey,
         balanceAccountPda,
         amountBigInt,
@@ -510,6 +515,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildFreezeInstruction(
         tokenState,
+        currentPublicKey,
+        currentPublicKey,
         accountPubkey,
         frozenAccountPda,
         programId
@@ -565,6 +572,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildUnfreezeInstruction(
         tokenState,
+        currentPublicKey,
+        currentPublicKey,
         accountPubkey,
         frozenAccountPda,
         programId
@@ -620,6 +629,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildAddAgentInstruction(
         tokenState,
+        currentPublicKey,
         currentPublicKey,
         agentPubkey,
         agentAccountPda,
@@ -677,6 +687,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildRemoveAgentInstruction(
         tokenState,
         currentPublicKey,
+        currentPublicKey,
+        agentPubkey,
         agentAccountPda,
         programId
       );
@@ -729,6 +741,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildTransferOwnerInstruction(
         tokenState,
+        currentPublicKey,
         currentPublicKey,
         newOwnerPubkey,
         programId
@@ -783,6 +796,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildTransferFreezeAuthorityInstruction(
         tokenState,
         currentPublicKey,
+        currentPublicKey,
         newFreezeAuthorityPubkey,
         programId
       );
@@ -804,6 +818,10 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
   // Get supply info (read-only query)
   const getSupplyInfo = useCallback(async (): Promise<SupplyInfo | null> => {
+    const currentPublicKey = publicKeyRef.current;
+    if (!currentPublicKey) {
+      return null;
+    }
     if (!tokenAccountPubkey) {
       return null;
     }
@@ -814,6 +832,7 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildGetSupplyInfoInstruction(
         tokenState,
+        currentPublicKey,
         programId
       );
 

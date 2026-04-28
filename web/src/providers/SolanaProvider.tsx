@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useMemo, useCallback } from 'react';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react';
+import { WalletProvider as WalletAbstractionProvider } from '@/wallet/WalletProvider';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 
@@ -115,9 +116,11 @@ export function SolanaProvider({ children, network = 'localnet', endpoint }: Sol
   return (
     <QueryClientProvider client={queryClient}>
       <ConnectionProvider endpoint={finalEndpoint}>
-        <WalletProvider wallets={wallets} autoConnect={network !== "localnet" && !endpoint?.includes("localhost")} onError={handleError}>
-          <WalletModalProvider>{children}</WalletModalProvider>
-        </WalletProvider>
+        <SolanaWalletProvider wallets={wallets} autoConnect={network !== "localnet" && !endpoint?.includes("localhost")} onError={handleError}>
+          <WalletModalProvider>
+            <WalletAbstractionProvider>{children}</WalletAbstractionProvider>
+          </WalletModalProvider>
+        </SolanaWalletProvider>
       </ConnectionProvider>
     </QueryClientProvider>
   );
