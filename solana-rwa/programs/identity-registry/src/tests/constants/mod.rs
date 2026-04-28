@@ -21,11 +21,11 @@ mod tests {
 
     #[test]
     fn test_max_metadata_uri_length_constant() {
-        assert_eq!(MAX_METADATA_URI_LENGTH, 256);
+        assert_eq!(MAX_METADATA_URI_LENGTH, 128);
     }
 
     #[test]
     fn test_max_identity_data_length_constant() {
-        assert_eq!(MAX_IDENTITY_DATA_LENGTH, 128);
+        assert_eq!(MAX_IDENTITY_DATA_LENGTH, 64);
     }
 }
