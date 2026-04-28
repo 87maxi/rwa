@@ -7,7 +7,7 @@ pub const MAX_NAME_LENGTH: usize = 32;
 pub const MAX_SYMBOL_LENGTH: usize = 10;
 
 /// Maximum length for metadata URI
-pub const MAX_METADATA_URI_LENGTH: usize = 256;
+pub const MAX_METADATA_URI_LENGTH: usize = 128;
 
 /// Maximum length for identity data string
-pub const MAX_IDENTITY_DATA_LENGTH: usize = 128;
+pub const MAX_IDENTITY_DATA_LENGTH: usize = 64;

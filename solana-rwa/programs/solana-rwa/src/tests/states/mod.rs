@@ -22,12 +22,11 @@ mod tests {
             owner: dummy_pubkey,
             freeze_authority: dummy_pubkey,
             name: [0; 32],
-            symbol: [0; 10],
+            symbol: [0; 8],
             decimals: 9,
             total_supply: 0,
-            next_index: 0,
             bump: 255,
-            _padding: [0; 4],
+            _padding: [0; 6],
         };
         crate::states::copy_str_to_bytes("Test Token", &mut state.name);
         crate::states::copy_str_to_bytes("TT", &mut state.symbol);

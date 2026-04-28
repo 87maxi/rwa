@@ -45,7 +45,7 @@ mod tests {
             name: [0; 32],
             symbol: [0; 10],
             identity_data: [0; 64],
-            metadata_uri: [0; 128],
+            metadata_uri: [0; 64],
             bump: 7,
             _padding: [0; 5],
         };
@@ -69,7 +69,7 @@ mod tests {
             name: [0; 32],
             symbol: [0; 10],
             identity_data: [0; 64],
-            metadata_uri: [0; 128],
+            metadata_uri: [0; 64],
             bump: 1,
             _padding: [0; 5],
         };
