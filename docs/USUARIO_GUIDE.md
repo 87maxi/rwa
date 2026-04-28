@@ -1,277 +1,365 @@
 # Guía de Usuario - Solana RWA Token Platform
 
-## 📋 Tabla de Contenidos
-
-1. [Introducción](#introducción)
-2. [Primeros Pasos](#primeros-pasos)
-3. [Conectar Wallet](#conectar-wallet)
-4. [Desplegar Token](#desplegar-token)
-5. [Gestionar Tokens](#gestionar-tokens)
-6. [Preguntas Frecuentes](#preguntas-frecuentes)
-
----
-
-## Introducción
-
-### ¿Qué es la Solana RWA Token Platform?
-
-Esta plataforma permite crear y gestionar **tokens de activos del mundo real (RWA - Real World Assets)** en la blockchain de Solana, con cumplimiento normativo integrado (KYC/AML).
-
-### Características Principales
-
-- ✅ **Tokens Cumplidos**: Tokens con reglas de cumplimiento integradas
-- ✅ **KYC/AML**: Verificación de identidad on-chain
-- ✅ **Control de Acceso**: Sistema de agentes autorizados
-- ✅ **Congelamiento**: Capacidad de congelar cuentas incumplidoras
-- ✅ **Bajo Coste**: Transacciones en Solana por menos de $0.01
-- ✅ **Rápido**: Confirmación en menos de 1 segundo
-
-### Flujo de Trabajo
-
-```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│  1. Conecta │ --> │  2. Despliega│ --> │  3. Gestiona │
-│  tu Wallet  │     │  tu Token    │     │  tus Tokens  │
-└─────────────┘     └──────────────┘     └──────────────┘
-```
+## Tabla de Contenidos
+1. [Inicio Rápido](#inicio-rápido)
+2. [Página de Deploy](#página-de-deploy)
+3. [Página de Manage](#página-de-manage)
+   - [Transfer Tokens](#transfer-tokens)
+   - [Mint Tokens](#mint-tokens)
+   - [Burn Tokens](#burn-tokens)
+   - [Freeze Account](#freeze-account)
+   - [Agents](#agents)
+   - [Transfer Owner](#transfer-owner)
+   - [Transfer Freeze Authority](#transfer-freeze-authority)
+   - [Supply Info](#supply-info)
+   - [Compliance](#compliance)
+   - [Identity](#identity)
+4. [Solución de Problemas](#solución-de-problemas)
 
 ---
 
-## Primeros Pasos
+## Inicio Rápido
 
 ### Requisitos
+- **Wallet Solana**: Backpack, Phantom, Brave Wallet, MetaMask, Ledger o Trezor
+- **Red**: Localnet (desarrollo) o Devnet
+- **SOL Balance**: Necesario para pagar fees de transacción
 
-1. **Wallet Solana**: Instala [Phantom](https://phantom.app/) o [Solflare](https://solflare.com/)
-2. **Fondo en SOL**: Necesitas SOL para pagar las transacciones (usa devnet para pruebas gratuitas)
-3. **Navegador Web**: Chrome, Firefox o Edge
-
-### Paso 1: Instalar Wallet
-
-1. Ve a [phantom.app](https://phantom.app/)
-2. Instala la extensión de tu navegador
-3. Sigue el asistente para crear tu wallet
-4. **Importante**: Guarda tu frase semilla en un lugar seguro
-
-### Paso 2: Obtener Devnet SOL
-
-Para pruebas, necesitas SOL de prueba (devnet):
-
-1. Ve a [Solana Faucet](https://faucet.solana.com/)
-2. Selecciona "devnet"
-3. Introduce tu dirección pública
-4. Solicita SOL de prueba
-
-### Paso 3: Abrir la Plataforma
-
-1. Abre la aplicación en tu navegador
-2. Verás la página principal con dos opciones:
-   - **Deploy New Token**: Crear un nuevo token
-   - **Manage Tokens**: Gestionar tokens existentes
+### Primeros Pasos
+1. Abre la aplicación en `http://localhost:3000`
+2. Conecta tu wallet haciendo clic en **"Connect Wallet"**
+3. Selecciona tu wallet preferida (Backpack recomendado para localnet)
+4. Una vez conectado, navega a **Deploy Token** o **Manage Tokens**
 
 ---
 
-## Conectar Wallet
+## Página de Deploy
 
-### Cómo Conectar
+**URL:** `/deploy`
 
-1. Haz clic en el botón **"Connect Wallet"** en la esquina superior derecha
-2. Selecciona tu wallet (Phantom, Solflare, etc.)
-3. Acepta la conexión en tu wallet
-4. Verás tu dirección abreviada y el estado de la red
+La página de deploy te permite crear un nuevo token de seguridad compliant en Solana.
 
-### Indicadores de Estado
+### Campos del Formulario
 
-| Indicador | Significado |
-|-----------|-------------|
-| 🟢 Punto verde pulsante | Conectado a la red local |
-| 🟡 Punto amarillo | Conectado a devnet |
-| 🔴 Punto rojo | Desconectado |
-| **Slot #12345** | Número de bloque actual en la blockchain |
+| Campo | Descripción | Requerido |
+|-------|-------------|-----------|
+| **Token Name** | Nombre completo del token (ej: "My Security Token") | Sí |
+| **Symbol** | Símbolo corto del token (ej: "MST"), máximo 10 caracteres | Sí |
+| **Decimals** | Número de decimales (0-18, recomendado: 9) | No (default: 9) |
+| **Initial Supply** | Supply inicial (se puede mintear después) | No (default: 0) |
+| **Mint Authority** | Dirección que puede mintear tokens (vacío = tu wallet) | No |
+| **Freeze Authority** | Dirección que puede congelar cuentas (vacío = tu wallet) | No |
 
-### Redes Soportadas
+### Proceso de Deploy
+1. Completa los campos requeridos (Name y Symbol)
+2. Revisa el **Deployment Summary** en la parte inferior
+3. Haz clic en **"Deploy Token"**
+4. Acepta la transacción en tu wallet
+5. Espera la confirmación
 
-- **Localnet**: Tu nodo Solana local (`localhost:8899`)
-- **Devnet**: Red de pruebas de Solana
-- **Mainnet**: Red principal de Solana
+### Mensajes de Error Comunes
 
----
-
-## Desplegar Token
-
-### Acceder a la Página de Despliegue
-
-1. Haz clic en **"Deploy New Token"** en la página principal
-2. O navega directamente a `/deploy`
-
-### Formulario de Configuración
-
-#### Campos Obligatorios
-
-| Campo | Descripción | Ejemplo |
-|-------|-------------|---------|
-| **Token Name** | Nombre del token (máx. 32 caracteres) | `Real Estate Token` |
-| **Symbol** | Símbolo del token (máx. 8 caracteres, mayúsculas) | `RET` |
-
-#### Campos Opcionales
-
-| Campo | Descripción | Valor por defecto |
-|-------|-------------|-------------------|
-| **Decimals** | Decimales del token (0-18) | `9` |
-| **Initial Supply** | Suministro inicial post-despliegue | `0` (se puede hacer mint después) |
-| **Mint Authority** | Dirección con permiso para hacer mint (dejar vacío = tu wallet) | `""` |
-| **Freeze Authority** | Dirección con permiso para congelar (dejar vacío = tu wallet) | `""` |
-
-### Proceso de Despliegue
-
-1. **Rellena el formulario** con los datos de tu token
-2. **Revisa el resumen** de despliegue
-3. **Haz clic en "Deploy Token"**
-4. **Confirma la transacción** en tu wallet
-5. **Espera la confirmación** (~10-30 segundos)
-
-### Resultado del Despliegue
-
-Una vez completado, verás:
-
-- ✅ Mensaje de éxito con el **hash de transacción**
-- 🔘 Botón **"Manage Token"** para ir a la gestión
-- 🔘 Botón **"Go Home"** para volver al inicio
-
-### Ejemplo de Despliegue
-
-```
-Token Name:    Green Bond Token
-Symbol:        GRNBD
-Decimals:      9
-Initial Supply: 1000000
-Network:       Solana Localnet
-```
+| Error | Causa | Solución |
+|-------|-------|----------|
+| "Token already initialized at..." | Token ya existe para esta wallet | Usa otra wallet o resetea el localnet |
+| "Wallet not connected" | Wallet desconectada | Conecta tu wallet primero |
+| "Insufficient funds" | Sin SOL para fees | Añade SOL a tu wallet |
 
 ---
 
-## Gestionar Tokens
+## Página de Manage
 
-### Acceder a la Página de Gestión
+**URL:** `/manage`
 
-1. Haz clic en **"Manage Tokens"** en la página principal
-2. O navega directamente a `/manage`
+La página de manage es el panel de control para gestionar tu token. Se organiza en **10 pestañas** con diferentes operaciones.
 
-### Panel de Información
+### Vista General
 
-En la parte superior verás:
+Al entrar verás:
+- **Connected Wallet**: Tu dirección de wallet (abreviada)
+- **SOL Balance**: Tu balance de SOL en tiempo real
+- **Barra de pestañas**: Navegación entre las 10 operaciones
 
-- **Connected Wallet**: Tu dirección pública abreviada
-- **SOL Balance**: Tu saldo actual de SOL
+---
 
-### Pestañas de Gestión
+### Transfer Tokens
 
-#### 1. Transfer Tokens
+**Envía tokens a otra dirección Solana.**
 
-Transferir tokens a otra dirección:
+**Campos:**
+- **Recipient Address**: Dirección Solana del destinatario
+- **Amount**: Cantidad de tokens a enviar
 
-1. Introduce la **dirección del destinatario** (dirección pública de Solana)
-2. Introduce la **cantidad** a transferir
+**Pasos:**
+1. Ingresa la dirección del destinatario
+2. Ingresa la cantidad de tokens
 3. Haz clic en **"Transfer Tokens"**
-4. Confirma en tu wallet
+4. Acepta la transacción en tu wallet
 
-#### 2. Mint Tokens
+---
 
-Crear nuevos tokens (requiere permiso de mint):
+### Mint Tokens
 
-1. Introduce la **dirección del destinatario**
-2. Introduce la **cantidad** a crear
+**Crea nuevos tokens y envíalos a un destinatario.**
+
+**Campos:**
+- **Recipient Address**: Dirección que recibirá los tokens nuevos
+- **Amount to Mint**: Cantidad de tokens a crear
+
+**Pasos:**
+1. Ingresa la dirección receptora
+2. Ingresa la cantidad a mintear
 3. Haz clic en **"Mint Tokens"**
-4. Confirma en tu wallet
+4. Acepta la transacción
 
-> ⚠️ **Nota**: Solo los agentes autorizados pueden hacer mint
+> **Nota:** Solo la Mint Authority puede mintear tokens.
 
-#### 3. Burn Tokens
+---
 
-Destruir tokens permanentemente:
+### Burn Tokens
 
-1. Introduce la **dirección desde la que quemar**
-2. Introduce la **cantidad** a quemar
-3. Haz clic en **"Burn Tokens"**
-4. Confirma en tu wallet
+**Destruye tokens desde tu cuenta.**
 
-> ⚠️ **Nota**: Los tokens quemados se pierden permanentemente
+**Campos:**
+- **Amount**: Cantidad de tokens a destruir
 
-#### 4. Freeze Account
+**Pasos:**
+1. Ingresa la cantidad a quemar
+2. Haz clic en **"Burn Tokens"**
+3. Acepta la transacción
 
-Congelar/descongelar una cuenta:
+> **Nota:** Los tokens quemados se reducen permanentemente del supply.
 
-1. Introduce la **dirección de la cuenta** a congelar
+---
+
+### Freeze Account
+
+**Congela o descongela una cuenta de token.**
+
+**Campos:**
+- **Account to Freeze**: Dirección de la cuenta de token a congelar
+
+**Pasos:**
+1. Ingresa la dirección de la cuenta
 2. Haz clic en **"Toggle Freeze Status"**
-3. Confirma en tu wallet
+3. Acepta la transacción
 
-> ⚠️ **Nota**: Solo los agentes autorizados pueden congelar cuentas
+> **Nota:** Solo la Freeze Authority puede congelar cuentas. Una cuenta congelada no puede transferir tokens.
 
-#### 5. Manage Agents
+---
 
-Gestionar agentes autorizados:
+### Agents
 
-1. Introduce la **dirección del agente** a añadir
+**Agrega agentes autorizados para operar con el token.**
+
+**Campos:**
+- **Agent Address**: Dirección del agente a autorizar
+
+**Pasos:**
+1. Ingresa la dirección del agente
 2. Haz clic en **"Add Agent"**
-3. Confirma en tu wallet
+3. Acepta la transacción
 
-> 💡 **Agentes**: Son direcciones autorizadas para realizar operaciones en tu nombre
-
-### Mensajes de Estado
-
-| Mensaje | Significado |
-|---------|-------------|
-| ✅ "Transaction Submitted!" | Transacción enviada exitosamente |
-| ⏳ "Processing..." | Transacción en proceso |
-| ❌ Error message | La transacción falló (ver mensaje) |
+> **Nota:** Los agentes pueden realizar operaciones en nombre del owner.
 
 ---
 
-## Preguntas Frecuentes
+### Transfer Owner
 
-### ¿Qué es un token RWA?
+**Transfiere la propiedad del token a otra dirección.**
 
-Un token RWA (Real World Asset) representa un activo del mundo real (inmuebles, bonos, commodities) en la blockchain. Estos tokens incluyen reglas de cumplimiento normativo.
+**Campos:**
+- **New Owner Address**: Dirección del nuevo propietario
 
-### ¿Cuánto cuesta desplegar un token?
+**Pasos:**
+1. Ingresa la dirección del nuevo owner
+2. Haz clic en **"Transfer Ownership"**
+3. Acepta la transacción
 
-En **localnet** (tu máquina local): Gratis
-En **devnet**: ~0.001 SOL (gratuito con faucet)
-En **mainnet**: ~0.01-0.1 SOL (varía según congestión)
-
-### ¿Puedo modificar mi token después de desplegarlo?
-
-No puedes cambiar el nombre o símbolo, pero puedes:
-- Hacer mint de más tokens
-- Transferir tokens
-- Congelar/descongelar cuentas
-- Añadir/remover agentes
-
-### ¿Qué pasa si pierdo mi wallet?
-
-Si pierdes tu wallet y no has guardado la clave privada, perderás el control sobre el token. Siempre guarda tu frase semilla en un lugar seguro.
-
-### ¿Puedo usar esta plataforma en mainnet?
-
-Sí, pero necesitas:
-1. Configurar las variables de entorno con los Program IDs de mainnet
-2. Tener SOL suficiente para las transacciones
-3. Cumplir con todas las regulaciones aplicables
-
-### ¿Cómo verifico una transacción?
-
-Usa un explorador de bloques:
-- **Localnet**: `http://localhost:8899` (si tienes UI local)
-- **Devnet**: `https://explorer.solana.com/?cluster=devnet`
-- **Mainnet**: `https://explorer.solana.com/`
-
-Introduce el hash de transacción para ver los detalles.
+> **⚠️ ADVERTENCIA:** Esta acción es irreversible. El nuevo owner tendrá control total del token.
 
 ---
 
-## Soporte
+### Transfer Freeze Authority
 
-Para problemas o preguntas:
+**Transfiere la autoridad de congelación a otra dirección.**
 
-1. Revisa el [README.md](../README.md) para documentación técnica
-2. Revisa el [SOLANA_INTEGRATION_DOCUMENTATION.md](../SOLANA_INTEGRATION_DOCUMENTATION.md) para detalles de implementación
-3. Abre un issue en el repositorio
+**Campos:**
+- **New Freeze Authority Address**: Dirección de la nueva autoridad
+
+**Pasos:**
+1. Ingresa la dirección de la nueva autoridad
+2. Haz clic en **"Transfer Freeze Authority"**
+3. Acepta la transacción
+
+> **Nota:** La Freeze Authority puede congelar/descongelar cuentas de token.
+
+---
+
+### Supply Info
+
+**Visualiza información del supply del token.**
+
+**Botón:** **"Load Supply Info"**
+
+**Información mostrada:**
+- **Current Supply**: Supply actual de tokens
+- **Max Supply**: Supply máximo permitido
+- **Decimals**: Número de decimales del token
+
+**Pasos:**
+1. Haz clic en **"Load Supply Info"**
+2. La información se cargará automáticamente
+
+---
+
+### Compliance
+
+**Gestiona el sistema de compliance del token.**
+
+#### Initialize Compliance Aggregator
+**Campos:**
+- **Aggregator Account**: Dirección del aggregator (opcional)
+
+**Pasos:**
+1. Ingresa la dirección del aggregator (o deja vacío para PDA)
+2. Haz clic en **"Initialize Compliance Aggregator"**
+3. Acepta la transacción
+
+#### Add Compliance Module
+**Campos:**
+- **Aggregator Account**: Dirección del aggregator
+- **Token Program ID**: ID del programa del token
+- **Module Program ID**: ID del módulo de compliance
+
+**Pasos:**
+1. Ingresa las direcciones requeridas
+2. Haz clic en **"Add Compliance Module"**
+3. Acepta la transacción
+
+#### Get Aggregator State
+**Campos:**
+- **Aggregator Account**: Dirección del aggregator
+
+**Pasos:**
+1. Ingresa la dirección del aggregator
+2. Haz clic en **"Get Aggregator State"**
+3. El estado se mostrará en pantalla
+
+---
+
+### Identity
+
+**Gestiona el registro de identidad del token.**
+
+#### Initialize Identity Registry
+**Campos:**
+- **Registry Account**: Dirección del registry (opcional)
+
+**Pasos:**
+1. Ingresa la dirección del registry (o deja vacío para PDA)
+2. Haz clic en **"Initialize Identity Registry"**
+3. Acepta la transacción
+
+#### Register Identity
+**Campos:**
+- **Registry Account**: Dirección del registry
+- **Identity Data**: Datos de identidad
+
+**Pasos:**
+1. Ingresa los datos requeridos
+2. Haz clic en **"Register Identity"**
+3. Acepta la transacción
+
+#### Register Identity with Metadata
+**Campos:**
+- **Registry Account**: Dirección del registry
+- **Identity Name**: Nombre de la identidad
+- **Identity Symbol**: Símbolo de la identidad
+- **Identity Data**: Datos de identidad
+- **Metadata URI**: URI de metadatos
+
+**Pasos:**
+1. Completa todos los campos
+2. Haz clic en **"Register Identity with Metadata"**
+3. Acepta la transacción
+
+#### Get Identity
+**Campos:**
+- **Registry Account**: Dirección del registry
+
+**Pasos:**
+1. Ingresa la dirección del registry
+2. Haz clic en **"Get Identity"**
+3. La información de identidad se mostrará en pantalla
+
+---
+
+## Solución de Problemas
+
+### Wallet no se conecta
+1. Verifica que la wallet está instalada y desbloqueada
+2. Recarga la página (Ctrl+Shift+R)
+3. Intenta con otra wallet (Backpack recomendado)
+
+### Transacción fallida
+1. Verifica que tienes suficiente SOL para fees
+2. Asegúrate de estar en la red correcta (localnet/devnet)
+3. Revisa el mensaje de error en la interfaz
+
+### "Token already initialized"
+- El token ya existe para esta wallet
+- Opciones:
+  - Usa la página `/manage` para gestionar el token existente
+  - Usa otra wallet para crear un nuevo token
+  - Resetea el localnet: `pkill -f surfpool && rm -rf solana-rwa/.surfpool/*.db && surfpool start --no-deploy && bash deploy.sh`
+
+### Transacción se queda en "Processing..."
+1. Verifica que aceptaste la transacción en tu wallet
+2. Espera hasta 30 segundos
+3. Si persiste, recarga la página
+
+### No veo mi token en /manage
+1. Asegúrate de usar la **misma wallet** que usaste para deployar
+2. El PDA se deriva de tu wallet: `[Buffer.from("token"), walletPublicKey]`
+3. Verifica que el deploy fue exitoso (revisa la firma de transacción)
+
+---
+
+## Referencia Rápida
+
+### Operaciones por Rol
+
+| Rol | Operaciones Disponibles |
+|-----|------------------------|
+| **Owner** | Transfer, Mint, Burn, Freeze, Add Agent, Transfer Owner, Transfer Freeze Auth |
+| **Agent** | Transfer (desde cuenta del owner) |
+| **Freeze Authority** | Freeze/Unfreeze accounts |
+| **Mint Authority** | Mint tokens |
+| **Cualquier usuario** | Supply Info, Compliance, Identity |
+
+### Límites del Sistema
+
+- **Decimales**: 0-18 (recomendado: 9)
+- **Símbolo**: Máximo 10 caracteres
+- **Token por wallet**: 1 (el PDA es único por wallet)
+- **Agentes**: Sin límite máximo
+
+### Comandos de Desarrollo
+
+```bash
+# Iniciar localnet
+cd solana-rwa && surfpool start --no-deploy
+
+# Deploy programas
+cd solana-rwa && bash deploy.sh
+
+# Resetear localnet completo
+pkill -f surfpool
+rm -rf solana-rwa/.surfpool/*.db solana-rwa/.surfpool/*.sqlite*
+cd solana-rwa && surfpool start --no-deploy
+bash deploy.sh
+
+# Iniciar frontend
+cd web && npm run dev
+```
