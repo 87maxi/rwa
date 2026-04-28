@@ -96,6 +96,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const selectRef = useRef(select);
   const signTransactionRef = useRef(signTransaction);
   const walletsRef = useRef(wallets);
+  const walletRef = useRef(wallet);
   const connectionRef = useRef(connection);
 
   useEffect(() => { connectRef.current = connect; }, [connect]);
@@ -103,6 +104,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   useEffect(() => { selectRef.current = select; }, [select]);
   useEffect(() => { signTransactionRef.current = signTransaction; }, [signTransaction]);
   useEffect(() => { walletsRef.current = wallets; }, [wallets]);
+  useEffect(() => { walletRef.current = wallet; }, [wallet]);
   useEffect(() => { connectionRef.current = connection; }, [connection]);
 
   // Derived state
@@ -182,6 +184,26 @@ export function WalletProvider({ children }: WalletProviderProps) {
             error: `Failed to select wallet "${walletName}"`,
           };
         }
+
+        // Wait for wallet adapter to propagate selection state
+        // Without this delay, connect() throws WalletNotSelectedError
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Verify a wallet is actually selected before connecting
+      if (!walletRef.current) {
+        const errorMsg = 'No wallet selected. Please select a wallet first.';
+        setError(errorMsg);
+        logger.logError({
+          category: 'wallet',
+          message: errorMsg,
+        });
+        return {
+          success: false,
+          publicKey: null,
+          wallet: null,
+          error: errorMsg,
+        };
       }
 
       // Attempt connection

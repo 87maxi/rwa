@@ -144,6 +144,10 @@ export function useWalletManager() {
       throw new Error(`Failed to select wallet "${walletName}"`);
     }
 
+    // Wait for wallet adapter to propagate selection state
+    // Without this delay, connect() throws WalletNotSelectedError
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Direct connection - no polling needed
     // The wallet-adapter handles the async UI interaction internally
     try {
