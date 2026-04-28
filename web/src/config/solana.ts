@@ -16,9 +16,9 @@ export type NetworkType = 'localnet' | 'devnet' | 'mainnet';
  * @see solana-rwa/Anchor.toml [programs.localnet]
  */
 const DEFAULT_PROGRAM_IDS = {
-  solanaRwa: '6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe',
-  identityRegistry: '6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc',
-  complianceAggregator: '9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7',
+  solanaRwa: '2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX',
+  identityRegistry: '5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce',
+  complianceAggregator: '7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb',
 } as const;
 
 /**
