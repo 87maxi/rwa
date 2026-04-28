@@ -60,7 +60,9 @@ export default function DeployPage() {
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!connected || !publicKey) return;
+    if (!connected || !publicKey) {
+      return;
+    }
 
     setErrorMessage(null);
     setIsLoading(true);
