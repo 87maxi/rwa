@@ -64,12 +64,12 @@ pub mod pdas;
 pub mod tests;
 
 // declare_id!() = the program's on-chain address
-declare_id!("6XDDBdZm8pqamteHWRHS2A8Ka4Pb6BkN5nCpWxWCzVpe");
+declare_id!("2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX");
 
 // Re-export all public items for easy access
 pub use constants::MAX_SUPPLY;
 pub use states::{TokenState, BalanceAccount, FrozenAccount, AgentAccount, SupplyInfo, ACCOUNT_FROZEN, ACCOUNT_ACTIVE};
-pub use events::{OwnerTransferredEvent, TokensMintedEvent, AccountFrozenEvent, AccountUnfrozenEvent, FreezeAuthorityTransferredEvent};
+pub use events::{OwnerTransferredEvent, TokensMintedEvent, AccountFrozenEvent, AccountUnfrozenEvent, FreezeAuthorityTransferredEvent, AgentAddedEvent, AgentRemovedEvent};
 pub use errors::ErrorCode;
 pub use pdas::{derive_balance_pda, derive_frozen_pda, derive_agent_pda};
 
@@ -343,8 +343,15 @@ pub mod solana_rwa {
         /// Authority performing the unfreeze
         pub authority: Signer<'info>,
 
+        /// CHECK: Wallet to unfreeze (used for PDA derivation)
+        pub wallet_to_freeze: AccountInfo<'info>,
+
         /// Frozen status PDA (must exist to be modified)
-        #[account(mut)]
+        #[account(
+            mut,
+            seeds = [b"frozen", token.key().as_ref(), wallet_to_freeze.key().as_ref()],
+            bump = frozen_account.load()?.bump,
+        )]
         pub frozen_account: AccountLoader<'info, FrozenAccount>,
     }
 
@@ -381,7 +388,6 @@ pub mod solana_rwa {
         crate::states::copy_str_to_bytes(&symbol, &mut token.symbol);
         token.decimals = decimals;
         token.total_supply = 0;
-        token.next_index = 0;
         token.bump = ctx.bumps.token;
 
         Ok(())
@@ -403,7 +409,7 @@ pub mod solana_rwa {
 
         // Initialize balance account if zero balance (using pubkey check as default wallet is 0)
         if balance_account.wallet == Pubkey::default() {
-            balance_account.wallet = ctx.accounts.agent.key();
+            balance_account.wallet = ctx.accounts.recipient.key();
         }
         balance_account.balance = balance_account.balance.checked_add(amount)
             .ok_or(ErrorCode::SupplyOverflow)?;
@@ -565,13 +571,19 @@ pub mod solana_rwa {
 
     /// Add an agent
     pub fn add_agent(ctx: Context<AddAgent>, agent: Pubkey) -> Result<()> {
-        let mut token = ctx.accounts.token.load_mut()?;
+        let token = ctx.accounts.token.load()?;
 
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
 
         let mut agent_account = ctx.accounts.agent_account.load_init()?;
         agent_account.agent = agent;
         agent_account.bump = ctx.bumps.agent_account;
+
+        emit!(AgentAddedEvent {
+            token: ctx.accounts.token.key(),
+            agent,
+            added_by: ctx.accounts.payer.key(),
+        });
 
         msg!("Agent added: {}", agent);
         Ok(())
@@ -583,6 +595,12 @@ pub mod solana_rwa {
         let agent_key = ctx.accounts.agent_account.load()?.agent;
 
         require!(token.owner == ctx.accounts.payer.key(), ErrorCode::Unauthorized);
+
+        emit!(AgentRemovedEvent {
+            token: ctx.accounts.token.key(),
+            agent: agent_key,
+            removed_by: ctx.accounts.payer.key(),
+        });
 
         msg!("Agent removed: {}", agent_key);
         Ok(())

@@ -26,7 +26,7 @@
 use anchor_lang::prelude::*;
 
 // declare_id!() = the program's on-chain address
-declare_id!("9EbDbR12nkLx2t7iYDJCgvJrELM1cDKqLQHgVWG3vzY7");
+declare_id!("7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb");
 
 // Module declarations
 pub mod constants;

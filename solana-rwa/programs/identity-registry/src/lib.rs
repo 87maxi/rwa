@@ -61,7 +61,7 @@ pub use errors::ErrorCode;
 pub use pdas::{derive_registry_pda, derive_identity_pda};
 
 // declare_id!() = the program's on-chain address
-declare_id!("6ULwDvPcDHFVET7oi172RSvE51oGmLC8PajxfnzVH5fc");
+declare_id!("5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce");
 
 // #[program] marks this module as containing all instruction handlers
 #[program]
