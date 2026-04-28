@@ -23,28 +23,27 @@ variable "compliance_aggregator_program_id" {
     value = input.compliance_aggregator_program_id
 }
 
-# Derive PDA for ComplianceAggregatorState: PDA("aggregator", compliance_aggregator_program_id)
-variable "aggregator_pda" {
-    description = "PDA derived from seed 'aggregator' and the compliance aggregator program ID"
-    value = "derive_pda([b\"aggregator\"], compliance_aggregator_program_id)"
+# Load program artifacts from Anchor project (includes IDL)
+variable "compliance_aggregator_program" {
+    value = svm::get_program_from_anchor_project("compliance_aggregator")
 }
 
 action "initialize_compliance_aggregator" "svm::process_instructions" {
     description = "Initialize compliance aggregator state (creates ComplianceAggregatorState PDA)"
-    
+    signers = [signer.payer]
+
     instruction {
         program_id = variable.compliance_aggregator_program_id
-        signers = [signer.payer]
-        accounts = [
-            { pubkey = signer.payer, is_signer = true, is_writable = true },
-            { pubkey = variable.aggregator_pda, is_signer = false, is_writable = true },
-            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
-        ]
-        data = "initialize"
+        program_idl = variable.compliance_aggregator_program.idl
+        instruction_name = "initialize"
+
+        payer {
+            public_key = signer.payer.public_key
+        }
     }
 }
 
 output "initialization_summary" {
     description = "Compliance aggregator initialization result"
-    value = "Compliance aggregator initialized. Program ID: ${variable.compliance_aggregator_program_id}, Aggregator PDA: ${variable.aggregator_pda}"
+    value = "Compliance aggregator initialized. Program ID: ${variable.compliance_aggregator_program_id}"
 }

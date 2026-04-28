@@ -23,28 +23,27 @@ variable "identity_registry_program_id" {
     value = input.identity_registry_program_id
 }
 
-# Derive PDA for IdentityRegistryState: PDA("registry", identity_registry_program_id)
-variable "registry_pda" {
-    description = "PDA derived from seed 'registry' and the identity registry program ID"
-    value = "derive_pda([b\"registry\"], identity_registry_program_id)"
+# Load program artifacts from Anchor project (includes IDL)
+variable "identity_registry_program" {
+    value = svm::get_program_from_anchor_project("identity_registry")
 }
 
 action "initialize_identity_registry" "svm::process_instructions" {
     description = "Initialize identity registry state (creates IdentityRegistryState PDA)"
-    
+    signers = [signer.payer]
+
     instruction {
         program_id = variable.identity_registry_program_id
-        signers = [signer.payer]
-        accounts = [
-            { pubkey = signer.payer, is_signer = true, is_writable = true },
-            { pubkey = variable.registry_pda, is_signer = false, is_writable = true },
-            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
-        ]
-        data = "initialize"
+        program_idl = variable.identity_registry_program.idl
+        instruction_name = "initialize"
+
+        payer {
+            public_key = signer.payer.public_key
+        }
     }
 }
 
 output "initialization_summary" {
     description = "Identity registry initialization result"
-    value = "Identity registry initialized. Program ID: ${variable.identity_registry_program_id}, Registry PDA: ${variable.registry_pda}"
+    value = "Identity registry initialized. Program ID: ${variable.identity_registry_program_id}"
 }

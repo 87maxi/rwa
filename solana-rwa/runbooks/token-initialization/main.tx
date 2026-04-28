@@ -30,33 +30,28 @@ variable "token_decimals" {
     value = input.token_decimals
 }
 
-# Derive PDA for TokenState: PDA(["token", payer], solana_rwa_program_id)
-variable "token_pda" {
-    description = "PDA derived from seeds ['token', payer] and the solana-rwa program ID"
-    value = "derive_pda([b\"token\", payer.public_key], solana_rwa_program_id)"
+# Load program artifacts from Anchor project (includes IDL)
+variable "solana_rwa_program" {
+    value = svm::get_program_from_anchor_project("solana_rwa")
 }
 
 action "initialize_token" "svm::process_instructions" {
     description = "Initialize RWA token (creates TokenState PDA with metadata)"
-    
+    signers = [signer.payer]
+
     instruction {
         program_id = variable.solana_rwa_program_id
-        signers = [signer.payer]
-        accounts = [
-            { pubkey = signer.payer, is_signer = true, is_writable = true },
-            { pubkey = variable.token_pda, is_signer = false, is_writable = true },
-            { pubkey = "11111111111111111111111111111111", is_signer = false, is_writable = false },
-        ]
-        data = {
-            discriminator = "initialize"
-            name = variable.token_name
-            symbol = variable.token_symbol
-            decimals = variable.token_decimals
+        program_idl = variable.solana_rwa_program.idl
+        instruction_name = "initialize"
+        instruction_args = [variable.token_name, variable.token_symbol, variable.token_decimals]
+
+        payer {
+            public_key = signer.payer.public_key
         }
     }
 }
 
 output "initialization_summary" {
     description = "Token initialization result"
-    value = "Token initialized: ${variable.token_name} (${variable.token_symbol}) with ${variable.token_decimals} decimals. Program ID: ${variable.solana_rwa_program_id}, Token PDA: ${variable.token_pda}"
+    value = "Token initialized: ${variable.token_name} (${variable.token_symbol}) with ${variable.token_decimals} decimals. Program ID: ${variable.solana_rwa_program_id}"
 }
