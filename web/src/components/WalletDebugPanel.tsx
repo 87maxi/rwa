@@ -2,16 +2,18 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletContextSafe } from '@/wallet/WalletProvider';
 
 /**
  * Debug panel for wallet detection diagnostics.
- * 
+ *
  * This component helps identify:
  * - Which wallets are detected and their state
  * - window.ethereum conflicts
  * - Wallet Standard compatibility
  * - Connection state transitions
- * 
+ * - Transaction logs from WalletLogger
+ *
  * Usage: Import and add <WalletDebugPanel /> anywhere in the app tree
  * under WalletProvider. Enable/disable via ?debug=wallet in URL.
  */
@@ -22,7 +24,6 @@ interface WalletDebugInfo {
     icon: string | null;
     readyState: string;
     url: string | null;
-    adapterType: string;
   }>;
   walletStandard: {
     supported: boolean;
@@ -39,10 +40,21 @@ interface WalletDebugInfo {
     publicKey: string | null;
     wallet: string | null;
   };
+  ethereum: {
+    hasConflict: boolean;
+    providers: string[];
+    recommendation: string;
+  };
 }
 
 export function WalletDebugPanel() {
   const { wallets, connected, connecting, publicKey, wallet } = useWallet();
+
+  // Safely access wallet context
+  const walletContext = useWalletContextSafe();
+  const hasWalletContext = !!walletContext;
+
+  const [loggerEntries, setLoggerEntries] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [debugInfo, setDebugInfo] = useState<WalletDebugInfo | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -65,7 +77,6 @@ export function WalletDebugPanel() {
       icon: w.adapter.icon,
       readyState: w.readyState,
       url: w.adapter.url || null,
-      adapterType: w.adapter.readyState || 'unknown',
     }));
 
     // Check Wallet Standard support
@@ -79,6 +90,18 @@ export function WalletDebugPanel() {
     const isSolana = solanaObj && typeof solanaObj.signTransaction === 'function';
     const isPhantom = solanaObj?.isPhantom === true;
 
+    // Ethereum shield status
+    let ethereumInfo = {
+      hasConflict: false,
+      providers: [] as string[],
+      recommendation: 'Not available',
+    };
+
+    if (walletContext?.ethereumShield) {
+      const status = walletContext.ethereumShield.getConflictStatus();
+      ethereumInfo = status;
+    }
+
     setDebugInfo({
       wallets: walletInfo,
       walletStandard: {
@@ -88,7 +111,7 @@ export function WalletDebugPanel() {
       solana: {
         exists: solanaExists,
         isSolana: !!isSolana,
-        isPhantom: isPhantom,
+        isPhantom,
       },
       connectionState: {
         connected,
@@ -96,8 +119,19 @@ export function WalletDebugPanel() {
         publicKey: publicKey?.toString() || null,
         wallet: wallet?.adapter.name || null,
       },
+      ethereum: ethereumInfo,
     });
-  }, [wallets, connected, connecting, publicKey, wallet]);
+
+    // Update logger entries
+    if (walletContext?.logger) {
+      setLoggerEntries(walletContext.logger.getEntries());
+    }
+
+    // Log ethereum shield status
+    if (walletContext?.ethereumShield) {
+      walletContext.ethereumShield.logStatus();
+    }
+  }, [wallets, connected, connecting, publicKey, wallet, walletContext]);
 
   // Update debug info periodically
   useEffect(() => {
@@ -110,13 +144,13 @@ export function WalletDebugPanel() {
   // Log connection state changes
   useEffect(() => {
     if (!isVisible) return;
-    
+
     const timestamp = new Date().toISOString();
     const log = `[${timestamp}] connected=${connected} connecting=${connecting} wallet=${wallet?.adapter.name || 'none'} publicKey=${publicKey?.toString()?.slice(0, 8) || 'none'}`;
-    
+
     setLogs(prev => {
       const updated = [...prev, log];
-      return updated.slice(-50); // Keep last 50 logs
+      return updated.slice(-50);
     });
   }, [connected, connecting, wallet, publicKey, isVisible]);
 
@@ -136,12 +170,19 @@ export function WalletDebugPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-gray-800/50">
         <h3 className="text-sm font-semibold text-white">🔧 Wallet Debug Panel</h3>
-        <button
-          onClick={() => setIsVisible(false)}
-          className="text-gray-400 hover:text-white transition-colors"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {hasWalletContext && (
+            <span className="text-xs text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
+              Abstraction Layer ✓
+            </span>
+          )}
+          <button
+            onClick={() => setIsVisible(false)}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Connection State */}
@@ -184,6 +225,32 @@ export function WalletDebugPanel() {
             ))
           )}
         </div>
+      </div>
+
+      {/* Ethereum Shield Status */}
+      <div className="px-4 py-3 border-b border-gray-700/50">
+        <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Ethereum Shield</h4>
+        {debugInfo?.ethereum ? (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">Conflict Detected:</span>
+              <span className={debugInfo.ethereum.hasConflict ? 'text-red-400' : 'text-green-400'}>
+                {debugInfo.ethereum.hasConflict ? '⚠ Yes' : '✓ No'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">Providers:</span>
+              <span className="text-gray-300">
+                {debugInfo.ethereum.providers.length > 0 ? debugInfo.ethereum.providers.join(', ') : 'None'}
+              </span>
+            </div>
+            <div className="px-2 py-1 rounded text-xs bg-gray-500/10 text-gray-400">
+              {debugInfo.ethereum.recommendation}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">Loading...</p>
+        )}
       </div>
 
       {/* Solana Object Status */}
@@ -238,6 +305,32 @@ export function WalletDebugPanel() {
         )}
       </div>
 
+      {/* Logger Entries */}
+      {hasWalletContext && loggerEntries.length > 0 && (
+        <div className="px-4 py-3 border-b border-gray-700/50">
+          <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+            Logger Entries ({loggerEntries.length})
+          </h4>
+          <div className="space-y-1 max-h-24 overflow-y-auto">
+            {loggerEntries.slice(-10).map((entry, i) => (
+              <div key={i} className="text-[10px] font-mono">
+                <span className="text-gray-500">[{entry.timestamp?.slice(11, 19)}]</span>{' '}
+                <span className={`
+                  ${entry.level === 'error' ? 'text-red-400' : ''}
+                  ${entry.level === 'warn' ? 'text-yellow-400' : ''}
+                  ${entry.level === 'info' ? 'text-blue-400' : ''}
+                  ${entry.level === 'debug' ? 'text-gray-400' : ''}
+                `}>
+                  [{entry.level?.toUpperCase()}]
+                </span>{' '}
+                <span className="text-purple-400">[{entry.category}]</span>{' '}
+                <span className="text-gray-300">{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Connection Logs */}
       <div className="flex-1 px-4 py-3 overflow-hidden flex flex-col min-h-0">
         <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Connection Logs</h4>
@@ -261,11 +354,28 @@ export function WalletDebugPanel() {
           🔄 Refresh
         </button>
         <button
-          onClick={() => setLogs([])}
+          onClick={() => {
+            setLogs([]);
+            if (walletContext?.logger) {
+              walletContext.logger.clear();
+            }
+          }}
           className="flex-1 px-3 py-2 bg-gray-500/20 text-gray-400 text-xs rounded-lg hover:bg-gray-500/30 transition-colors"
         >
           🗑️ Clear Logs
         </button>
+        {hasWalletContext && (
+          <button
+            onClick={() => {
+              if (walletContext?.logger) {
+                navigator.clipboard.writeText(walletContext.logger.exportLogs());
+              }
+            }}
+            className="flex-1 px-3 py-2 bg-green-500/20 text-green-400 text-xs rounded-lg hover:bg-green-500/30 transition-colors"
+          >
+            📋 Export
+          </button>
+        )}
       </div>
     </div>
   );

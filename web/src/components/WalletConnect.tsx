@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Image from 'next/image';
+import { useWalletContextSafe, WalletLogger } from '@/wallet';
 import { useWalletManager } from '@/hooks/useWalletManager';
 import type { WalletName } from '@solana/wallet-adapter-base';
 
@@ -19,38 +20,68 @@ const WALLET_OPTIONS: Record<string, WalletOption> = {
 };
 
 export function WalletConnect() {
-  const {
-    connected,
-    publicKey,
-    selectedWallet,
-    lastError,
-    availableWallets,
-    connectToWallet,
-    disconnect,
-    formatAddress,
-  } = useWalletManager();
+  // Use new wallet abstraction layer when available
+  const walletContext = useWalletContextSafe();
+  // Fallback to legacy hook
+  const legacyManager = useWalletManager();
+
+  // Prefer new context values, fallback to legacy
+  const connected = walletContext?.connected ?? legacyManager.connected;
+  const publicKey = walletContext?.publicKey ?? legacyManager.publicKey;
+  const selectedWallet = walletContext?.currentWallet ?? legacyManager.selectedWallet;
+  const availableWallets = walletContext?.availableWallets ?? legacyManager.availableWallets;
+  const lastError = legacyManager.lastError;
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  const shortAddress = publicKey ? formatAddress(publicKey) : '';
+  const shortAddress = useMemo(() => {
+    if (!publicKey) return '';
+    const addr = typeof publicKey === 'string' ? publicKey : publicKey.toString();
+    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+  }, [publicKey]);
 
   const handleConnect = useCallback(async (walletName: string) => {
     setConnecting(true);
     setShowDropdown(false);
     try {
-      await connectToWallet(walletName as WalletName);
+      if (walletContext) {
+        walletContext.logger.logConnection({
+          wallet: walletName,
+          status: 'connecting',
+        });
+        const result = await walletContext.connect(walletName as WalletName);
+        if (result.success) {
+          walletContext.logger.logConnection({
+            wallet: walletName,
+            status: 'connected',
+            publicKey: result.publicKey,
+          });
+        } else {
+          walletContext.logger.logConnection({
+            wallet: walletName,
+            status: 'error',
+            error: result.error || 'Connection failed',
+          });
+        }
+      } else {
+        await legacyManager.connectToWallet(walletName as WalletName);
+      }
     } catch {
-      // Error is handled by useWalletManager
+      // Error is handled by respective hook
     } finally {
       setConnecting(false);
     }
-  }, [connectToWallet]);
+  }, [walletContext, legacyManager.connectToWallet]);
 
   const handleDisconnect = useCallback(() => {
-    disconnect();
+    if (walletContext) {
+      walletContext.disconnect();
+    } else {
+      legacyManager.disconnect();
+    }
     setShowDropdown(false);
-  }, [disconnect]);
+  }, [walletContext, legacyManager.disconnect]);
 
   if (!connected) {
     return (
