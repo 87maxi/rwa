@@ -172,11 +172,15 @@ export function WalletProvider({ children }: WalletProviderProps) {
    * Connect to the currently selected wallet
    */
   const connectWallet = useCallback(async (walletName?: string): Promise<ConnectionResult> => {
+    console.log('[WalletProvider] connectWallet called with:', walletName);
     try {
       // If a wallet name is provided, select it first
       if (walletName) {
+        console.log('[WalletProvider] Calling selectWallet for:', walletName);
         const selected = selectWallet(walletName);
+        console.log('[WalletProvider] selectWallet returned:', selected);
         if (!selected) {
+          console.log('[WalletProvider] selectWallet failed');
           return {
             success: false,
             publicKey: null,
@@ -185,29 +189,17 @@ export function WalletProvider({ children }: WalletProviderProps) {
           };
         }
 
-        // Wait for wallet adapter to propagate selection state
-        // Without this delay, connect() throws WalletNotSelectedError
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Use microtask instead of setTimeout to avoid event loop blocking issues
+        // with certain wallets (Backpack) that may interfere with timer queues
+        await Promise.resolve();
+        console.log('[WalletProvider] Microtask complete, walletRef.current:', !!walletRef.current);
       }
 
-      // Verify a wallet is actually selected before connecting
-      if (!walletRef.current) {
-        const errorMsg = 'No wallet selected. Please select a wallet first.';
-        setError(errorMsg);
-        logger.logError({
-          category: 'wallet',
-          message: errorMsg,
-        });
-        return {
-          success: false,
-          publicKey: null,
-          wallet: null,
-          error: errorMsg,
-        };
-      }
-
-      // Attempt connection
+      // Attempt connection directly - wallet-adapter handles selection internally
+      // The select() call above prepares the wallet; connect() triggers the popup
+      console.log('[WalletProvider] Calling connectRef.current()');
       await connectRef.current();
+      console.log('[WalletProvider] connectRef.current() completed');
 
       const result: ConnectionResult = {
         success: true,

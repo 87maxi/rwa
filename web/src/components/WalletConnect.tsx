@@ -67,12 +67,12 @@ export function WalletConnect() {
       } else {
         await legacyManager.connectToWallet(walletName as WalletName);
       }
-    } catch {
-      // Error is handled by respective hook
+    } catch (err) {
+      console.error('[WalletConnect] Error:', err);
     } finally {
       setConnecting(false);
     }
-  }, [walletContext, legacyManager.connectToWallet]);
+  }, [walletContext, legacyManager.connectToWallet, availableWallets]);
 
   const handleDisconnect = useCallback(() => {
     if (walletContext) {
