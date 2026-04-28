@@ -35,6 +35,7 @@
 #
 # =============================================================================
 
+set -e          # Exit on error
 set -o pipefail  # Catch pipeline errors
 
 # =============================================================================
@@ -56,8 +57,8 @@ PROGRAMS_ANCHOR=("compliance_aggregator" "identity_registry" "solana_rwa")
 # Keypairs directory (for localnet deployment)
 KEYPAIRS_DIR="keys"
 
-# Default network
-NETWORK="${2:-localnet}"
+# Default network - parse from arguments
+NETWORK="localnet"
 
 # =============================================================================
 # Helper Functions
@@ -142,14 +143,26 @@ preflight_checks() {
         done
         log_success "All keypairs found and verified"
     else
-        # Check wallet exists for non-localnet
-        WALLET_PATH="$HOME/.config/solana/${NETWORK}.json"
+        # Check wallet exists for non-localnet (use default id.json)
+        WALLET_PATH="$HOME/.config/solana/id.json"
         if [ ! -f "$WALLET_PATH" ]; then
             log_error "Wallet file not found: $WALLET_PATH"
             log_info "Create or download your devnet/mainnet wallet first"
+            log_info "Or set SOLANA_KEYPAIR_FILE environment variable"
             exit 1
         fi
         log_success "Wallet file found: $WALLET_PATH"
+        
+        # Check wallet has sufficient balance for deployment
+        log_info "Checking wallet balance for ${NETWORK}..."
+        local balance
+        balance=$(solana -u "$NETWORK" balance 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)?' | head -1 || echo "0")
+        log_info "Wallet balance: ${balance} SOL"
+        
+        if [ "$NETWORK" = "mainnet" ]; then
+            log_warning "Mainnet deployment requires significant SOL (~1-2 SOL per program)"
+            log_warning "Make sure you have sufficient balance"
+        fi
     fi
 }
 
@@ -325,8 +338,27 @@ deploy_program() {
     local max_retries=3
     local retry=0
     
+    # Build solana command with network-specific flags
+    local solana_url_flag=""
+    local solana_keypair_flag=""
+    
+    if [ "$network" = "devnet" ]; then
+        solana_url_flag="--url devnet"
+    elif [ "$network" = "mainnet" ]; then
+        solana_url_flag="--url mainnet-beta"
+    elif [ "$network" = "localnet" ] || [ "$network" = "localhost" ]; then
+        solana_url_flag="--url localhost"
+    fi
+    
+    # Use SOLANA_KEYPAIR_FILE if set, otherwise default
+    if [ -n "$SOLANA_KEYPAIR_FILE" ]; then
+        solana_keypair_flag="--keypair $SOLANA_KEYPAIR_FILE"
+    fi
+    
     while [ $retry -lt $max_retries ] && [ $deploy_exit -ne 0 ]; do
         deploy_output=$(solana program deploy \
+            $solana_url_flag \
+            $solana_keypair_flag \
             --program-id "$keypair_file" \
             "$program_file" 2>&1)
         deploy_exit=$?
@@ -460,11 +492,20 @@ show_summary() {
 main() {
     local reset_flag=""
     
-    # Parse arguments
+    # Parse arguments properly
     for arg in "$@"; do
-        if [ "$arg" = "--reset" ]; then
-            reset_flag="--reset"
-        fi
+        case "$arg" in
+            --reset)
+                reset_flag="--reset"
+                ;;
+            localnet|localhost|devnet|mainnet)
+                NETWORK="$arg"
+                ;;
+            *)
+                log_warning "Unknown argument: $arg"
+                log_info "Usage: ./deploy.sh [localnet|devnet|mainnet] [--reset]"
+                ;;
+        esac
     done
 
     print_header "Solana RWA Deployment"
