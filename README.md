@@ -192,97 +192,346 @@ rwa/
 
 ## 🏗️ Arquitectura
 
-### Diagrama del Sistema
+### Diagrama de Componentes del Sistema
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         USER BROWSER                               │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    Next.js Frontend (Web)                     │  │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐  │  │
-│  │  │   Home Page │ │ Deploy Page │ │    Manage Page          │  │  │
-│  │  │  (Landing)  │ │  (Token)    │ │  (Transfer/Mint/Burn/   │  │  │
-│  │  │             │ │             │ │   Freeze/Agents/        │  │  │
-│  │  │             │ │             │ │   Compliance/Identity)  │  │  │
-│  │  └─────────────┘ └─────────────┘ └─────────────────────────┘  │  │
-│  │                                                               │  │
-│  │  ┌─────────────────────────────────────────────────────────┐  │  │
-│  │  │              Hooks Layer                                │  │  │
-│  │  │  useTokenActions │ useComplianceActions │ useIdentity   │  │  │
-│  │  └─────────────────────────────────────────────────────────┘  │  │
-│  │                                                               │  │
-│  │  ┌─────────────────────────────────────────────────────────┐  │  │
-│  │  │              Anchor Client Layer                        │  │  │
-│  │  │  PDA derivation │ Instruction builders │ TX execution   │  │  │
-│  │  └─────────────────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            │ RPC HTTP (localhost:8899)
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      SOLANA BLOCKCHAIN                             │
-│                                                                     │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    System Program                              │  │
-│  │              (Account Creation, Transfers)                     │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                              ▲                                      │
-│                              │                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │              Custom RWA Programs (Rust/Anchor)                 │  │
-│  │                                                               │  │
-│  │  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐  │  │
-│  │  │  solana-rwa    │  │ identity-registry│  │compliance-   │  │  │
-│  │  │  (Main Token)  │  │                  │  │aggregator    │  │  │
-│  │  │                │  │ • KYC Registry   │  │              │  │  │
-│  │  │ • Balances     │  │ • Identity Data  │  │ • Modules    │  │  │
-│  │  │ • Supply       │  │ • Validation     │  │ • can_transfer│  │  │
-│  │  │ • Freeze       │  │ • Updates        │  │ • Aggregation│  │  │
-│  │  │ • Agents       │  │ • Removal        │  │              │  │  │
-│  │  └────────────────┘  └──────────────────┘  └──────────────┘  │  │
-│  │       │                        │                      │        │  │
-│  │       └────────────────────────┴──────────────────────┘        │  │
-│  │                            │                                    │  │
-│  │  ┌─────────────────────────┴────────────────────────────────┐  │  │
-│  │  │              PDA Accounts (Derived Addresses)             │  │  │
-│  │  │  [b"balance", token, wallet]    → BalanceEntry           │  │  │
-│  │  │  [b"frozen", token, wallet]     → FrozenEntry            │  │  │
-│  │  │  [b"agent", token, agent]       → AgentEntry             │  │  │
-│  │  │  [b"identity", registry, owner] → IdentityAccount        │  │  │
-│  │  │  [b"token_compliance", agg, tok]→ TokenComplianceAccount │  │  │
-│  │  └──────────────────────────────────────────────────────────┘  │  │
-│  └─────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Browser["🌐 Navegador del Usuario"]
+        subgraph Frontend["Next.js Frontend"]
+            Home["📄 Home Page"]
+            Deploy["🚀 Deploy Page"]
+            Manage["⚙️ Manage Page"]
+            
+            subgraph Hooks["Hooks Layer"]
+                useToken["useTokenActions"]
+                useCompliance["useComplianceActions"]
+                useIdentity["useIdentityActions"]
+                useWallet["useWalletManager"]
+            end
+            
+            subgraph AnchorClient["Anchor Client"]
+                PDA["PDA Derivation"]
+                Builders["Instruction Builders"]
+                Executor["TX Execution"]
+            end
+        end
+    end
+    
+    subgraph Solana["⛓️ Solana Blockchain"]
+        subgraph Programs["Smart Contracts (Anchor)"]
+            subgraph RWA["solana-rwa"]
+                RWA_Bal["Balances"]
+                RWA_Supply["Supply Management"]
+                RWA_Freeze["Freeze/Unfreeze"]
+                RWA_Agents["Agent Management"]
+            end
+            
+            subgraph Identity["identity-registry"]
+                ID_Registry["KYC Registry"]
+                ID_Data["Identity Data"]
+                ID_Valid["Validation"]
+            end
+            
+            subgraph Compliance["compliance-aggregator"]
+                CO_Modules["Module Management"]
+                CO_Check["can_transfer"]
+                CO_Agg["Aggregation"]
+            end
+        end
+        
+        subgraph PDAs["PDA Accounts"]
+            BalancePDA["BalanceEntry"]
+            FrozenPDA["FrozenEntry"]
+            AgentPDA["AgentEntry"]
+            IdentityPDA["IdentityAccount"]
+            CompliancePDA["TokenComplianceAccount"]
+        end
+    end
+    
+    Frontend -->|RPC HTTP| Solana
+    Hooks --> AnchorClient
+    AnchorClient -->|Instructions| Programs
+    RWA --> PDAs
+    Identity --> PDAs
+    Compliance --> PDAs
+    
+    style Browser fill:#1a1a2e,stroke:#16213e,color:#fff
+    style Frontend fill:#16213e,stroke:#0f3460,color:#fff
+    style Solana fill:#0a3d62,stroke:#006266,color:#fff
+    style Programs fill:#006266,stroke:#009432,color:#fff
+    style RWA fill:#e23e57,stroke:#fff,color:#fff
+    style Identity fill:#25c2a0,stroke:#fff,color:#fff
+    style Compliance fill:#7c5cbf,stroke:#fff,color:#fff
+    style PDAs fill:#f08080,stroke:#fff,color:#fff
 ```
 
-### Flujo de Operaciones
+### Diagrama de Clases - Modelos de Datos On-Chain
 
+```mermaid
+classDiagram
+    class TokenState {
+        +Pubkey owner
+        +Pubkey freeze_authority
+        +string name~32~
+        +string symbol~8~
+        +u8 decimals
+        +u64 total_supply
+        +u64 bump
+        +initialize()
+        +mint()
+        +burn()
+        +transfer()
+        +freeze_account()
+        +unfreeze_account()
+        +add_agent()
+        +remove_agent()
+        +transfer_owner()
+        +transfer_freeze_authority()
+        +get_supply_info()
+    }
+    
+    class BalanceEntry {
+        +Pubkey wallet
+        +u64 balance
+        PDA: [b"balance", token, wallet]
+    }
+    
+    class FrozenEntry {
+        +Pubkey wallet
+        +bool frozen
+        PDA: [b"frozen", token, wallet]
+    }
+    
+    class AgentEntry {
+        +Pubkey agent
+        PDA: [b"agent", token, agent]
+    }
+    
+    class IdentityRegistryState {
+        +Pubkey owner
+        +u64 registry_bump
+        PDA: [b"registry"]
+        +initialize()
+    }
+    
+    class IdentityAccount {
+        +Pubkey wallet
+        +Pubkey identity
+        +string name~32~
+        +string symbol~10~
+        +string identity_data~64~
+        +string metadata_uri~128~
+        +u64 bump
+        PDA: [b"identity", registry, owner]
+        +register_identity()
+        +register_with_data()
+        +update_identity()
+        +remove_identity()
+    }
+    
+    class AggregatorState {
+        +Pubkey owner
+        +u64 aggregator_bump
+        PDA: [b"aggregator"]
+        +initialize()
+        +get_state()
+    }
+    
+    class TokenComplianceAccount {
+        +Pubkey token
+        +u64 module_count
+        +Pubkey[10] modules
+        +u64 bump
+        PDA: [b"token_compliance", aggregator, token]
+        +add_module()
+        +remove_module()
+        +can_transfer()
+        +get_modules()
+    }
+    
+    TokenState "1" -- "*" BalanceEntry : manages
+    TokenState "1" -- "*" FrozenEntry : controls
+    TokenState "1" -- "*" AgentEntry : authorizes
+    IdentityRegistryState "1" -- "*" IdentityAccount : registers
+    AggregatorState "1" -- "*" TokenComplianceAccount : aggregates
+    TokenComplianceAccount "*" -- "*" TokenComplianceAccount : modules
+    
+    note for TokenState "Program: solana-rwa\n2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX"
+    note for IdentityAccount "Program: identity-registry\n5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce"
+    note for TokenComplianceAccount "Program: compliance-aggregator\n7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb"
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FLUJO DE DESPLIEGUE                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  1. anchor build          → Compilar programas Rust                │
-│  2. anchor deploy         → Desplegar 3 programas en blockchain    │
-│  3. txtx run deployment   → Runbook de despliegue automatizado     │
-│  4. txtx run token-init   → Inicializar TokenState PDA             │
-│  5. txtx run compliance   → Inicializar AggregatorState PDA        │
-│  6. txtx run identity     → Inicializar RegistryState PDA          │
-│                                                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                    FLUJO DE OPERACIÓN                               │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Frontend → buildInstruction() → derivePDA() → signAndSend()       │
-│       ↓                                                                │
-│  Wallet Adapter → Firma TX → RPC Submit → Confirmación on-chain    │
-│       ↓                                                                │
-│  Anchor Program → Validar cuentas → Ejecutar lógica → Emitir evento│
-│       ↓                                                                │
-│  Frontend ← Notificación ← Listener ← Confirmación                 │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+
+### Diagrama de Secuencia - Flujo de Transferencia
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 Usuario
+    participant Wallet as 🔐 Wallet<br/>(Phantom/Solflare)
+    participant Frontend as 🌐 Frontend<br/>(Next.js)
+    participant Anchor as ⚓ Anchor Client
+    participant RWA as 💰 solana-rwa
+    participant Balance as 📊 BalanceEntry PDA
+    participant Compliance as ✅ compliance-aggregator
+    
+    User->>Frontend: Ingresa datos de transferencia
+    Frontend->>Anchor: buildTransferInstruction(from, to, amount)
+    Anchor->>Anchor: derivePDA(b"balance", token, from)
+    Anchor->>Anchor: derivePDA(b"balance", token, to)
+    
+    Anchor->>Wallet: signTransaction(tx)
+    Wallet-->>Anchor: Firma criptográfica
+    
+    Anchor->>RWA: transfer(from, to, amount)
+    
+    RWA->>RWA: Validar signers
+    RWA->>Balance: Verificar saldo suficiente
+    RWA->>Balance: Verificar no frozen
+    
+    alt Transferencia válida
+        RWA->>Balance: from.balance -= amount
+        RWA->>Balance: to.balance += amount
+        RWA->>RWA: Emitir TokensTransferredEvent
+        RWA-->>Frontend: Confirmación on-chain
+        Frontend-->>User: ✅ Transferencia exitosa
+    else Saldo insuficiente
+        RWA-->>Frontend: Error: InsufficientBalance
+        Frontend-->>User: ❌ Saldo insuficiente
+    else Cuenta congelada
+        RWA-->>Frontend: Error: AccountFrozen
+        Frontend-->>User: ❌ Cuenta congelada
+    end
+```
+
+### Diagrama de Secuencia - Flujo de Despliegue
+
+```mermaid
+sequenceDiagram
+    participant Dev as 👨‍💻 Desarrollador
+    participant CLI as 💻 Terminal
+    participant Anchor as ⚓ Anchor CLI
+    participant Surfpool as 🌊 Surfpool/ttxt
+    participant Validator as ⛓️ Solana Validator
+    participant Programs as 📦 Smart Contracts
+    
+    Dev->>CLI: anchor build
+    CLI->>Anchor: Compilar programas Rust
+    Anchor-->>CLI: Binarios .so generados
+    
+    Dev->>CLI: anchor deploy
+    CLI->>Validator: Desplegar programas
+    Validator-->>Programs: Programas desplegados
+    
+    Dev->>CLI: txtx run token-initialization
+    CLI->>Surfpool: Ejecutar runbook
+    Surfpool->>Programs: initialize(name, symbol, decimals)
+    Programs-->>Validator: TokenState PDA creado
+    
+    Dev->>CLI: txtx run compliance-initialization
+    CLI->>Surfpool: Ejecutar runbook
+    Surfpool->>Programs: initialize()
+    Programs-->>Validator: AggregatorState PDA creado
+    
+    Dev->>CLI: txtx run identity-initialization
+    CLI->>Surfpool: Ejecutar runbook
+    Surfpool->>Programs: initialize()
+    Programs-->>Validator: RegistryState PDA creado
+    
+    Validator-->>Dev: ✅ Todo inicializado
+```
+
+### Diagrama de Estados - Ciclo de Vida del Token
+
+```mermaid
+stateDiagram-v2
+    [*] --> NoInicializado: Despliegue del programa
+    
+    NoInicializado --> Inicializado: initialize(name, symbol, decimals)
+    note right of Inicializado
+        TokenState PDA creado
+        Owner y FreezeAuthority asignados
+        total_supply = 0
+    end note
+    
+    Inicializado --> ConSupply: mint(amount)
+    note right of ConSupply
+        Agent autorizado emite tokens
+        total_supply += amount
+        BalanceEntry creado/actualizado
+    end note
+    
+    ConSupply --> Transferido: transfer(from, to, amount)
+    note right of Transferido
+        Balance transferido entre wallets
+        Validaciones: saldo, frozen status
+    end note
+    
+    ConSupply --> Congelado: freeze_account(wallet)
+    note right of Congelado
+        FreezeAuthority congela cuenta
+        Transferencias bloqueadas
+    end note
+    
+    Congelado --> ConSupply: unfreeze_account(wallet)
+    
+    ConSupply --> Quemado: burn(from, amount)
+    note right of Quemado
+        Agent autorizado quema tokens
+        total_supply -= amount
+    end note
+    
+    Inicializado --> OwnershipTransferida: transfer_owner(new_owner)
+    OwnershipTransferida --> ConSupply: mint(amount)
+    
+    ConSupply --> [*]: burn(todos los tokens)
+```
+
+### Diagrama de Roles y Permisos
+
+```mermaid
+graph LR
+    subgraph Roles["🔐 Roles del Sistema"]
+        Owner["👑 Owner<br/>Administración completa"]
+        FreezeAuth["❄️ Freeze Authority<br/>Control de congelación"]
+        Agent["🛡️ Agent<br/>Operaciones de supply"]
+        Holder["💼 Holder<br/>Transferencias"]
+        Public["👁️ Público<br/>Lectura"]
+    end
+    
+    subgraph Permisos["Instrucciones Disponibles"]
+        Init["initialize"]
+        Mint["mint"]
+        Burn["burn"]
+        Transfer["transfer"]
+        Freeze["freeze_account"]
+        Unfreeze["unfreeze_account"]
+        AddAgent["add_agent"]
+        RemoveAgent["remove_agent"]
+        TransferOwner["transfer_owner"]
+        TransferFreeze["transfer_freeze_authority"]
+        SupplyInfo["get_supply_info"]
+    end
+    
+    Owner --> Init
+    Owner --> AddAgent
+    Owner --> TransferOwner
+    Owner --> Transfer
+    
+    FreezeAuth --> Freeze
+    FreezeAuth --> Unfreeze
+    FreezeAuth --> TransferFreeze
+    
+    Agent --> Mint
+    Agent --> Burn
+    
+    Holder --> Transfer
+    
+    Public --> SupplyInfo
+    
+    style Owner fill:#f0e68c,stroke:#daa520,color:#000
+    style FreezeAuth fill:#87ceeb,stroke:#4682b4,color:#000
+    style Agent fill:#98fb98,stroke:#2e8b57,color:#000
+    style Holder fill:#dda0dd,stroke:#9370db,color:#000
+    style Public fill:#d3d3d3,stroke:#a9a9a9,color:#000
 ```
 
 ## 🚀 Inicio Rápido
