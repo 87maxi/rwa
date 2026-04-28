@@ -904,7 +904,18 @@
       "name": "TokenComplianceAccount",
       "docs": [
         "TokenComplianceAccount stores compliance modules for a specific token.",
-        "It is stored as a PDA with seeds: [b\"compliance\", aggregator_pubkey, token_pubkey]"
+        "It is stored as a PDA with seeds: [b\"compliance\", aggregator_pubkey, token_pubkey]",
+        "",
+        "Optimized layout (200 bytes - reducido de 360):",
+        "- Reducido modules de [Pubkey; 10] a [Pubkey; 5]",
+        "",
+        "Layout:",
+        "Offset 0:   token: Pubkey (32 bytes)",
+        "Offset 32:  modules: [Pubkey; 5] (160 bytes)",
+        "Offset 192: module_count: u8 (1 byte)",
+        "Offset 193: bump: u8 (1 byte)",
+        "Offset 194: _padding: [u8; 6] (6 bytes)",
+        "Total: 200 bytes (ahorro 160 bytes = 44%)"
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -922,7 +933,7 @@
             "type": {
               "array": [
                 "pubkey",
-                10
+                5
               ]
             }
           },
