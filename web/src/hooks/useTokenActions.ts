@@ -269,6 +269,16 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const programId = getProgramPublicKey();
       const tokenState = new PublicKey(tokenAccountPubkey);
 
+      // Pre-flight check: verify token account doesn't already exist
+      const existingAccount = await connection.getAccountInfo(tokenState);
+      if (existingAccount) {
+        const addr = tokenState.toString();
+        const shortAddr = `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+        const errorMessage = `Token already initialized at ${shortAddr}. Use a different wallet or reset the localnet.`;
+        setError(errorMessage);
+        return { signature: null, loading: false, error: errorMessage, success: false };
+      }
+
       const { keys, data } = buildInitializeInstruction(
         tokenState,
         currentPublicKey,
