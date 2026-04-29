@@ -9,6 +9,7 @@ import { useSolanaConnection, useWalletBalance } from '@/hooks';
 import { ClientOnly } from '@/components/ClientOnly';
 import { useTokenActions, type SupplyInfo, type AggregatorState, type IdentityInfo } from '@/hooks/useTokenActions';
 import { useSolanaNotification } from '@/hooks';
+import { deriveTokenStatePda } from '@/anchor/pdas';
 import { PublicKey } from '@solana/web3.js';
 import { PROGRAM_IDS, getCurrentNetwork } from '@/config/solana';
 
@@ -17,6 +18,7 @@ export default function ManagePage() {
   const { shortAddress } = useSolanaConnection();
   const { balance: solBalance } = useWalletBalance();
   const [activeTab, setActiveTab] = useState<'transfer' | 'mint' | 'burn' | 'freeze' | 'agents' | 'transferOwner' | 'transferFreeze' | 'supplyInfo' | 'compliance' | 'identity'>('transfer');
+  const [tokenId, setTokenId] = useState('');
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,29 +46,23 @@ export default function ManagePage() {
   const [aggregatorState, setAggregatorState] = useState<AggregatorState | null>(null);
   const [identityInfo, setIdentityInfo] = useState<IdentityInfo | null>(null);
 
-  // Derive PDA for the token state account from the owner wallet
-  // The token state is a PDA seeded with: [b"token", owner_wallet_bytes]
+  // Derive PDA for the token state account
+  // Multi-token: Seeds [b"token", owner, token_id]
   // @see solana-rwa/idl_solana_rwa.json - TokenState PDA seeds
   const tokenStatePda = useMemo(() => {
-    if (!publicKey) return null;
-
     try {
       const network = getCurrentNetwork();
       const programIdStr = PROGRAM_IDS[network]?.solanaRwa;
-      if (!programIdStr) return null;
+      if (!programIdStr || !publicKey || !tokenId) return null;
 
       const programId = new PublicKey(programIdStr);
-      // Derive PDA from "token" constant + owner wallet and program ID
-      const [derivedPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("token"), publicKey.toBuffer()],
-        programId
-      );
+      const derivedPda = deriveTokenStatePda(publicKey, tokenId, programId);
 
       return derivedPda.toString();
     } catch {
       return null;
     }
-  }, [publicKey]);
+  }, [publicKey, tokenId]);
 
   const tokenActions = useTokenActions(tokenStatePda);
 

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { WalletConnect } from '@/components/WalletConnect';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TOKEN_CONFIG, PROGRAM_IDS, getCurrentNetwork } from '@/config/solana';
 import { useTokenActions } from '@/hooks/useTokenActions';
+import { deriveTokenStatePda } from '@/anchor/pdas';
 import { PublicKey, Connection } from '@solana/web3.js';
 
 interface TokenConfig {
@@ -14,11 +16,13 @@ interface TokenConfig {
   symbol: string;
   decimals: number;
   initialSupply: string;
+  tokenId: string;
   mintAuthority: string;
   freezeAuthority: string;
 }
 
 export default function DeployPage() {
+  const router = useRouter();
   const { connected, publicKey } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
@@ -28,33 +32,28 @@ export default function DeployPage() {
     symbol: TOKEN_CONFIG.defaultSymbol,
     decimals: TOKEN_CONFIG.defaultDecimals,
     initialSupply: '0',
+    tokenId: '',
     mintAuthority: '',
     freezeAuthority: '',
   });
 
-  // Derive PDA for the token state account from the owner wallet
-  // The token state is a PDA seeded with: [b"token", owner_wallet_bytes]
+  // Derive PDA for the token state account
+  // Multi-token: Seeds [b"token", owner, token_id]
   // @see solana-rwa/idl_solana_rwa.json - TokenState PDA seeds
   const tokenStatePda = useMemo(() => {
-    if (!publicKey) return null;
-    
     try {
       const network = getCurrentNetwork();
       const programIdStr = PROGRAM_IDS[network]?.solanaRwa;
-      if (!programIdStr) return null;
-      
+      if (!programIdStr || !publicKey || !tokenConfig.tokenId) return null;
+
       const programId = new PublicKey(programIdStr);
-      // Derive PDA from owner wallet and program ID
-      const [derivedPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("token"), publicKey.toBuffer()],
-        programId
-      );
-      
+      const derivedPda = deriveTokenStatePda(publicKey, tokenConfig.tokenId, programId);
+
       return derivedPda.toString();
     } catch {
       return null;
     }
-  }, [publicKey]);
+  }, [publicKey, tokenConfig.tokenId]);
   
   const tokenActions = useTokenActions(tokenStatePda);
 
@@ -72,13 +71,18 @@ export default function DeployPage() {
       const result = await tokenActions.initializeToken(
         tokenConfig.name,
         tokenConfig.symbol,
-        tokenConfig.decimals
+        tokenConfig.decimals,
+        tokenConfig.tokenId
       );
 
       if (result.success && result.signature) {
         setTransactionHash(result.signature);
       } else if (result.error) {
         setErrorMessage(result.error);
+        // Redirect to manage page if token is already initialized
+        if (result.alreadyInitialized) {
+          setTimeout(() => router.push('/manage'), 2000);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -86,7 +90,7 @@ export default function DeployPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, tokenConfig, tokenActions]);
+  }, [connected, publicKey, tokenConfig, tokenActions, router]);
 
   if (!connected) {
     return (
@@ -253,6 +257,26 @@ export default function DeployPage() {
                 className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
                 required
               />
+            </div>
+
+            {/* Token ID */}
+            <div>
+              <label htmlFor="tokenId" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Token ID <span className="text-error">*</span>
+              </label>
+              <input
+                id="tokenId"
+                type="text"
+                value={tokenConfig.tokenId}
+                onChange={(e) => setTokenConfig({ ...tokenConfig, tokenId: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
+                placeholder="rwa-001"
+                maxLength={16}
+                className="w-full px-4 py-3 rounded-xl bg-background-secondary border border-surface-border text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all hover:border-primary/50"
+                required
+              />
+              <p className="text-xs text-foreground-tertiary mt-1">
+                Unique identifier for this token (max 16 chars, alphanumeric, hyphens, underscores). Use different IDs to create multiple tokens.
+              </p>
             </div>
 
             {/* Decimals and Initial Supply */}
