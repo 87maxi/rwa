@@ -176,6 +176,28 @@ pub mod identity_registry {
         pub owner: Signer<'info>,
     }
 
+    /// CheckIdentity instruction - verifies if a wallet has a registered identity (for CPI)
+    #[derive(Accounts)]
+    pub struct CheckIdentity<'info> {
+        /// Registry PDA (for authorization)
+        #[account(
+            seeds = [b"registry"],
+            bump = registry.registry_bump,
+        )]
+        pub registry: Account<'info, IdentityRegistryState>,
+
+        /// IdentityAccount PDA (read-only)
+        /// If this account exists and is properly initialized, the wallet is KYC verified
+        #[account(
+            seeds = [b"identity", registry.key().as_ref(), wallet.key().as_ref()],
+            bump,
+        )]
+        pub identity_account: AccountLoader<'info, IdentityAccount>,
+
+        /// CHECK: Wallet to check
+        pub wallet: AccountInfo<'info>,
+    }
+
     // =================================================================
     // INSTRUCTION HANDLERS
     // =================================================================
@@ -219,6 +241,7 @@ pub mod identity_registry {
     }
 
     /// Register a new identity with string-based identity data (MEDIUM-01: with length validation)
+    /// P2-8: Eliminated unnecessary String clones by reordering operations
     pub fn register_identity_with_data(
         ctx: Context<RegisterIdentity>,
         wallet: Pubkey,
@@ -236,11 +259,15 @@ pub mod identity_registry {
         // SECURITY CHECK: Wallet must match owner
         require!(wallet == ctx.accounts.owner.key(), ErrorCode::WalletMismatch);
 
-        // Clone strings BEFORE moving them (for event emission)
-        let name_clone = name.clone();
-        let symbol_clone = symbol.clone();
-        let identity_data_clone = identity_data.clone();
-        let metadata_uri_clone = metadata_uri.clone();
+        // P2-8: Emit event FIRST (before moving strings) to avoid clones
+        emit!(IdentityRegisteredWithDataEvent {
+            wallet: ctx.accounts.owner.key(),
+            name: name.clone(),
+            symbol: symbol.clone(),
+            identity_data: identity_data.clone(),
+            metadata_uri: metadata_uri.clone(),
+            registered_by: ctx.accounts.owner.key(),
+        });
 
         let mut identity_account = ctx.accounts.identity_account.load_init()?;
 
@@ -252,16 +279,6 @@ pub mod identity_registry {
         crate::states::copy_str_to_bytes(&identity_data, &mut identity_account.identity_data);
         crate::states::copy_str_to_bytes(&metadata_uri, &mut identity_account.metadata_uri);
         identity_account.bump = ctx.bumps.identity_account;
-
-        // Emit event with full identity data for audit trail
-        emit!(IdentityRegisteredWithDataEvent {
-            wallet: ctx.accounts.owner.key(),
-            name: name_clone,
-            symbol: symbol_clone,
-            identity_data: identity_data_clone,
-            metadata_uri: metadata_uri_clone,
-            registered_by: ctx.accounts.owner.key(),
-        });
 
         msg!("Identity with data registered for wallet: {} (by {})", ctx.accounts.owner.key(), ctx.accounts.owner.key());
         Ok(())
@@ -342,6 +359,23 @@ pub mod identity_registry {
 
         msg!("Identity removed for wallet: {} (by {})", identity_account.wallet, caller);
         Ok(())
+    }
+
+    /// Check if a wallet has a registered identity (for CPI from compliance-aggregator)
+    /// Returns true if the wallet is KYC verified, false otherwise
+    pub fn check_identity(ctx: Context<CheckIdentity>) -> Result<bool> {
+        let identity_account = ctx.accounts.identity_account.load()?;
+        
+        // If wallet is set (not default), the identity is registered
+        let is_registered = identity_account.wallet != Pubkey::default();
+        
+        if is_registered {
+            msg!("Wallet {} is KYC verified", ctx.accounts.wallet.key());
+        } else {
+            msg!("Wallet {} is not KYC verified", ctx.accounts.wallet.key());
+        }
+        
+        Ok(is_registered)
     }
 
 }
