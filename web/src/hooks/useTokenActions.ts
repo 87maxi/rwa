@@ -30,6 +30,7 @@ import {
   deriveBalancePda,
   deriveFrozenPda,
   deriveAgentPda,
+  deriveCompliancePda,
 } from '@/anchor/client';
 import {
   parseSupplyInfo,
@@ -69,6 +70,7 @@ export interface TransactionResult {
   loading: boolean;
   error: string | null;
   success: boolean;
+  alreadyInitialized?: boolean;
 }
 
 /**
@@ -234,7 +236,8 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
   const initializeToken = useCallback(async (
     name: string,
     symbol: string,
-    decimals: number
+    decimals: number,
+    tokenId: string
   ): Promise<TransactionResult> => {
     const currentPublicKey = publicKeyRef.current;
     if (!currentPublicKey) {
@@ -274,17 +277,18 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       if (existingAccount) {
         const addr = tokenState.toString();
         const shortAddr = `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-        const errorMessage = `Token already initialized at ${shortAddr}. Use a different wallet or reset the localnet.`;
+        const errorMessage = `Token already initialized at ${shortAddr}. Navigate to /manage to interact with your token.`;
         setError(errorMessage);
-        return { signature: null, loading: false, error: errorMessage, success: false };
+        return { signature: null, loading: false, error: errorMessage, success: false, alreadyInitialized: true };
       }
 
       const { keys, data } = buildInitializeInstruction(
-        tokenState,
         currentPublicKey,
+        tokenState,
         name,
         symbol,
         decimals,
+        tokenId,
         programId
       );
 
@@ -337,11 +341,13 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const amountBigInt = BigInt(amount);
       // Derive the BalanceAccount PDA: [b"balance", token_state, recipient]
       const balanceAccountPda = deriveBalancePda(tokenState, recipientPubkey, programId);
+      // Derive the AgentAccount PDA: [b"agent", token_state, agent]
+      const agentAccountPda = deriveAgentPda(tokenState, currentPublicKey, programId);
 
       const { keys, data } = buildMintInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
+        agentAccountPda,
         recipientPubkey,
         balanceAccountPda,
         amountBigInt,
@@ -403,16 +409,20 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       // Derive BalanceAccount PDAs: [b"balance", token_state, wallet]
       const fromBalancePda = deriveBalancePda(tokenState, fromPubkey, programId);
       const toBalancePda = deriveBalancePda(tokenState, toPubkey, programId);
+      // Derive optional frozen PDAs
+      const fromFrozenPda = deriveFrozenPda(tokenState, fromPubkey, programId);
+      const toFrozenPda = deriveFrozenPda(tokenState, toPubkey, programId);
 
       const { keys, data } = buildTransferInstruction(
         tokenState,
-        currentPublicKey,
         fromPubkey,
         fromBalancePda,
         toPubkey,
         toBalancePda,
         amountBigInt,
-        programId
+        programId,
+        fromFrozenPda,
+        toFrozenPda
       );
 
       const transaction = new Transaction();
@@ -464,11 +474,13 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const amountBigInt = BigInt(amount);
       // Derive the BalanceAccount PDA: [b"balance", token_state, from]
       const balanceAccountPda = deriveBalancePda(tokenState, fromPubkey, programId);
+      // Derive the AgentAccount PDA: [b"agent", token_state, agent]
+      const agentAccountPda = deriveAgentPda(tokenState, currentPublicKey, programId);
 
       const { keys, data } = buildBurnInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
+        agentAccountPda,
         fromPubkey,
         balanceAccountPda,
         amountBigInt,
@@ -526,7 +538,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildFreezeInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
         accountPubkey,
         frozenAccountPda,
         programId
@@ -582,7 +593,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildUnfreezeInstruction(
         tokenState,
-        currentPublicKey,
         currentPublicKey,
         accountPubkey,
         frozenAccountPda,
@@ -640,7 +650,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildAddAgentInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
         agentPubkey,
         agentAccountPda,
         programId
@@ -697,7 +706,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildRemoveAgentInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
         agentPubkey,
         agentAccountPda,
         programId
@@ -752,7 +760,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildTransferOwnerInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
         newOwnerPubkey,
         programId
       );
@@ -806,7 +813,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const { keys, data } = buildTransferFreezeAuthorityInstruction(
         tokenState,
         currentPublicKey,
-        currentPublicKey,
         newFreezeAuthorityPubkey,
         programId
       );
@@ -842,7 +848,6 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
 
       const { keys, data } = buildGetSupplyInfoInstruction(
         tokenState,
-        currentPublicKey,
         programId
       );
 
@@ -1035,11 +1040,13 @@ export function useTokenActions(tokenAccountPubkey: string | null) {
       const token = new PublicKey(tokenProgramId);
       const modulePubkey = new PublicKey(moduleProgramId);
 
-      const tokenCompliance = new PublicKey(tokenProgramId);
+      // Derive the TokenCompliance PDA: [b"compliance", aggregator, token]
+      const tokenCompliance = deriveCompliancePda(aggregatorState, token, programId);
       const { keys, data } = buildComplianceRemoveModuleInstruction(
         aggregatorState,
         currentPublicKey,
         tokenCompliance,
+        token,
         programId
       );
 

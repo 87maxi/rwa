@@ -52,19 +52,23 @@ function serializeAnchorString(s: string): Buffer {
 
 /**
  * Build initialize instruction for Token State.
+ * Accounts: payer, token, system_program
+ * Token PDA seeds: [b"token", b"state"] - fixed global PDA
  */
 export function buildInitializeInstruction(
+  payer: PublicKey,
   tokenState: PublicKey,
-  owner: PublicKey,
   name: string,
   symbol: string,
   decimals: number,
+  tokenId: string,
   _programId: PublicKey
 ): InstructionResult {
   const nameBuffer = serializeAnchorString(name);
   const symbolBuffer = serializeAnchorString(symbol);
+  const tokenIdBuffer = serializeAnchorString(tokenId);
 
-  const dataLength = 8 + nameBuffer.length + symbolBuffer.length + 1;
+  const dataLength = 8 + nameBuffer.length + symbolBuffer.length + 1 + tokenIdBuffer.length;
   const data = Buffer.alloc(dataLength);
 
   let offset = 0;
@@ -85,10 +89,14 @@ export function buildInitializeInstruction(
 
   // Write decimals (1 byte)
   data[offset] = decimals;
+  offset += 1;
+
+  // Write token_id (Anchor String format)
+  tokenIdBuffer.copy(data, offset);
 
   return {
     keys: [
-      { pubkey: owner, isSigner: true, isWritable: true },
+      { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: tokenState, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
@@ -98,11 +106,12 @@ export function buildInitializeInstruction(
 
 /**
  * Build mint instruction
+ * Accounts: token, agent, agent_account, recipient, balance_account, system_program
  */
 export function buildMintInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   agent: PublicKey,
+  agentAccount: PublicKey,
   recipient: PublicKey,
   balanceAccount: PublicKey,
   amount: bigint,
@@ -121,8 +130,8 @@ export function buildMintInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: agent, isSigner: true, isWritable: false },
+      { pubkey: agentAccount, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: false },
       { pubkey: balanceAccount, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
@@ -133,11 +142,12 @@ export function buildMintInstruction(
 
 /**
  * Build burn instruction
+ * Accounts: token, agent, agent_account, sender, balance_account, system_program
  */
 export function buildBurnInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   agent: PublicKey,
+  agentAccount: PublicKey,
   sender: PublicKey,
   balanceAccount: PublicKey,
   amount: bigint,
@@ -159,8 +169,8 @@ export function buildBurnInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: agent, isSigner: true, isWritable: false },
+      { pubkey: agentAccount, isSigner: false, isWritable: false },
       { pubkey: sender, isSigner: true, isWritable: true },
       { pubkey: balanceAccount, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
@@ -171,16 +181,18 @@ export function buildBurnInstruction(
 
 /**
  * Build transfer instruction
+ * Accounts: token, from, from_balance, receiver, to_balance, system_program, from_frozen?, to_frozen?
  */
 export function buildTransferInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   from: PublicKey,
   fromBalance: PublicKey,
   receiver: PublicKey,
   toBalance: PublicKey,
   amount: bigint,
-  _programId: PublicKey
+  _programId: PublicKey,
+  fromFrozen?: PublicKey,
+  toFrozen?: PublicKey
 ): InstructionResult {
   const data = Buffer.alloc(16);
   let offset = 0;
@@ -192,26 +204,34 @@ export function buildTransferInstruction(
 
   data.writeBigUInt64LE(amount, offset);
 
+  const keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }> = [
+    { pubkey: tokenState, isSigner: false, isWritable: false },
+    { pubkey: from, isSigner: true, isWritable: false },
+    { pubkey: fromBalance, isSigner: false, isWritable: true },
+    { pubkey: receiver, isSigner: false, isWritable: false },
+    { pubkey: toBalance, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ];
+
+  if (fromFrozen) {
+    keys.push({ pubkey: fromFrozen, isSigner: false, isWritable: false });
+  }
+  if (toFrozen) {
+    keys.push({ pubkey: toFrozen, isSigner: false, isWritable: false });
+  }
+
   return {
-    keys: [
-      { pubkey: tokenState, isSigner: false, isWritable: false },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
-      { pubkey: from, isSigner: true, isWritable: false },
-      { pubkey: fromBalance, isSigner: false, isWritable: true },
-      { pubkey: receiver, isSigner: false, isWritable: false },
-      { pubkey: toBalance, isSigner: false, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
+    keys,
     data,
   };
 }
 
 /**
  * Build freeze account instruction
+ * Accounts: token, authority, wallet_to_freeze, frozen_account, system_program
  */
 export function buildFreezeInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   authority: PublicKey,
   walletToFreeze: PublicKey,
   frozenAccount: PublicKey,
@@ -230,7 +250,6 @@ export function buildFreezeInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: false },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: authority, isSigner: true, isWritable: false },
       { pubkey: walletToFreeze, isSigner: false, isWritable: false },
       { pubkey: frozenAccount, isSigner: false, isWritable: true },
@@ -242,10 +261,10 @@ export function buildFreezeInstruction(
 
 /**
  * Build unfreeze account instruction
+ * Accounts: token, authority, wallet_to_freeze, frozen_account
  */
 export function buildUnfreezeInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   authority: PublicKey,
   walletToFreeze: PublicKey,
   frozenAccount: PublicKey,
@@ -264,7 +283,6 @@ export function buildUnfreezeInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: false },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: authority, isSigner: true, isWritable: false },
       { pubkey: walletToFreeze, isSigner: false, isWritable: false },
       { pubkey: frozenAccount, isSigner: false, isWritable: true },
@@ -275,10 +293,10 @@ export function buildUnfreezeInstruction(
 
 /**
  * Build add agent instruction
+ * Accounts: token, payer, new_agent, agent_account, system_program
  */
 export function buildAddAgentInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   payer: PublicKey,
   newAgent: PublicKey,
   agentAccount: PublicKey,
@@ -297,7 +315,6 @@ export function buildAddAgentInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: newAgent, isSigner: false, isWritable: false },
       { pubkey: agentAccount, isSigner: false, isWritable: true },
@@ -309,10 +326,10 @@ export function buildAddAgentInstruction(
 
 /**
  * Build remove agent instruction
+ * Accounts: token, payer, agent_to_remove, agent_account
  */
 export function buildRemoveAgentInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   payer: PublicKey,
   agentToRemove: PublicKey,
   agentAccount: PublicKey,
@@ -329,7 +346,6 @@ export function buildRemoveAgentInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: agentToRemove, isSigner: false, isWritable: false },
       { pubkey: agentAccount, isSigner: false, isWritable: true },
@@ -340,10 +356,10 @@ export function buildRemoveAgentInstruction(
 
 /**
  * Build transfer owner instruction
+ * Accounts: token, current_owner
  */
 export function buildTransferOwnerInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   currentOwner: PublicKey,
   newOwner: PublicKey,
   _programId: PublicKey
@@ -361,7 +377,6 @@ export function buildTransferOwnerInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: currentOwner, isSigner: true, isWritable: false },
     ],
     data,
@@ -370,10 +385,10 @@ export function buildTransferOwnerInstruction(
 
 /**
  * Build transfer freeze authority instruction
+ * Accounts: token, current_freeze_authority
  */
 export function buildTransferFreezeAuthorityInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   currentFreezeAuthority: PublicKey,
   newFreezeAuthority: PublicKey,
   _programId: PublicKey
@@ -391,7 +406,6 @@ export function buildTransferFreezeAuthorityInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: true },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
       { pubkey: currentFreezeAuthority, isSigner: true, isWritable: false },
     ],
     data,
@@ -400,10 +414,10 @@ export function buildTransferFreezeAuthorityInstruction(
 
 /**
  * Build get supply info instruction (read-only query)
+ * Accounts: token
  */
 export function buildGetSupplyInfoInstruction(
   tokenState: PublicKey,
-  tokenOwner: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
   const data = Buffer.alloc(8);
@@ -416,7 +430,6 @@ export function buildGetSupplyInfoInstruction(
   return {
     keys: [
       { pubkey: tokenState, isSigner: false, isWritable: false },
-      { pubkey: tokenOwner, isSigner: false, isWritable: false },
     ],
     data,
   };

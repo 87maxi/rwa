@@ -61,14 +61,15 @@ export function deriveAgentPda(
 
 /**
  * Derive the TokenState PDA.
- * Seeds: [b"token", owner]
+ * Multi-token: Seeds [b"token", owner, token_id] - allows multiple tokens per wallet
  */
 export function deriveTokenStatePda(
   owner: PublicKey,
+  tokenId: string,
   programId: PublicKey
 ): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("token"), owner.toBuffer()],
+    [Buffer.from("token"), owner.toBuffer(), Buffer.from(tokenId)],
     programId
   );
   return pda;

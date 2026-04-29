@@ -75,11 +75,13 @@ export function buildComplianceAddModuleInstruction(
 
 /**
  * Build compliance remove module instruction
+ * Accounts: aggregator_state, owner, token_compliance, token_compliance_token, system_program
  */
 export function buildComplianceRemoveModuleInstruction(
   aggregatorState: PublicKey,
   owner: PublicKey,
   tokenCompliance: PublicKey,
+  tokenComplianceToken: PublicKey,
   _programId: PublicKey
 ): InstructionResult {
   const data = Buffer.alloc(8);
@@ -94,6 +96,8 @@ export function buildComplianceRemoveModuleInstruction(
       { pubkey: aggregatorState, isSigner: false, isWritable: false },
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: tokenCompliance, isSigner: false, isWritable: true },
+      { pubkey: tokenComplianceToken, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   };

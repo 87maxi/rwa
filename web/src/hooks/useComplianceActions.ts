@@ -9,6 +9,7 @@ import {
   buildComplianceRebalanceInstruction,
   buildComplianceGetStateInstruction,
 } from '@/anchor/compliance';
+import { deriveCompliancePda } from '@/anchor/pdas';
 import { parseAggregatorState } from '@/anchor/parsers';
 import { getCurrentNetwork, PROGRAM_IDS } from '@/config/solana';
 import { isValidSolanaAddress } from '@/utils/solana';
@@ -122,8 +123,8 @@ export function useComplianceActions() {
       const aggregatorState = new PublicKey(aggregatorAccount);
       const token = new PublicKey(tokenProgramId);
       const modulePubkey = new PublicKey(moduleProgramId);
-
-      const tokenCompliance = new PublicKey(tokenProgramId);
+      // Derive the TokenCompliance PDA: [b"compliance", aggregator, token]
+      const tokenCompliance = deriveCompliancePda(aggregatorState, token, programId);
       const { keys, data } = buildComplianceAddModuleInstruction(
         aggregatorState,
         currentPublicKey,
@@ -176,12 +177,14 @@ export function useComplianceActions() {
     try {
       const programId = getComplianceProgramId();
       const aggregatorState = new PublicKey(aggregatorAccount);
-
-      const tokenCompliance = new PublicKey(tokenProgramId);
+      const token = new PublicKey(tokenProgramId);
+      // Derive the TokenCompliance PDA: [b"compliance", aggregator, token]
+      const tokenCompliance = deriveCompliancePda(aggregatorState, token, programId);
       const { keys, data } = buildComplianceRemoveModuleInstruction(
         aggregatorState,
         currentPublicKey,
         tokenCompliance,
+        token,
         programId
       );
 

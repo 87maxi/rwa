@@ -36,13 +36,14 @@ export {
 
 // Solana RWA PDA seeds
 export const SOLANA_RWA_SEEDS = {
-  // TokenState PDA: [b"token", owner]
+  // TokenState PDA: [b"token", b"state"] - fixed global PDA, independent of owner
   token: 'token' as const,
+  state: 'state' as const,
   // AgentAccount PDA: [b"agent", tokenState, agent]
   agent: 'agent' as const,
-  // BalanceAccount PDA: [b"balance", tokenState, mint]
+  // BalanceAccount PDA: [b"balance", tokenState, wallet]
   balance: 'balance' as const,
-  // FrozenAccount PDA: [b"frozen", tokenState, account]
+  // FrozenAccount PDA: [b"frozen", tokenState, wallet]
   frozen: 'frozen' as const,
 } as const;
 
@@ -71,7 +72,7 @@ export const COMPLIANCE_AGGREGATOR_SEEDS = {
 /**
  * TokenState - Main token state account
  * Rust struct: owner, freeze_authority, name, symbol, decimals, total_supply, next_index, bump
- * Seeds: [b"token", owner]
+ * Seeds: [b"token", b"state"] - fixed global PDA, independent of owner
  */
 export interface TokenStateData {
   owner: string;           // Pubkey - Who created this token
