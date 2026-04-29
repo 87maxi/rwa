@@ -8,8 +8,8 @@
 // ARCHITECTURE:
 // -------------
 // 1. TokenState (PDA): Control account for the token
-//    - Seeds: [b"token", owner]
-//    - Stores: owner, freeze_authority, name, symbol, decimals, total_supply, next_index
+//    - Seeds: [b"token", owner, token_id]
+//    - Stores: owner, freeze_authority, name, symbol, decimals, total_supply, token_id
 //
 // 2. BalanceAccount (PDA): Individual balance records
 //    - Seeds: [b"balance", token_pubkey, wallet_pubkey]
@@ -84,17 +84,18 @@ pub mod solana_rwa {
 
     /// Initialize instruction - creates a new token state account
     #[derive(Accounts)]
+    #[instruction(name: String, symbol: String, decimals: u8, token_id: String)]
     pub struct Initialize<'info> {
         /// Who pays the rent for creating the account
         #[account(mut)]
         pub payer: Signer<'info>,
 
         /// The new TokenState PDA account (stores token metadata only)
-        /// Seeds: [b"token"]
+        /// Multi-token: Seeds: [b"token", payer, token_id] - allows multiple tokens per wallet
         #[account(
             init,
             payer = payer,
-            seeds = [b"token", payer.key().as_ref()],
+            seeds = [b"token", payer.key().as_ref(), token_id.as_bytes()],
             bump,
             space = 8 + std::mem::size_of::<TokenState>()
         )]
@@ -108,17 +109,24 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct Mint<'info> {
         /// Token state account (will be modified - total_supply updated)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Agent performing the mint (must be authorized by token owner)
         pub agent: Signer<'info>,
+
+        /// P1-6: Agent account PDA (verifies agent is registered)
+        /// Seeds: [b"agent", token.key(), agent.key()]
+        #[account(
+            seeds = [b"agent", token.key().as_ref(), agent.key().as_ref()],
+            bump,
+        )]
+        pub agent_account: AccountLoader<'info, AgentAccount>,
 
         /// CHECK: Recipient wallet (used for PDA derivation)
         pub recipient: AccountInfo<'info>,
@@ -138,17 +146,24 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct Burn<'info> {
         /// Token state account (will be modified)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Agent performing the burn (must be authorized)
         pub agent: Signer<'info>,
+
+        /// P1-6: Agent account PDA (verifies agent is registered)
+        /// Seeds: [b"agent", token.key(), agent.key()]
+        #[account(
+            seeds = [b"agent", token.key().as_ref(), agent.key().as_ref()],
+            bump,
+        )]
+        pub agent_account: AccountLoader<'info, AgentAccount>,
 
         /// Sender wallet (must sign and have balance)
         #[account(mut)]
@@ -170,13 +185,12 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct Transfer<'info> {
         /// Token state account (metadata only, total_supply unchanged)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Sender: must sign to prove ownership
         pub from: Signer<'info>,
@@ -200,6 +214,16 @@ pub mod solana_rwa {
         )]
         pub to_balance: AccountLoader<'info, BalanceAccount>,
 
+        /// Sender's frozen status PDA (optional - only checked if provided)
+        /// Seeds: [b"frozen", token.key(), from.key()]
+        /// If this account exists, we verify the sender is not frozen
+        pub from_frozen: Option<AccountLoader<'info, FrozenAccount>>,
+
+        /// Receiver's frozen status PDA (optional - only checked if provided)
+        /// Seeds: [b"frozen", token.key(), receiver.key()]
+        /// If this account exists, we verify the receiver is not frozen
+        pub to_frozen: Option<AccountLoader<'info, FrozenAccount>>,
+
         /// System program for account creation
         pub system_program: Program<'info, System>,
     }
@@ -208,14 +232,13 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct AddAgent<'info> {
         /// Token state account (will be modified)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Must be the token owner
         #[account(mut)]
@@ -243,14 +266,13 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct RemoveAgent<'info> {
         /// Token state account
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Must be the token owner (receives returned SOL)
         pub payer: Signer<'info>,
@@ -272,27 +294,25 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct GetSupplyInfo<'info> {
         /// Token state account (read-only)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
     }
 
     /// TransferOwner instruction - transfers the token ownership
     #[derive(Accounts)]
     pub struct TransferOwner<'info> {
         /// Token state account (owner field will be modified)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Current owner (must sign to authorize transfer)
         pub current_owner: Signer<'info>,
@@ -302,13 +322,12 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct FreezeAccount<'info> {
         /// Token state account
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Authority performing the freeze (must be freeze_authority)
         pub authority: Signer<'info>,
@@ -332,13 +351,12 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct UnfreezeAccount<'info> {
         /// Token state account
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
 
         /// Authority performing the unfreeze
         pub authority: Signer<'info>,
@@ -359,14 +377,13 @@ pub mod solana_rwa {
     #[derive(Accounts)]
     pub struct TransferFreezeAuthority<'info> {
         /// Token state account (freeze_authority field will be modified)
+        /// Multi-token: Seeds: [b"token", owner, token_id]
         #[account(
             mut,
-            seeds = [b"token", token_owner.key().as_ref()],
+            seeds = [b"token", token.load()?.owner.as_ref(), &token.load()?.token_id],
             bump = token.load()?.bump,
         )]
         pub token: AccountLoader<'info, TokenState>,
-        /// CHECK: used for PDA derivation
-        pub token_owner: AccountInfo<'info>,
         
         /// Current freeze authority (must sign to authorize transfer)
         pub current_freeze_authority: Signer<'info>,
@@ -377,15 +394,16 @@ pub mod solana_rwa {
     // =================================================================
 
     /// Initialize a new token
-    pub fn initialize(ctx: Context<Initialize>, name: String, symbol: String, decimals: u8) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, name: String, symbol: String, decimals: u8, token_id: String) -> Result<()> {
         let mut token = ctx.accounts.token.load_init()?;
         
-        msg!("Token initialized: {} ({}) with {} decimals", name, symbol, decimals);
+        msg!("Token initialized: {} ({}) with {} decimals, id: {}", name, symbol, decimals, token_id);
 
         token.owner = ctx.accounts.payer.key();
         token.freeze_authority = ctx.accounts.payer.key();
         crate::states::copy_str_to_bytes(&name, &mut token.name);
         crate::states::copy_str_to_bytes(&symbol, &mut token.symbol);
+        crate::states::copy_str_to_bytes(&token_id, &mut token.token_id);
         token.decimals = decimals;
         token.total_supply = 0;
         token.bump = ctx.bumps.token;
@@ -443,14 +461,36 @@ pub mod solana_rwa {
 
     /// Transfer tokens
     pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
-        let token = ctx.accounts.token.load()?;
+        let _token = ctx.accounts.token.load()?;
         let mut from_balance = ctx.accounts.from_balance.load_mut()?;
         let mut to_balance = ctx.accounts.to_balance.load_mut()?;
         let from_key = ctx.accounts.from.key();
-        let to_key = to_balance.wallet;
+        let to_key = ctx.accounts.receiver.key();
+
+        // P0-1: Verify frozen status for both from and to accounts
+        if let Some(from_frozen) = ctx.accounts.from_frozen.as_ref() {
+            let frozen_data = from_frozen.load()?;
+            require!(
+                frozen_data.frozen != ACCOUNT_FROZEN,
+                ErrorCode::AccountFrozen
+            );
+        }
+
+        if let Some(to_frozen) = ctx.accounts.to_frozen.as_ref() {
+            let frozen_data = to_frozen.load()?;
+            require!(
+                frozen_data.frozen != ACCOUNT_FROZEN,
+                ErrorCode::AccountFrozen
+            );
+        }
 
         require!(amount > 0, ErrorCode::InvalidAmount);
         require!(from_balance.balance >= amount, ErrorCode::InsufficientBalance);
+
+        // P1-5: Initialize to_balance if not yet initialized (wallet == Pubkey::default())
+        if to_balance.wallet == Pubkey::default() {
+            to_balance.wallet = to_key;
+        }
 
         from_balance.balance = from_balance.balance.checked_sub(amount)
             .ok_or(ErrorCode::InsufficientBalance)?;

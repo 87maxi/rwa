@@ -23,6 +23,7 @@ mod tests {
             freeze_authority: dummy_pubkey,
             name: [0; 32],
             symbol: [0; 8],
+            token_id: [0; 16],
             decimals: 9,
             total_supply: 0,
             bump: 255,
@@ -30,9 +31,11 @@ mod tests {
         };
         crate::states::copy_str_to_bytes("Test Token", &mut state.name);
         crate::states::copy_str_to_bytes("TT", &mut state.symbol);
+        crate::states::copy_str_to_bytes("token-001", &mut state.token_id);
 
         assert_eq!(crate::states::bytes_to_str(&state.name), "Test Token");
         assert_eq!(crate::states::bytes_to_str(&state.symbol), "TT");
+        assert_eq!(crate::states::bytes_to_str(&state.token_id), "token-001");
         assert_eq!(state.decimals, 9);
         assert_eq!(state.total_supply, 0);
         assert_eq!(state.bump, 255);

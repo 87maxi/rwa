@@ -19,7 +19,8 @@ pub fn derive_agent_pda(token: &Pubkey, agent: &Pubkey) -> (Pubkey, u8) {
 }
 
 /// Derive the PDA for TokenState
-pub fn derive_token_state_pda(owner: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"token", owner.as_ref()];
+/// Multi-token: Seeds [b"token", owner, token_id] - allows multiple tokens per wallet
+pub fn derive_token_state_pda(owner: &Pubkey, token_id: &[u8]) -> (Pubkey, u8) {
+    let seeds = &[b"token", owner.as_ref(), token_id];
     Pubkey::find_program_address(seeds, &crate::id())
 }
