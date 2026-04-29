@@ -210,7 +210,8 @@
     {
       "name": "can_transfer",
       "docs": [
-        "Check if a transfer is allowed (compliance check)"
+        "Check if a transfer is allowed (compliance check)",
+        "P0-3: Now performs real CPI to identity-registry for KYC verification"
       ],
       "discriminator": [
         233,
@@ -283,6 +284,41 @@
               }
             ]
           }
+        },
+        {
+          "name": "identity_registry_program",
+          "docs": [
+            "Identity registry program (for verifying account ownership)"
+          ]
+        },
+        {
+          "name": "identity_registry",
+          "docs": [
+            "Identity registry PDA (for seed validation)"
+          ]
+        },
+        {
+          "name": "sender_identity",
+          "docs": [
+            "Sender's identity account PDA (for KYC verification)",
+            "If provided, we verify the sender is KYC registered by checking",
+            "that the account is owned by identity_registry_program and has valid data"
+          ],
+          "optional": true
+        },
+        {
+          "name": "recipient_identity",
+          "docs": [
+            "Recipient's identity account PDA (for KYC verification)",
+            "If provided, we verify the recipient is KYC registered"
+          ],
+          "optional": true
+        },
+        {
+          "name": "sender"
+        },
+        {
+          "name": "recipient"
         }
       ],
       "args": [
@@ -301,14 +337,6 @@
         {
           "name": "amount",
           "type": "u64"
-        },
-        {
-          "name": "sender_kyc",
-          "type": "pubkey"
-        },
-        {
-          "name": "recipient_kyc",
-          "type": "pubkey"
         },
         {
           "name": "sender_balance",
@@ -401,6 +429,41 @@
               }
             ]
           }
+        },
+        {
+          "name": "identity_registry_program",
+          "docs": [
+            "Identity registry program (for verifying account ownership)"
+          ]
+        },
+        {
+          "name": "identity_registry",
+          "docs": [
+            "Identity registry PDA (for seed validation)"
+          ]
+        },
+        {
+          "name": "sender_identity",
+          "docs": [
+            "Sender's identity account PDA (for KYC verification)",
+            "If provided, we verify the sender is KYC registered by checking",
+            "that the account is owned by identity_registry_program and has valid data"
+          ],
+          "optional": true
+        },
+        {
+          "name": "recipient_identity",
+          "docs": [
+            "Recipient's identity account PDA (for KYC verification)",
+            "If provided, we verify the recipient is KYC registered"
+          ],
+          "optional": true
+        },
+        {
+          "name": "sender"
+        },
+        {
+          "name": "recipient"
         }
       ],
       "args": [],
@@ -482,6 +545,41 @@
               }
             ]
           }
+        },
+        {
+          "name": "identity_registry_program",
+          "docs": [
+            "Identity registry program (for verifying account ownership)"
+          ]
+        },
+        {
+          "name": "identity_registry",
+          "docs": [
+            "Identity registry PDA (for seed validation)"
+          ]
+        },
+        {
+          "name": "sender_identity",
+          "docs": [
+            "Sender's identity account PDA (for KYC verification)",
+            "If provided, we verify the sender is KYC registered by checking",
+            "that the account is owned by identity_registry_program and has valid data"
+          ],
+          "optional": true
+        },
+        {
+          "name": "recipient_identity",
+          "docs": [
+            "Recipient's identity account PDA (for KYC verification)",
+            "If provided, we verify the recipient is KYC registered"
+          ],
+          "optional": true
+        },
+        {
+          "name": "sender"
+        },
+        {
+          "name": "recipient"
         }
       ],
       "args": [],
@@ -643,14 +741,16 @@
         {
           "name": "owner",
           "docs": [
-            "Owner of the aggregator (must sign)"
+            "Owner of the aggregator (must sign, receives rent if account closed)"
           ],
+          "writable": true,
           "signer": true
         },
         {
           "name": "token_compliance",
           "docs": [
-            "TokenComplianceAccount PDA (will be updated or closed)"
+            "TokenComplianceAccount PDA (will be updated or closed)",
+            "Note: No automatic 'close' constraint - we close manually only when module_count == 0"
           ],
           "writable": true,
           "pda": {
@@ -683,6 +783,13 @@
         },
         {
           "name": "token_compliance_token"
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for manual account close"
+          ],
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -812,6 +919,11 @@
       "code": 6009,
       "name": "TransferAmountExceeded",
       "msg": "Transfer amount exceeded"
+    },
+    {
+      "code": 6010,
+      "name": "ModuleArrayFull",
+      "msg": "Module array is full"
     }
   ],
   "types": [
@@ -838,7 +950,9 @@
       "name": "ComplianceAggregatorState",
       "docs": [
         "ComplianceAggregatorState is the control account for the compliance aggregator.",
-        "It is stored as a PDA with seeds [b\"aggregator\"]."
+        "It is stored as a PDA with seeds [b\"aggregator\"].",
+        "Note: zero_copy was considered but requires AccountLoader<T> instead of Account<T>,",
+        "which would require refactoring all instruction handlers. Keeping #[account] for now."
       ],
       "type": {
         "kind": "struct",

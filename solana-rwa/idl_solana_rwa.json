@@ -26,30 +26,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (will be modified)"
+            "Token state account (will be modified)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "payer",
@@ -128,30 +108,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (will be modified)"
+            "Token state account (will be modified)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "agent",
@@ -159,6 +119,35 @@
             "Agent performing the burn (must be authorized)"
           ],
           "signer": true
+        },
+        {
+          "name": "agent_account",
+          "docs": [
+            "P1-6: Agent account PDA (verifies agent is registered)",
+            "Seeds: [b\"agent\", token.key(), agent.key()]"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
         },
         {
           "name": "sender",
@@ -237,29 +226,9 @@
         {
           "name": "token",
           "docs": [
-            "Token state account"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+            "Token state account",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
+          ]
         },
         {
           "name": "authority",
@@ -338,29 +307,9 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (read-only)"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+            "Token state account (read-only)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
+          ]
         }
       ],
       "args": [],
@@ -398,7 +347,7 @@
           "name": "token",
           "docs": [
             "The new TokenState PDA account (stores token metadata only)",
-            "Seeds: [b\"token\"]"
+            "Multi-token: Seeds: [b\"token\", payer, token_id] - allows multiple tokens per wallet"
           ],
           "writable": true,
           "pda": {
@@ -416,6 +365,10 @@
               {
                 "kind": "account",
                 "path": "payer"
+              },
+              {
+                "kind": "arg",
+                "path": "token_id"
               }
             ]
           }
@@ -440,6 +393,10 @@
         {
           "name": "decimals",
           "type": "u8"
+        },
+        {
+          "name": "token_id",
+          "type": "string"
         }
       ]
     },
@@ -462,30 +419,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (will be modified - total_supply updated)"
+            "Token state account (will be modified - total_supply updated)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "agent",
@@ -493,6 +430,35 @@
             "Agent performing the mint (must be authorized by token owner)"
           ],
           "signer": true
+        },
+        {
+          "name": "agent_account",
+          "docs": [
+            "P1-6: Agent account PDA (verifies agent is registered)",
+            "Seeds: [b\"agent\", token.key(), agent.key()]"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token"
+              },
+              {
+                "kind": "account",
+                "path": "agent"
+              }
+            ]
+          }
         },
         {
           "name": "recipient"
@@ -562,30 +528,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account"
+            "Token state account",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "payer",
@@ -651,29 +597,9 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (metadata only, total_supply unchanged)"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+            "Token state account (metadata only, total_supply unchanged)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
+          ]
         },
         {
           "name": "from",
@@ -751,6 +677,24 @@
           }
         },
         {
+          "name": "from_frozen",
+          "docs": [
+            "Sender's frozen status PDA (optional - only checked if provided)",
+            "Seeds: [b\"frozen\", token.key(), from.key()]",
+            "If this account exists, we verify the sender is not frozen"
+          ],
+          "optional": true
+        },
+        {
+          "name": "to_frozen",
+          "docs": [
+            "Receiver's frozen status PDA (optional - only checked if provided)",
+            "Seeds: [b\"frozen\", token.key(), receiver.key()]",
+            "If this account exists, we verify the receiver is not frozen"
+          ],
+          "optional": true
+        },
+        {
           "name": "system_program",
           "docs": [
             "System program for account creation"
@@ -784,30 +728,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (freeze_authority field will be modified)"
+            "Token state account (freeze_authority field will be modified)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "current_freeze_authority",
@@ -843,30 +767,10 @@
         {
           "name": "token",
           "docs": [
-            "Token state account (owner field will be modified)"
+            "Token state account (owner field will be modified)",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+          "writable": true
         },
         {
           "name": "current_owner",
@@ -902,29 +806,9 @@
         {
           "name": "token",
           "docs": [
-            "Token state account"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "token_owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_owner"
+            "Token state account",
+            "Multi-token: Seeds: [b\"token\", owner, token_id]"
+          ]
         },
         {
           "name": "authority",
@@ -1426,9 +1310,14 @@
       "name": "TokenState",
       "docs": [
         "TokenState is the main control account for the token program.",
-        "It is stored as a PDA with seeds [b\"token\", owner].",
+        "It is stored as a PDA with seeds [b\"token\", owner, token_id].",
         "",
-        "Optimized layout (120 bytes - reducido de 128):",
+        "Multi-token support: Each wallet can create multiple tokens differentiated",
+        "by a unique token_id (16 bytes). This allows a single wallet to manage",
+        "multiple independent RWA token instances.",
+        "",
+        "Optimized layout (136 bytes):",
+        "- Added token_id: [u8; 16] for multi-token differentiation",
         "- Removido next_index (no se usa en la lógica actual)",
         "- Reducido symbol de [u8; 10] a [u8; 8]",
         "",
@@ -1438,10 +1327,11 @@
         "Offset 64:  total_supply: u64 (8 bytes)",
         "Offset 72:  name: [u8; 32] (32 bytes)",
         "Offset 104: symbol: [u8; 8] (8 bytes)",
-        "Offset 112: decimals: u8 (1 byte)",
-        "Offset 113: bump: u8 (1 byte)",
-        "Offset 114: _padding: [u8; 6] (6 bytes para alineamiento a 8)",
-        "Total: 120 bytes (ahorro 8 bytes = 6.25%)"
+        "Offset 112: token_id: [u8; 16] (16 bytes) NEW",
+        "Offset 128: decimals: u8 (1 byte)",
+        "Offset 129: bump: u8 (1 byte)",
+        "Offset 130: _padding: [u8; 6] (6 bytes para alineamiento a 8)",
+        "Total: 136 bytes"
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -1477,6 +1367,15 @@
               "array": [
                 "u8",
                 8
+              ]
+            }
+          },
+          {
+            "name": "token_id",
+            "type": {
+              "array": [
+                "u8",
+                16
               ]
             }
           },

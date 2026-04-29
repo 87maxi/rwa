@@ -8,6 +8,85 @@
   },
   "instructions": [
     {
+      "name": "check_identity",
+      "docs": [
+        "Check if a wallet has a registered identity (for CPI from compliance-aggregator)",
+        "Returns true if the wallet is KYC verified, false otherwise"
+      ],
+      "discriminator": [
+        19,
+        37,
+        17,
+        244,
+        97,
+        193,
+        32,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "docs": [
+            "Registry PDA (for authorization)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity_account",
+          "docs": [
+            "IdentityAccount PDA (read-only)",
+            "If this account exists and is properly initialized, the wallet is KYC verified"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet"
+        }
+      ],
+      "args": [],
+      "returns": "bool"
+    },
+    {
       "name": "initialize",
       "docs": [
         "Initialize a new identity registry"
@@ -176,7 +255,8 @@
     {
       "name": "register_identity_with_data",
       "docs": [
-        "Register a new identity with string-based identity data (MEDIUM-01: with length validation)"
+        "Register a new identity with string-based identity data (MEDIUM-01: with length validation)",
+        "P2-8: Eliminated unnecessary String clones by reordering operations"
       ],
       "discriminator": [
         108,
