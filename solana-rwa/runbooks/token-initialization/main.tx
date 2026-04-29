@@ -1,7 +1,8 @@
 ################################################################
 # Token Initialization Runbook
 # Initializes the RWA token after deployment.
-# Creates the TokenState PDA derived from seeds ["token", payer].
+# Creates the TokenState PDA derived from seeds ["token", payer, token_id].
+# Multi-token: Each wallet can create multiple tokens with different token_ids.
 # =============================================================================
 
 addon "svm" {
@@ -30,6 +31,10 @@ variable "token_decimals" {
     value = input.token_decimals
 }
 
+variable "token_id" {
+    value = input.token_id
+}
+
 # Load program artifacts from Anchor project (includes IDL)
 variable "solana_rwa_program" {
     value = svm::get_program_from_anchor_project("solana_rwa")
@@ -43,7 +48,7 @@ action "initialize_token" "svm::process_instructions" {
         program_id = variable.solana_rwa_program_id
         program_idl = variable.solana_rwa_program.idl
         instruction_name = "initialize"
-        instruction_args = [variable.token_name, variable.token_symbol, variable.token_decimals]
+        instruction_args = [variable.token_name, variable.token_symbol, variable.token_decimals, variable.token_id]
 
         payer {
             public_key = signer.payer.public_key
