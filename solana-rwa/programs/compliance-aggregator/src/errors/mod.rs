@@ -41,4 +41,8 @@ pub enum ErrorCode {
     /// Compliance check failed: max transfer exceeded
     #[msg("Transfer amount exceeded")]
     TransferAmountExceeded,
+
+    /// Module array is full - cannot add more modules
+    #[msg("Module array is full")]
+    ModuleArrayFull,
 }

@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 /// ComplianceAggregatorState is the control account for the compliance aggregator.
 /// It is stored as a PDA with seeds [b"aggregator"].
+/// Note: zero_copy was considered but requires AccountLoader<T> instead of Account<T>,
+/// which would require refactoring all instruction handlers. Keeping #[account] for now.
 #[account]
 pub struct ComplianceAggregatorState {
     pub owner: Pubkey,          // Who created this aggregator
