@@ -1,6 +1,15 @@
 # Solana RWA Token Platform
 
-Plataforma completa de tokenización de **Real World Assets (RWA)** sobre Solana con cumplimiento regulatorio integrado. Construida con Anchor Framework (Rust) para los smart contracts y Next.js para la interfaz web. Permite crear, gestionar y transferir tokens de seguridad con controles KYC/AML, restricciones de transferencia y módulos de cumplimiento extensibles.
+Plataforma completa de tokenización de **Real World Assets (RWA)** sobre Solana con cumplimiento regulatorio integrado y **soporte multi-token**. Construida con Anchor Framework (Rust) para los smart contracts y Next.js para la interfaz web. Permite crear, gestionar y transferir múltiples tokens de seguridad desde una misma wallet con controles KYC/AML, restricciones de transferencia y módulos de cumplimiento extensibles.
+
+## ✨ Novedades Multi-Token
+
+**Cada wallet puede ahora crear y gestionar múltiples tokens diferenciados por `token_id`:**
+
+- **Seeds PDA**: `[b"token", owner, token_id]` - permite un TokenState PDA único por combinación wallet+token_id
+- **token_id**: Identificador de 16 bytes (alfanumérico, guiones y underscores) que diferencia tokens del mismo owner
+- **Gestión**: La página `/manage` incluye un selector para cambiar entre tokens del wallet conectado
+- **Compatibilidad**: Todos los balances, agentes y estados de congelación se derivan dinámicamente del TokenState seleccionado
 
 ## 🎯 Características Principales
 
@@ -20,7 +29,7 @@ Gestiona el ciclo de vida completo de un token RWA con arquitectura basada en **
 
 | Instrucción | Permisos Requeridos | Descripción |
 |-------------|---------------------|-------------|
-| `initialize(name, symbol, decimals)` | Owner (payer) | Crea el TokenState PDA con los parámetros del token. Establece al caller como owner y freeze_authority |
+| `initialize(name, symbol, decimals, token_id)` | Owner (payer) | Crea el TokenState PDA con los parámetros del token. Seeds: `[b"token", owner, token_id]`. Establece al caller como owner y freeze_authority |
 | `mint(to, amount)` | Agent autorizado | Emite nuevos tokens hasta el límite MAX_SUPPLY. Actualiza el balance PDA del destinatario y el total_supply |
 | `burn(from, amount)` | Agent autorizado | Destruye tokens de un balance específico. Reduce el total_supply proporcionalmente |
 | `transfer(from, to, amount)` | Sender (signer) | Transfiere tokens entre balances PDAs. Valida saldo suficiente y rechaza montos cero |
@@ -33,7 +42,7 @@ Gestiona el ciclo de vida completo de un token RWA con arquitectura basada en **
 | `get_supply_info()` | Público | Retorna SupplyInfo con total_supply, max_supply y remaining_supply sin modificar estado |
 
 **Modelo de datos:**
-- **TokenState** (PDA): Estado principal con owner, freeze_authority, name, symbol, decimals, total_supply y bump
+- **TokenState** (PDA `[b"token", owner, token_id]`): Estado principal con owner, freeze_authority, name, symbol, decimals, **token_id**, total_supply y bump (136 bytes)
 - **BalanceEntry** (PDA por wallet): Balance individual derivado de `[b"balance", token, wallet]`
 - **FrozenEntry** (PDA por wallet): Estado de congelación derivado de `[b"frozen", token, wallet]`
 - **AgentEntry** (PDA por agente): Registro de agente derivado de `[b"agent", token, agent]`
@@ -85,8 +94,8 @@ Interfaz completa para gestión de tokens RWA con conexión a wallets Solana:
 | Página | Funcionalidad |
 |--------|---------------|
 | **/** (Home) | Landing page con overview de la plataforma, características y navegación a Deploy/Manage |
-| **/deploy** | Formulario de despliegue de tokens con validación de parámetros (name, symbol, decimals) y conexión wallet |
-| **/manage** | Dashboard completo de gestión: transferencias, mint/burn, freeze/unfreeze, gestión de agentes, transferencia de ownership, módulos de compliance y registro de identidades |
+| **/deploy** | Formulario de despliegue de tokens con validación de parámetros (name, symbol, decimals, **token_id**) y conexión wallet |
+| **/manage** | Dashboard completo de gestión con **selector multi-token**: transferencias, mint/burn, freeze/unfreeze, gestión de agentes, transferencia de ownership, módulos de compliance y registro de identidades |
 
 **Componentes de Wallet:**
 - **WalletProvider**: Contexto global con gestión de conexión, desconexión y firma de transacciones
@@ -274,10 +283,12 @@ classDiagram
         +Pubkey freeze_authority
         +string name~32~
         +string symbol~8~
+        +string token_id~16~
         +u8 decimals
         +u64 total_supply
-        +u64 bump
-        +initialize()
+        +u8 bump
+        PDA~[b"token", owner, token_id]~
+        +initialize(name, symbol, decimals, token_id)
         +mint()
         +burn()
         +transfer()
@@ -293,24 +304,24 @@ classDiagram
     class BalanceEntry {
         +Pubkey wallet
         +u64 balance
-        PDA: [b"balance", token, wallet]
+        PDA~[b"balance", token, wallet]~
     }
     
     class FrozenEntry {
         +Pubkey wallet
         +bool frozen
-        PDA: [b"frozen", token, wallet]
+        PDA~[b"frozen", token, wallet]~
     }
     
     class AgentEntry {
         +Pubkey agent
-        PDA: [b"agent", token, agent]
+        PDA~[b"agent", token, agent]~
     }
     
     class IdentityRegistryState {
         +Pubkey owner
         +u64 registry_bump
-        PDA: [b"registry"]
+        PDA~[b"registry"]~
         +initialize()
     }
     
@@ -322,7 +333,7 @@ classDiagram
         +string identity_data~64~
         +string metadata_uri~128~
         +u64 bump
-        PDA: [b"identity", registry, owner]
+        PDA~[b"identity", registry, owner]~
         +register_identity()
         +register_with_data()
         +update_identity()
@@ -332,7 +343,7 @@ classDiagram
     class AggregatorState {
         +Pubkey owner
         +u64 aggregator_bump
-        PDA: [b"aggregator"]
+        PDA~[b"aggregator"]~
         +initialize()
         +get_state()
     }
@@ -342,7 +353,7 @@ classDiagram
         +u64 module_count
         +Pubkey[10] modules
         +u64 bump
-        PDA: [b"token_compliance", aggregator, token]
+        PDA~[b"token_compliance", aggregator, token]~
         +add_module()
         +remove_module()
         +can_transfer()
@@ -356,7 +367,7 @@ classDiagram
     AggregatorState "1" -- "*" TokenComplianceAccount : aggregates
     TokenComplianceAccount "*" -- "*" TokenComplianceAccount : modules
     
-    note for TokenState "Program: solana-rwa\n2XuB3ngjvJkMTxB82eM9NszBUGNovjuJUs4mzdez7EEX"
+    note for TokenState "Program: solana-rwa\nMulti-token: [b''token'', owner, token_id]\n136 bytes total"
     note for IdentityAccount "Program: identity-registry\n5SeHm9i7CcgHqF9UBYBtGbzqf3F3FWFETQF8AxfU2Rce"
     note for TokenComplianceAccount "Program: compliance-aggregator\n7cURjJvyf3oe6JsuVxS9EiVHKNauiFj7Gao3THzZSnpb"
 ```
@@ -423,7 +434,7 @@ sequenceDiagram
     
     Dev->>CLI: txtx run token-initialization
     CLI->>Surfpool: Ejecutar runbook
-    Surfpool->>Programs: initialize(name, symbol, decimals)
+    Surfpool->>Programs: initialize(name, symbol, decimals, token_id)
     Programs-->>Validator: TokenState PDA creado
     
     Dev->>CLI: txtx run compliance-initialization
@@ -445,9 +456,9 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> NoInicializado: Despliegue del programa
     
-    NoInicializado --> Inicializado: initialize(name, symbol, decimals)
+    NoInicializado --> Inicializado: initialize(name, symbol, decimals, token_id)
     note right of Inicializado
-        TokenState PDA creado
+        TokenState PDA creado con seeds [b"token", owner, token_id]
         Owner y FreezeAuthority asignados
         total_supply = 0
     end note
@@ -613,9 +624,12 @@ solana airdrop 100 <YOUR_WALLET_ADDRESS>
    - **Token Name**: Nombre del token (máx. 32 caracteres)
    - **Symbol**: Símbolo del token (máx. 8 caracteres)
    - **Decimals**: Precisión decimal (0-18, típico: 9)
+   - **Token ID**: Identificador único (máx. 16 caracteres, alfanumérico/guiones/underscores)
 4. Haz clic en "Deploy Token"
 5. Confirma la transacción en tu wallet
 6. Espera la confirmación on-chain (~10-30 segundos)
+
+> **Nota Multi-Token**: Puedes crear múltiples tokens desde la misma wallet usando diferentes `token_id`. Cada token tiene su propio TokenState PDA, balances, agentes y estados de congelación independientes.
 
 ### Gestionar Tokens (Página /manage)
 
@@ -662,11 +676,12 @@ solana airdrop 100 <YOUR_WALLET_ADDRESS>
 
 ### Protecciones On-Chain
 
-- **Derivación PDA**: Todos los balances y estados usan PDAs con seeds verificadas, previniendo manipulación de cuentas
+- **Derivación PDA multi-token**: TokenState usa seeds `[b"token", owner, token_id]` para aislamiento completo entre tokens del mismo owner
+- **Seeds dinámicas**: Todas las instrucciones derivan PDAs desde el TokenState cargado (`token.load()?.owner`, `token.load()?.token_id`)
 - **Validación de signers**: Cada instrucción verifica que el caller tenga el rol requerido
 - **Protección contra overflow**: Operaciones aritméticas con `checked_add`/`checked_sub` y límites MAX_SUPPLY
 - **Prevención de duplicados**: Validación de agentes e identidades duplicadas
-- **Validación de strings**: Límites de longitud en todos los campos de texto (identity-registry)
+- **Validación de strings**: Límites de longitud en todos los campos de texto (identity-registry y token_id)
 - **Separación de autoridades**: Owner y Freeze Authority son roles independientes para gobernanza segura
 
 ### Suite de Tests
@@ -732,7 +747,7 @@ npm run build
 | Componente | Tecnología |
 |------------|------------|
 | Language | Rust |
-| Framework | Anchor 0.30.x |
+| Framework | Anchor 0.32.1 |
 | Testing | Cargo test (Rust) + Mocha/Chai (TypeScript) |
 | Deployment | Surfpool + txtx runbooks |
 
@@ -746,6 +761,7 @@ npm run build
 | Wallets | @solana/wallet-adapter + wallet-standard |
 | State | @tanstack/react-query |
 | Blockchain | @solana/web3.js |
+| Multi-Token | Selector token_id en /manage para gestionar múltiples tokens |
 
 ## 📝 Variables de Entorno
 
@@ -784,6 +800,7 @@ Este proyecto es con fines educativos y de demostración. Para uso en producció
 | Métrica | Valor |
 |---------|-------|
 | Smart Contracts | 3 programas Anchor |
+| Arquitectura Multi-Token | Soporte completo (seeds `[b"token", owner, token_id]`) |
 | Tests Unitarios (Rust) | 62 tests (100% passing) |
 | Tests de Seguridad (TS) | 42+ casos (SC-001 a SC-042) |
 | Páginas Frontend | 3 (Home, Deploy, Manage) |
