@@ -9,7 +9,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import type { TokenInfo } from '@/hooks/useTokenList';
 
 // ============================================================================
@@ -68,13 +68,90 @@ export function TokenDetails({
   onClose,
   onManage,
 }: TokenDetailsProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const circulatingSupply = token.totalSupply - token.balance;
 
+  // Focus trap and ESC handler
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    // Focus first focusable element
+    const focusableElements = modal.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0] as HTMLElement;
+    firstElement?.focus();
+
+    // ESC handler
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // Focus trap
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const focusable = Array.from(modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )) as HTMLElement[];
+
+      if (focusable.length === 0) return;
+
+      const firstFocusable = focusable[0];
+      const lastFocusable = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstFocusable) {
+          e.preventDefault();
+          lastFocusable.focus();
+        }
+      } else {
+        if (document.activeElement === lastFocusable) {
+          e.preventDefault();
+          firstFocusable.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleEsc);
+    document.addEventListener('keydown', handleTab);
+
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.removeEventListener('keydown', handleTab);
+    };
+  }, [onClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  const handleOverlayClick = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface-primary rounded-xl border border-surface-border max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Detalles del token ${token.name}`}
+    >
+      <div
+        className="bg-surface-raised backdrop-blur-xl rounded-xl border border-surface-border max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
+      >
         {/* Header */}
-        <div className="sticky top-0 bg-surface-primary border-b border-surface-border px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
+        <div className="sticky top-0 bg-surface-raised/95 backdrop-blur-xl border-b border-surface-border px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
           <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-surface-primary font-bold text-lg">
               {token.symbol.charAt(0)}
@@ -222,7 +299,7 @@ export function TokenDetails({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-surface-primary border-t border-surface-border px-6 py-4 flex gap-3 rounded-b-xl">
+        <div className="sticky bottom-0 bg-surface-raised/95 backdrop-blur-xl border-t border-surface-border px-6 py-4 flex gap-3 rounded-b-xl">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2.5 bg-surface-secondary text-foreground rounded-lg hover:bg-surface-hover transition-colors font-medium"
