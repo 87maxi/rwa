@@ -3,527 +3,533 @@
 # Solana RWA - Deployment Script
 # =============================================================================
 #
-# This script deploys all three Solana programs using `solana program deploy`
-# with fixed keypairs that match the declare_id!() in each program.
-#
-# Workflow:
-#   1. Pre-flight checks (verify keypairs exist)
-#   2. Build all programs with anchor build
-#   3. Deploy each program in dependency order using solana program deploy:
-#      a. compliance_aggregator (no dependencies)
-#      b. identity_registry (depends on compliance_aggregator)
-#      c. solana_rwa (depends on both)
-#   4. Generate IDL files for each program
-#   5. Display deployment summary
+# Script para despliegue de programas Solana RWA.
+# La inicialización de PDAs se maneja mediante runbooks de txtx.
 #
 # Usage:
-#   ./deploy.sh                    # Deploy to localnet (default)
-#   ./deploy.sh devnet             # Deploy to devnet
-#   ./deploy.sh mainnet            # Deploy to mainnet
-#   ./deploy.sh --reset            # Reset validator and deploy to localnet
+#   ./deploy.sh [build|deploy|verify|status|reset] [network]
 #
-# Prerequisites:
-#   - Anchor CLI installed: cargo install anchor-cli
-#   - Solana CLI installed: https://docs.solana.com/cli/install
-#   - Keypairs generated: ./scripts/setup-keypairs.sh (REQUIRED for localnet)
-#   - For localnet: surfpool/solana-test-validator running
+# Subcomandos:
+#   build    - Compilar programas con anchor build
+#   deploy   - Desplegar programas con solana program deploy
+#   verify   - Verificar consistencia de program IDs
+#   status   - Mostrar estado del despliegue
+#   reset    - Reiniciar validator con estado limpio (localnet only)
 #
-# Setup (one-time):
-#   ./scripts/setup-keypairs.sh    # Generate keypairs and update declare_id!()
-#   anchor build                   # Build programs
-#   ./deploy.sh                    # Deploy to localnet
+# Networks:
+#   localnet   - Desarrollo local con surfpool (default)
+#   devnet     - Red de pruebas de Solana
+#   mainnet    - Red principal de Solana
+#
+# Ejemplos:
+#   ./deploy.sh deploy localnet    # Deploy a localnet
+#   ./deploy.sh deploy devnet      # Deploy a devnet
+#   ./deploy.sh verify localnet    # Verificar consistencia
+#   txtx run compliance-initialization --env localnet  # Init compliance
+#   txtx run identity-initialization --env localnet    # Init identity
+#   txtx run token-initialization --env localnet       # Init token
 #
 # =============================================================================
 
-set -e          # Exit on error
-set -o pipefail  # Catch pipeline errors
+set -euo pipefail
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Program names (directory names under programs/)
-# Note: Directory names use hyphens, but anchor deploy uses underscores
-PROGRAMS_DIR=("compliance-aggregator" "identity-registry" "solana-rwa")
-PROGRAMS_ANCHOR=("compliance_aggregator" "identity_registry" "solana_rwa")
+# Default values
+SUBCOMMAND="${1:-deploy}"
+NETWORK="${2:-localnet}"
 
-# Keypairs directory (for localnet deployment)
-KEYPAIRS_DIR="keys"
+# Program configuration (anchor generates binaries with snake_case names)
+PROGRAM_NAMES=("compliance_aggregator" "identity_registry" "solana_rwa")
+PROGRAMS=("${PROGRAM_NAMES[@]}")
 
-# Default network - parse from arguments
-NETWORK="localnet"
+# Directories
+KEYS_DIR="keys"
+ANCHOR_TOML="Anchor.toml"
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 print_header() {
     echo ""
     echo "============================================================="
     echo " $1"
     echo "============================================================="
-    echo ""
+}
+
+usage() {
+    cat <<EOF
+Solana RWA - Deployment Script
+
+Usage: ./deploy.sh [subcommand] [network]
+
+Subcommands:
+  build      Compile programs with anchor build
+  deploy     Deploy programs with solana program deploy
+  verify     Verify program ID consistency
+  status     Show deployment status
+  reset      Restart validator with clean state (localnet only)
+
+Networks:
+  localnet   Local development with surfpool (default)
+  devnet     Solana testnet
+  mainnet    Solana mainnet
+
+Examples:
+  ./deploy.sh deploy localnet          # Deploy to localnet
+  ./deploy.sh deploy devnet            # Deploy to devnet
+  ./deploy.sh verify localnet          # Verify consistency
+  ./deploy.sh status localnet          # Show status
+  ./deploy.sh reset localnet           # Reset validator
+
+After deployment, initialize PDAs with txtx:
+  txtx run compliance-initialization --env localnet
+  txtx run identity-initialization --env localnet
+  txtx run token-initialization --env localnet
+EOF
 }
 
 # =============================================================================
-# Pre-flight Checks
+# Helper: Check Validator Running
 # =============================================================================
 
-preflight_checks() {
-    print_header "Running Pre-flight Checks"
-
-    # Check Anchor CLI
-    if ! command -v anchor &> /dev/null; then
-        log_error "Anchor CLI not found. Install it with: cargo install anchor-cli"
-        exit 1
-    fi
-    log_info "Anchor CLI version: $(anchor --version)"
-
-    # Check Solana CLI
-    if ! command -v solana &> /dev/null; then
-        log_error "Solana CLI not found. Install it with: sh -c \"\$(curl -sSfL https://release.solana.com/stable/install)\""
-        exit 1
-    fi
-    log_info "Solana CLI version: $(solana --version)"
-
-    # Check Anchor.toml exists
-    if [ ! -f "Anchor.toml" ]; then
-        log_error "Anchor.toml not found. Run this script from the solana-rwa directory."
-        exit 1
-    fi
-    log_success "Anchor.toml found"
-
-    # Check programs exist (use directory names with hyphens)
-    for program_dir in "${PROGRAMS_DIR[@]}"; do
-        if [ ! -d "programs/$program_dir" ]; then
-            log_error "Program directory 'programs/$program_dir' not found"
-            exit 1
-        fi
-    done
-    log_success "All program directories found"
-
-    # Check keypairs exist for localnet
-    if [ "$NETWORK" = "localnet" ] || [ "$NETWORK" = "localhost" ]; then
-        log_info "Checking keypairs for localnet deployment..."
-        for program in "${PROGRAMS_ANCHOR[@]}"; do
-            local keypair_file="$KEYPAIRS_DIR/${program}.json"
-            if [ ! -f "$keypair_file" ]; then
-                log_error "Keypair file not found: $keypair_file"
-                log_info "Run: ./scripts/setup-keypairs.sh"
-                log_info "This will generate fixed keypairs that match declare_id!() in each program"
-                exit 1
-            fi
-            # Verify keypair pubkey matches expected
-            local pubkey
-            pubkey=$(solana-keygen pubkey "$keypair_file" 2>/dev/null)
-            log_success "  ${program}: ${pubkey}"
-        done
-        log_success "All keypairs found and verified"
-    else
-        # Check wallet exists for non-localnet (use default id.json)
-        WALLET_PATH="$HOME/.config/solana/id.json"
-        if [ ! -f "$WALLET_PATH" ]; then
-            log_error "Wallet file not found: $WALLET_PATH"
-            log_info "Create or download your devnet/mainnet wallet first"
-            log_info "Or set SOLANA_KEYPAIR_FILE environment variable"
-            exit 1
-        fi
-        log_success "Wallet file found: $WALLET_PATH"
-        
-        # Check wallet has sufficient balance for deployment
-        log_info "Checking wallet balance for ${NETWORK}..."
-        local balance
-        balance=$(solana -u "$NETWORK" balance 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)?' | head -1 || echo "0")
-        log_info "Wallet balance: ${balance} SOL"
-        
-        if [ "$NETWORK" = "mainnet" ]; then
-            log_warning "Mainnet deployment requires significant SOL (~1-2 SOL per program)"
-            log_warning "Make sure you have sufficient balance"
-        fi
-    fi
-}
-
-# =============================================================================
-# Start Validator (localnet only)
-# =============================================================================
-
-start_validator() {
-    if [ "$NETWORK" != "localnet" ]; then
-        return
+check_validator_running() {
+    # Check surfpool process
+    if ps aux | grep -v grep | grep -q "surfpool"; then
+        return 0
     fi
 
-    print_header "Starting Localnet Validator"
-
-    # Check if validator or surfpool is already running
-    check_health() {
-        # Check for surfpool process
-        if ps aux | grep -v grep | grep -q "surfpool"; then
-            return 0
-        fi
-        # Try solana slot (works with newer solana CLI versions)
-        if solana -u localhost slot 2>/dev/null | grep -qE '^[0-9]+'; then
-            return 0
-        fi
-        # Try curl to localhost:8899 (standard surfpool/solana-test-validator RPC port)
-        if curl -s -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}' http://localhost:8899 2>/dev/null | grep -qE '"result":[0-9]+'; then
-            return 0
-        fi
-        return 1
-    }
-
-    if check_health; then
-        log_info "Localnet validator is already running"
-        # Detect which one is running
-        if ps aux | grep -v grep | grep -q "surfpool"; then
-            log_info "Detected: surfpool"
-        else
-            log_info "Detected: solana-test-validator"
-        fi
-    else
-        if [ "$1" = "--reset" ]; then
-            log_info "Starting fresh validator with --reset..."
-            solana-test-validator --reset 2>/dev/null &
-            log_warning "Validator starting in background..."
-            log_info "Waiting 15 seconds for validator to initialize..."
-            sleep 15
-        else
-            log_warning "No validator running."
-            log_info "Use ./deploy.sh --reset for a fresh start"
-            log_info "Or start manually:"
-            log_info "  solana-test-validator --reset"
-            log_info "  OR: surfpool start"
-            exit 1
-        fi
+    # Check RPC endpoint
+    if curl -s -X POST -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}' \
+        http://localhost:8899 2>/dev/null | grep -qE '"result":[0-9]+'; then
+        return 0
     fi
 
-    # Verify validator is running
-    if check_health; then
-        log_success "Validator is healthy"
-        # Try to get slot
-        local slot=$(solana -u localhost slot 2>/dev/null | head -1)
-        if [ -n "$slot" ] && echo "$slot" | grep -qE '^[0-9]+'; then
-            log_info "Current slot: $slot"
-        else
-            # Try curl method
-            slot=$(curl -s -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}' http://localhost:8899 2>/dev/null | grep -oE '"result":[0-9]+' | cut -d: -f2)
-            if [ -n "$slot" ]; then
-                log_info "Current slot: $slot"
-            fi
-        fi
-    else
-        log_error "Validator is not responding. Please start it manually:"
-        log_info "  solana-test-validator --reset"
-        log_info "  OR: surfpool start"
-        exit 1
+    # Check solana CLI
+    if solana -u localhost slot 2>/dev/null | grep -qE '^[0-9]+'; then
+        return 0
     fi
-}
 
-# =============================================================================
-# Build Programs
-# =============================================================================
-
-build_programs() {
-    print_header "Building Programs"
-
-    log_info "Running: anchor build"
-    if anchor build; then
-        log_success "All programs built successfully"
-        
-        # List built programs (use anchor program names with underscores)
-        echo ""
-        log_info "Built programs:"
-        for program in "${PROGRAMS_ANCHOR[@]}"; do
-            if [ -f "target/deploy/${program}.so" ]; then
-                local size=$(du -h "target/deploy/${program}.so" | cut -f1)
-                log_success "  ${program}.so (${size})"
-            else
-                log_error "  ${program}.so not found in target/deploy/"
-            fi
-        done
-    else
-        log_error "Build failed. Check for compilation errors above."
-        exit 1
-    fi
-}
-
-# =============================================================================
-# Deploy Programs using solana program deploy with fixed keypairs
-# =============================================================================
-
-# Store deployed program IDs for later use
-declare -A DEPLOYED_PROGRAM_IDS
-
-# Keypairs directory
-KEYPAIRS_DIR="keys"
-
-# Wait for validator to be ready before deployment
-wait_for_validator() {
-    local max_attempts=30
-    local attempt=1
-    
-    log_info "Waiting for validator to be ready..."
-    while [ $attempt -le $max_attempts ]; do
-        if curl -s -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}' http://localhost:8899 2>/dev/null | grep -qE '"result":[0-9]+'; then
-            log_success "Validator is ready"
-            return 0
-        fi
-        log_warning "Validator not ready, waiting... (attempt $attempt/$max_attempts)"
-        sleep 2
-        attempt=$((attempt + 1))
-    done
-    
-    log_error "Validator not ready after $max_attempts attempts"
     return 1
 }
 
-deploy_program() {
-    local program_name=$1
-    local network=$2
-    
-    print_header "Deploying: ${program_name}"
+# =============================================================================
+# Subcommand: build
+# =============================================================================
 
-    local program_file="target/deploy/${program_name}.so"
-    local keypair_file="$KEYPAIRS_DIR/${program_name}.json"
+cmd_build() {
+    print_header "Building Programs"
     
-    # Check if program file exists
-    if [ ! -f "$program_file" ]; then
-        log_error "Program file not found: $program_file"
-        log_info "Run: anchor build"
-        exit 1
-    fi
-    
-    # Check if keypair file exists (must be generated by setup-keypairs.sh)
-    if [ ! -f "$keypair_file" ]; then
-        log_error "Keypair file not found: $keypair_file"
-        log_info "Run: ./scripts/setup-keypairs.sh"
-        exit 1
-    fi
-
-    log_info "Deploying ${program_name} to ${network}..."
-    log_info "Program: $program_file"
-    log_info "Keypair: $keypair_file"
-    
-    # Wait for validator to be ready before deploying (localnet only)
-    if [ "$network" = "localnet" ] || [ "$network" = "localhost" ]; then
-        wait_for_validator || return 1
-    fi
-    
-    # Use solana program deploy with fixed keypair
-    # This avoids the DeclaredProgramIdMismatch error from anchor deploy
-    local deploy_output
-    local deploy_exit=1
-    local max_retries=3
-    local retry=0
-    
-    # Build solana command with network-specific flags
-    local solana_url_flag=""
-    local solana_keypair_flag=""
-    
-    if [ "$network" = "devnet" ]; then
-        solana_url_flag="--url devnet"
-    elif [ "$network" = "mainnet" ]; then
-        solana_url_flag="--url mainnet-beta"
-    elif [ "$network" = "localnet" ] || [ "$network" = "localhost" ]; then
-        solana_url_flag="--url localhost"
-    fi
-    
-    # Use SOLANA_KEYPAIR_FILE if set, otherwise default
-    if [ -n "$SOLANA_KEYPAIR_FILE" ]; then
-        solana_keypair_flag="--keypair $SOLANA_KEYPAIR_FILE"
-    fi
-    
-    while [ $retry -lt $max_retries ] && [ $deploy_exit -ne 0 ]; do
-        deploy_output=$(solana program deploy \
-            $solana_url_flag \
-            $solana_keypair_flag \
-            --program-id "$keypair_file" \
-            "$program_file" 2>&1)
-        deploy_exit=$?
+    log_info "Running: anchor build"
+    if anchor build 2>&1; then
+        log_success "Build completed successfully"
         
-        if [ $deploy_exit -ne 0 ]; then
-            # Check if it's a blockhash error
-            if echo "$deploy_output" | grep -q "Blockhash not found"; then
-                log_warning "Blockhash error, retrying... ($((retry + 1))/$max_retries)"
-                sleep 3
-                retry=$((retry + 1))
-                # Wait for validator again
-                if [ "$network" = "localnet" ] || [ "$network" = "localhost" ]; then
-                    wait_for_validator || break
-                fi
+        for program in "${PROGRAM_NAMES[@]}"; do
+            if [ -f "target/deploy/${program}.so" ]; then
+                local size
+                size=$(du -h "target/deploy/${program}.so" | cut -f1)
+                log_success "  ${program}.so (${size})"
             else
-                echo "$deploy_output"
-                break
+                log_warning "  ${program}.so: Not found"
             fi
-        fi
-    done
-    
-    if [ $deploy_exit -ne 0 ]; then
-        echo "$deploy_output"
-        log_error "Deployment failed after $max_retries attempts"
-        return 1
-    fi
-    
-    # Extract program ID from output
-    local deployed_id
-    deployed_id=$(echo "$deploy_output" | grep "Program Id:" | tail -1 | awk '{print $NF}')
-    if [ -n "$deployed_id" ]; then
-        log_info "Deployed Program Id: $deployed_id"
-        DEPLOYED_PROGRAM_IDS["$program_name"]="$deployed_id"
-    fi
-    
-    # Also get the pubkey from keypair as verification
-    local keypair_pubkey
-    keypair_pubkey=$(solana-keygen pubkey "$keypair_file" 2>/dev/null)
-    if [ "$deployed_id" = "$keypair_pubkey" ]; then
-        log_success "Program ID matches keypair: ${deployed_id}"
+        done
     else
-        log_warning "Program ID mismatch! Deployed: ${deployed_id}, Keypair: ${keypair_pubkey}"
+        log_error "Build failed"
+        exit 1
     fi
-    
-    log_success "Program ${program_name} deployed successfully"
 }
 
-deploy_all_programs() {
-    local network=$1
-    
-    print_header "Deploying All Programs to ${network}"
+# =============================================================================
+# Subcommand: deploy
+# =============================================================================
 
-    # Deploy in dependency order (use anchor program names with underscores)
-    for i in "${!PROGRAMS_ANCHOR[@]}"; do
-        local program="${PROGRAMS_ANCHOR[$i]}"
-        local program_dir="${PROGRAMS_DIR[$i]}"
-        log_info "Deploying ${program} (directory: ${program_dir})..."
+cmd_deploy() {
+    print_header "Deploying Programs to ${NETWORK}"
+    
+    # Check validator for localnet
+    if [ "$NETWORK" = "localnet" ] || [ "$NETWORK" = "localhost" ]; then
+        if ! check_validator_running; then
+            log_error "No validator running on ${NETWORK}"
+            log_info "Start: surfpool start"
+            exit 1
+        fi
+    fi
+    
+    for i in "${!PROGRAMS[@]}"; do
+        local program="${PROGRAMS[$i]}"
+        local program_name="${PROGRAM_NAMES[$i]}"
+        local program_file="target/deploy/${program}.so"
+        local keypair_file="$KEYS_DIR/${program}.json"
         
-        # Deploy and capture output
-        local deploy_output
-        deploy_output=$(deploy_program "$program" "$network" 2>&1)
-        echo "$deploy_output"
+        print_header "Deploying: ${program_name}"
         
-        # Add delay between program deployments to avoid blockhash issues
-        if [ $i -lt $((${#PROGRAMS_ANCHOR[@]} - 1)) ]; then
+        if [ ! -f "$keypair_file" ]; then
+            log_error "Keypair not found: $keypair_file"
+            log_info "Generate with: solana-keygen new --no-passphrase --outfile $keypair_file"
+            exit 1
+        fi
+        
+        if [ ! -f "$program_file" ]; then
+            log_error "Program binary not found: $program_file"
+            log_info "Run: ./deploy.sh build first"
+            exit 1
+        fi
+        
+        local expected_id
+        expected_id=$(solana-keygen pubkey "$keypair_file" 2>/dev/null)
+        log_info "Expected Program ID: ${expected_id}"
+        log_info "Keypair: ${keypair_file}"
+        log_info "Binary: ${program_file}"
+        
+        # Build solana deploy command with network-specific flags
+        local solana_args=("--program-id" "$keypair_file" "$program_file")
+        
+        if [ "$NETWORK" = "devnet" ]; then
+            solana_args+=("--url" "devnet")
+        elif [ "$NETWORK" = "mainnet" ]; then
+            solana_args+=("--url" "mainnet-beta")
+        elif [ "$NETWORK" = "localnet" ] || [ "$NETWORK" = "localhost" ]; then
+            solana_args+=("--url" "localhost")
+        fi
+        
+        log_info "Running: solana program deploy ${solana_args[*]}"
+        
+        # Deploy with retry logic for blockhash errors
+        local deploy_output=""
+        local deploy_exit=1
+        local max_retries=3
+        local retry=0
+        
+        while [ $retry -lt $max_retries ] && [ $deploy_exit -ne 0 ]; do
+            deploy_output=$(solana program deploy "${solana_args[@]}" 2>&1)
+            deploy_exit=$?
+            
+            if [ $deploy_exit -ne 0 ]; then
+                if echo "$deploy_output" | grep -q "Blockhash not found\|blockhash not found"; then
+                    log_warning "Blockhash error, retrying... ($((retry + 1))/$max_retries)"
+                    sleep 3
+                    retry=$((retry + 1))
+                    if [ "$NETWORK" = "localnet" ] || [ "$NETWORK" = "localhost" ]; then
+                        if ! check_validator_running; then
+                            log_error "Validator stopped responding"
+                            break
+                        fi
+                    fi
+                else
+                    break
+                fi
+            fi
+        done
+        
+        if [ $deploy_exit -ne 0 ]; then
+            echo "$deploy_output" | tail -10
+            log_error "Failed to deploy ${program_name} after $max_retries attempts"
+            exit 1
+        fi
+        
+        # Extract and verify program ID
+        local deployed_id
+        deployed_id=$(echo "$deploy_output" | grep "Program Id:" | tail -1 | awk '{print $NF}')
+        
+        if [ "$deployed_id" = "$expected_id" ]; then
+            log_success "${program_name} deployed successfully (ID: ${deployed_id})"
+        else
+            log_error "Program ID mismatch! Expected: ${expected_id}, Got: ${deployed_id}"
+            exit 1
+        fi
+        
+        # Brief delay between deployments
+        if [ $i -lt $((${#PROGRAMS[@]} - 1)) ]; then
             log_info "Waiting 3 seconds before next deployment..."
             sleep 3
         fi
-        
-        echo ""
     done
-
-    log_success "All programs deployed successfully!"
-}
-
-# =============================================================================
-# Generate IDLs
-# =============================================================================
-
-generate_idls() {
+    
+    # Generate IDLs
     print_header "Generating IDL Files"
-
-    # Generate IDLs using anchor program names with underscores
-    for program in "${PROGRAMS_ANCHOR[@]}"; do
+    for program in "${PROGRAM_NAMES[@]}"; do
         log_info "Generating IDL for ${program}..."
-        
         if anchor idl build -p "$program" -o "idl_${program}.json" 2>/dev/null; then
-            log_success "IDL generated: idl_${program}.json"
+            log_success "  idl_${program}.json generated"
         else
-            log_warning "Could not generate IDL for ${program} (non-critical)"
+            log_warning "  Could not generate IDL for ${program}"
         fi
     done
-
-    log_success "IDL generation complete"
+    
+    # Show summary
+    print_header "Deployment Summary"
+    log_info "Network: ${NETWORK}"
+    echo ""
+    log_info "Programs deployed:"
+    for program in "${PROGRAM_NAMES[@]}"; do
+        if [ -f "$KEYS_DIR/${program}.json" ]; then
+            local pubkey
+            pubkey=$(solana-keygen pubkey "$KEYS_DIR/${program}.json" 2>/dev/null || echo "unknown")
+            log_success "  ${program}: ${pubkey}"
+        fi
+    done
+    
+    echo ""
+    log_info "Next steps:"
+    log_info "  1. Initialize programs with txtx:"
+    log_info "     txtx run compliance-initialization --env ${NETWORK}"
+    log_info "     txtx run identity-initialization --env ${NETWORK}"
+    log_info "     txtx run token-initialization --env ${NETWORK}"
+    log_info "  2. Verify deployment:  ./deploy.sh verify ${NETWORK}"
 }
 
 # =============================================================================
-# Display Deployment Summary
+# Subcommand: verify
 # =============================================================================
 
-show_summary() {
-    local network=$1
+cmd_verify() {
+    print_header "Verifying Deployment Consistency"
     
-    print_header "Deployment Summary"
-
-    log_info "Network: ${network}"
-    log_info "Programs deployed:"
+    local errors=0
     
-    for program in "${PROGRAMS_ANCHOR[@]}"; do
-        local deployed_id="${DEPLOYED_PROGRAM_IDS[$program]:-N/A}"
-        log_success "  ${program} -> $deployed_id"
+    # Check Anchor.toml exists
+    if [ ! -f "$ANCHOR_TOML" ]; then
+        log_error "$ANCHOR_TOML not found"
+        ((errors++))
+    fi
+    
+    # Extract program IDs from Anchor.toml
+    log_info "Checking program IDs consistency..."
+    for program in "${PROGRAM_NAMES[@]}"; do
+        local id
+        id=$(grep -A1 "\[${program}\]" "$ANCHOR_TOML" 2>/dev/null | grep -oE '"[a-zA-Z0-9]{44}"' | tr -d '"' || echo "")
+        if [ -z "$id" ]; then
+            id=$(grep "${program} = " "$ANCHOR_TOML" 2>/dev/null | grep -oE '"[a-zA-Z0-9]{44}"' | tr -d '"' || echo "")
+        fi
+        
+        if [ -z "$id" ]; then
+            log_warning "  ${program}: ID not found in Anchor.toml"
+        else
+            log_success "  ${program}: ${id}"
+        fi
     done
     
-    log_info ""
-    log_info "Next steps:"
-    log_info "  1. Run initialization: ./init.sh"
-    log_info "  2. Run token operations: txtx run token-operations --env ${network}"
-    log_info "  3. Verify programs: solana -u ${network} program show <program-id>"
+    # Check keypair consistency
+    log_info "Checking keypair consistency..."
+    for program in "${PROGRAM_NAMES[@]}"; do
+        local keypair_file="$KEYS_DIR/${program}.json"
+        
+        if [ -f "$keypair_file" ]; then
+            local pubkey
+            pubkey=$(solana-keygen pubkey "$keypair_file" 2>/dev/null || echo "ERROR")
+            if [ "$pubkey" = "ERROR" ]; then
+                log_error "  ${program}: Failed to read keypair"
+                ((errors++))
+            else
+                log_success "  ${program}: ${pubkey}"
+            fi
+        else
+            log_warning "  ${program}: Keypair not found ($keypair_file)"
+        fi
+    done
     
-    if [ "$network" = "localnet" ]; then
-        log_info ""
-        log_info "Note: Program IDs are fixed (from keypairs generated by setup-keypairs.sh)"
-        log_info "These IDs match declare_id!() in each program and Anchor.toml"
+    # Check IDL files
+    log_info "Checking IDL files..."
+    for program in "${PROGRAM_NAMES[@]}"; do
+        local idl_file="idl_${program}.json"
+        if [ -f "$idl_file" ]; then
+            local idl_address
+            idl_address=$(grep '"address"' "$idl_file" 2>/dev/null | head -1 | grep -oE '"[a-zA-Z0-9]{44}"' | tr -d '"' || echo "")
+            if [ -n "$idl_address" ]; then
+                log_success "  ${program}: IDL address = ${idl_address}"
+            else
+                log_warning "  ${program}: Could not read IDL address"
+            fi
+        else
+            log_warning "  ${program}: IDL file not found ($idl_file)"
+        fi
+    done
+    
+    echo ""
+    if [ $errors -gt 0 ]; then
+        log_error "Verification completed with ${errors} error(s)"
+        return 1
+    else
+        log_success "Verification completed - all checks passed"
+        return 0
     fi
 }
 
 # =============================================================================
-# Main Execution
+# Subcommand: status
+# =============================================================================
+
+cmd_status() {
+    print_header "Deployment Status"
+    
+    # Check tools
+    log_info "Installed tools:"
+    for cmd in anchor solana surfpool txtx; do
+        if command -v "$cmd" &>/dev/null; then
+            local version
+            version=$("$cmd" --version 2>/dev/null | head -1 || echo "unknown")
+            log_success "  ${cmd}: ${version}"
+        else
+            log_warning "  ${cmd}: not installed"
+        fi
+    done
+    
+    # Check keypairs
+    echo ""
+    log_info "Keypairs:"
+    for program in "${PROGRAM_NAMES[@]}"; do
+        if [ -f "$KEYS_DIR/${program}.json" ]; then
+            local pubkey
+            pubkey=$(solana-keygen pubkey "$KEYS_DIR/${program}.json" 2>/dev/null || echo "unknown")
+            log_success "  ${program}: ${pubkey}"
+        else
+            log_warning "  ${program}: not found"
+        fi
+    done
+    
+    # Check built programs
+    echo ""
+    log_info "Built programs:"
+    for program in "${PROGRAM_NAMES[@]}"; do
+        if [ -f "target/deploy/${program}.so" ]; then
+            local size
+            size=$(du -h "target/deploy/${program}.so" | cut -f1)
+            log_success "  ${program}.so (${size})"
+        else
+            log_warning "  ${program}.so: not built"
+        fi
+    done
+    
+    # Check IDLs
+    echo ""
+    log_info "IDL files:"
+    for program in "${PROGRAM_NAMES[@]}"; do
+        if [ -f "idl_${program}.json" ]; then
+            log_success "  idl_${program}.json"
+        else
+            log_warning "  idl_${program}.json: not found"
+        fi
+    done
+    
+    # Check validator
+    echo ""
+    log_info "Validator status:"
+    if check_validator_running; then
+        log_success "  Validator is running"
+    else
+        log_warning "  No validator running"
+    fi
+}
+
+# =============================================================================
+# Subcommand: reset (restart validator with clean state)
+# =============================================================================
+
+cmd_reset() {
+    print_header "Resetting Localnet Validator"
+    
+    if [ "$NETWORK" != "localnet" ] && [ "$NETWORK" != "localhost" ]; then
+        log_error "Reset is only available for localnet"
+        exit 1
+    fi
+    
+    # Stop any running validator
+    log_info "Stopping any running validator..."
+    pkill -f surfpool 2>/dev/null || true
+    pkill -f solana-test-validator 2>/dev/null || true
+    sleep 3
+    
+    # Clean test ledger
+    if [ -d ".surfpool/test-ledger" ]; then
+        log_info "Cleaning test ledger..."
+        rm -rf .surfpool/test-ledger
+    fi
+    
+    # Start fresh validator
+    log_info "Starting fresh validator with --reset..."
+    surfpool start --ci --daemon 2>/dev/null || {
+        log_warning "surfpool start --ci failed, trying solana-test-validator..."
+        solana-test-validator --reset --quiet 2>/dev/null &
+    }
+    
+    log_info "Waiting 15 seconds for validator to initialize..."
+    sleep 15
+    
+    if check_validator_running; then
+        log_success "Validator restarted successfully"
+        log_info "Now run: ./deploy.sh deploy localnet"
+    else
+        log_error "Validator failed to start"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# Main Entry Point
 # =============================================================================
 
 main() {
-    local reset_flag=""
+    # Handle --help
+    if [ "$SUBCOMMAND" = "--help" ] || [ "$SUBCOMMAND" = "-h" ]; then
+        usage
+    fi
     
-    # Parse arguments properly
-    for arg in "$@"; do
-        case "$arg" in
-            --reset)
-                reset_flag="--reset"
-                ;;
-            localnet|localhost|devnet|mainnet)
-                NETWORK="$arg"
-                ;;
-            *)
-                log_warning "Unknown argument: $arg"
-                log_info "Usage: ./deploy.sh [localnet|devnet|mainnet] [--reset]"
-                ;;
-        esac
+    # Validate subcommand
+    valid_commands=("build" "deploy" "verify" "status" "reset" "--help" "-h")
+    local valid=false
+    for cmd in "${valid_commands[@]}"; do
+        if [ "$SUBCOMMAND" = "$cmd" ]; then
+            valid=true
+            break
+        fi
     done
-
-    print_header "Solana RWA Deployment"
-    log_info "Starting deployment to ${NETWORK}..."
-    log_info "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-
-    # Run deployment pipeline
-    preflight_checks
-    start_validator $reset_flag
-    build_programs
-    deploy_all_programs "$NETWORK"
-    generate_idls
-    show_summary "$NETWORK"
-
-    print_header "Deployment Complete!"
-    log_success "All steps completed successfully"
-    log_info "Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    
+    if [ "$valid" = false ]; then
+        log_error "Unknown subcommand: $SUBCOMMAND"
+        echo ""
+        usage
+    fi
+    
+    # Validate network
+    valid_networks=("localnet" "localhost" "devnet" "mainnet")
+    local valid_net=false
+    for net in "${valid_networks[@]}"; do
+        if [ "$NETWORK" = "$net" ]; then
+            valid_net=true
+            break
+        fi
+    done
+    
+    if [ "$valid_net" = false ]; then
+        log_error "Unknown network: $NETWORK"
+        echo ""
+        usage
+    fi
+    
+    # Execute subcommand
+    case "$SUBCOMMAND" in
+        build)  cmd_build ;;
+        deploy) cmd_deploy ;;
+        verify) cmd_verify ;;
+        status) cmd_status ;;
+        reset)  cmd_reset ;;
+    esac
 }
 
-# Run main function
 main "$@"
