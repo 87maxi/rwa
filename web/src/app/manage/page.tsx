@@ -19,7 +19,7 @@ import { ManageLayout, ManageTabs, TokenSelector, TokenList, TokenDetails } from
 import { deriveTokenStatePda, deriveFrozenPda } from '@/anchor/pdas';
 import { PublicKey } from '@solana/web3.js';
 import { PROGRAM_IDS, getCurrentNetwork } from '@/config/solana';
-import { useTokenList } from '@/hooks';
+import { useTokenList, useSolanaNotification } from '@/hooks';
 import type { TokenInfo } from '@/hooks/useTokenList';
 
 export default function ManagePage() {
@@ -73,13 +73,15 @@ export default function ManagePage() {
     }
   }, [tokenStatePda, publicKey, programId]);
 
+  const { success: showSuccess, error: showError } = useSolanaNotification();
+
   const handleSuccess = (message: string) => {
-    console.log('[Manage] Success:', message);
+    showSuccess(message);
     refetch();
   };
 
   const handleError = (message: string) => {
-    console.error('[Manage] Error:', message);
+    showError(message);
   };
 
   const handleSelectToken = (token: TokenInfo) => {
@@ -95,7 +97,7 @@ export default function ManagePage() {
 
   const handleNewToken = () => {
     // TODO: Implementar creación de nuevo token
-    console.log('[Manage] Create new token');
+    showSuccess('Token creation coming soon');
   };
 
   const handleCloseDetails = () => {
