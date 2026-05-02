@@ -39,7 +39,6 @@ pub mod tests;
 // Re-exports
 pub use states::*;
 pub use events::*;
-pub use errors::*;
 pub use pdas::*;
 
 // =============================================================================
