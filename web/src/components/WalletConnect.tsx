@@ -110,15 +110,15 @@ export function WalletConnect() {
         </button>
 
         {lastError && (
-          <div className="absolute top-full left-0 right-0 mt-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+          <div className="absolute top-full left-0 right-0 mt-2 px-3 py-2 bg-error/10 border border-error/30 rounded-lg text-error text-xs">
             {lastError.message}
           </div>
         )}
 
         {showDropdown && (
-          <div className="absolute right-0 mt-2 w-64 rounded-xl bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 shadow-2xl z-50 overflow-hidden">
+          <div className="absolute right-0 mt-2 w-64 rounded-xl bg-surface-raised/95 backdrop-blur-xl border border-surface-border shadow-2xl z-50 overflow-hidden">
             <div className="p-2">
-              <p className="text-xs text-gray-400 px-3 py-2 uppercase tracking-wider">Select wallet</p>
+              <p className="text-xs text-foreground-muted px-3 py-2 uppercase tracking-wider">Select wallet</p>
               {availableWallets.length > 0 ? (
                 availableWallets.map((w) => {
                   const option = WALLET_OPTIONS[w.adapter.name];
@@ -126,11 +126,11 @@ export function WalletConnect() {
                     <button
                       key={w.adapter.name}
                       onClick={() => handleConnect(w.adapter.name)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left disabled:opacity-50"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-hover transition-colors text-left disabled:opacity-50"
                       disabled={connecting}
                     >
                       <span className="text-xl">{option?.icon || '💼'}</span>
-                      <span className="text-white font-medium">{w.adapter.name}</span>
+                      <span className="text-foreground font-medium">{w.adapter.name}</span>
                       {w.adapter.icon && (
                         <Image src={w.adapter.icon} alt={w.adapter.name} width={20} height={20} className="ml-auto" />
                       )}
@@ -138,20 +138,20 @@ export function WalletConnect() {
                   );
                 })
               ) : (
-                <div className="px-3 py-4 text-center text-gray-400 text-sm">
+                <div className="px-3 py-4 text-center text-foreground-muted text-sm">
                   No wallet extensions detected
-                  <div className="mt-2 text-xs text-gray-500">
+                  <div className="mt-2 text-xs text-foreground-muted/70">
                     Install Phantom or Solflare
                   </div>
                 </div>
               )}
             </div>
-            <div className="px-3 py-2 border-t border-gray-700/50">
+            <div className="px-3 py-2 border-t border-surface-border">
               <a
                 href="https://phantom.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                className="text-xs text-primary hover:text-primary-light transition-colors"
               >
                 Need a wallet? &rarr;
               </a>
@@ -164,16 +164,16 @@ export function WalletConnect() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span className="text-sm font-mono text-gray-300">{shortAddress}</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-secondary border border-surface-border">
+        <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+        <span className="text-sm font-mono text-foreground-secondary">{shortAddress}</span>
         {selectedWallet && (
-          <span className="text-xs text-gray-500">{selectedWallet}</span>
+          <span className="text-xs text-foreground-muted">{selectedWallet}</span>
         )}
       </div>
       <button
         onClick={handleDisconnect}
-        className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm"
+        className="px-3 py-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors text-sm"
       >
         Disconnect
       </button>
