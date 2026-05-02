@@ -65,46 +65,85 @@ export function parseSupplyInfo(data: Buffer): {
 
 /**
  * Parse TokenState from account data (zero_copy)
- * Structure: owner(32), authority(32), supply(8), index(8), name(32), symbol(10), decimals(1), bump(1), padding(4) = 128 bytes
+ *
+ * IMPORTANT: Anchor adds an 8-byte discriminator at the start.
+ * The actual TokenState struct starts at offset 8.
+ *
+ * ACCOUNT LAYOUT (144 bytes total):
+ * - Offset 0-7:   Anchor discriminator (8 bytes)
+ * - Offset 8-39:  owner: Pubkey (32 bytes)
+ * - Offset 40-71: freeze_authority: Pubkey (32 bytes)
+ * - Offset 72-79: total_supply: u64 (8 bytes)
+ * - Offset 80-111: name: [u8; 32] (32 bytes)
+ * - Offset 112-119: symbol: [u8; 8] (8 bytes)
+ * - Offset 120-135: token_id: [u8; 16] (16 bytes)
+ * - Offset 136: decimals: u8 (1 byte)
+ * - Offset 137: bump: u8 (1 byte)
+ * - Offset 138-143: _padding: [u8; 6] (6 bytes)
+ *
+ * STRUCT LAYOUT (136 bytes, starts at offset 8):
+ * - owner(32), freeze_authority(32), total_supply(8),
+ *   name(32), symbol(8), token_id(16), decimals(1), bump(1), padding(6)
  */
 export function parseTokenState(data: Buffer): {
   owner: string;
   freezeAuthority: string;
   totalSupply: bigint;
-  nextIndex: bigint;
   name: string;
   symbol: string;
+  tokenId: string;
   decimals: number;
   bump: number;
 } {
-  if (data.length < 128) {
-    throw new Error(`Invalid TokenState data length: expected 128, got ${data.length}`);
+  // Anchor discriminator is 8 bytes, struct starts at offset 8
+  const DISCRIMINATOR_SIZE = 8;
+  
+  if (data.length < 144) {
+    throw new Error(`Invalid TokenState data length: expected 144, got ${data.length}`);
   }
-
-  let offset = 0;
+  
+  // Skip Anchor discriminator
+  let offset = DISCRIMINATOR_SIZE;
+  
+  // owner: Pubkey (32 bytes) at offset 8
   const owner = new PublicKey(data.slice(offset, offset + 32)).toBase58();
-  offset += 32;
+  offset += 32; // offset = 40
+  
+  // freeze_authority: Pubkey (32 bytes) at offset 40
   const freezeAuthority = new PublicKey(data.slice(offset, offset + 32)).toBase58();
-  offset += 32;
+  offset += 32; // offset = 72
+  
+  // total_supply: u64 at offset 72
   const totalSupply = BigInt(data.readBigUInt64LE(offset));
-  offset += 8;
-  const nextIndex = BigInt(data.readBigUInt64LE(offset));
-  offset += 8;
+  offset += 8; // offset = 80
+  
+  // name: [u8; 32] at offset 80
   const name = readFixedString(data, offset, 32);
-  offset += 32;
-  const symbol = readFixedString(data, offset, 10);
-  offset += 10;
+  offset += 32; // offset = 112
+  
+  // symbol: [u8; 8] at offset 112
+  const symbol = readFixedString(data, offset, 8);
+  offset += 8; // offset = 120
+  
+  // token_id: [u8; 16] at offset 120
+  const tokenIdBytes = data.slice(offset, offset + 16);
+  const tokenId = Buffer.from(tokenIdBytes).toString('utf-8').trim();
+  offset += 16; // offset = 136
+  
+  // decimals: u8 at offset 136
   const decimals = data[offset];
-  offset += 1;
+  offset += 1; // offset = 137
+  
+  // bump: u8 at offset 137
   const bump = data[offset];
-
+  
   return {
     owner,
     freezeAuthority,
     totalSupply,
-    nextIndex,
     name,
     symbol,
+    tokenId,
     decimals,
     bump,
   };
